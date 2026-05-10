@@ -94,11 +94,18 @@ function findColumns(headers: ExcelRow, matcher: (headerLower: string, header: s
 }
 
 function findCableTypeColumn(headers: ExcelRow): number {
-  return findColumn(headers, headerLower =>
+  const primaryCol = findColumn(headers, headerLower =>
     headerLower.includes('线缆类型') ||
     headerLower.includes('cable type') ||
     headerLower === 'type' ||
     headerLower === '类型'
+  );
+
+  if (primaryCol >= 0) return primaryCol;
+
+  return findColumn(headers, headerLower =>
+    headerLower.includes('接口类型') ||
+    headerLower.includes('interface type')
   );
 }
 
@@ -545,7 +552,7 @@ function handleOOB(workbook: XLSX.WorkBook, cableType: string) {
     typeMatcher: matchesRedCableType,
     generatedCableNo: sequence => String(sequence),
     replaceConstantExplicitCableNo: true,
-    emptyMessage: '未找到Cat 5e红网数据：Cat 5e会匹配线缆类型中包含“红”或“red/RED”的行'
+    emptyMessage: '未找到Cat 5e红网数据：Cat 5e会匹配“线缆类型/接口类型”中包含“红”或“red/RED”的行'
   });
 }
 
@@ -560,7 +567,7 @@ function handleLC(workbook: XLSX.WorkBook, cableType: string) {
     typeMatcher: matchesLcCableType,
     generatedCableNo: sequence => String(sequence),
     replaceConstantExplicitCableNo: true,
-    emptyMessage: '未找到LC数据：LC会匹配“线缆类型/Cable Type”列中 LC 作为独立标记的光纤行，例如“SM,LC-LC”，并排除黄网/红网等网线行'
+    emptyMessage: '未找到LC数据：LC会匹配“线缆类型/接口类型/Cable Type”列中 LC 作为独立标记的光纤行，例如“SM,LC-LC”，并排除黄网/红网等网线行'
   });
 }
 
@@ -601,7 +608,7 @@ function handleVerticalCabling(workbook: XLSX.WorkBook, cableType: string) {
   const bColIndex = 1;
 
   if (cableTypeCol === -1) {
-    return NextResponse.json({ error: '未找到"Cable Type"列' }, { status: 400 });
+    return NextResponse.json({ error: '未找到"线缆类型/接口类型/Cable Type"列' }, { status: 400 });
   }
 
   const filteredRows: ParsedCableRow[] = [];
@@ -633,7 +640,7 @@ function handleVerticalCabling(workbook: XLSX.WorkBook, cableType: string) {
 
   if (filteredRows.length === 0) {
     return NextResponse.json({
-      error: '未找到Vertical Cat 5e红网数据：该类型会匹配Cable Type中包含“红”或“red/RED”的行'
+      error: '未找到Vertical Cat 5e红网数据：该类型会匹配“线缆类型/接口类型/Cable Type”中包含“红”或“red/RED”的行'
     }, { status: 400 });
   }
 
@@ -669,7 +676,7 @@ function handleMPO(workbook: XLSX.WorkBook, cableType: string) {
     typeMatcher: matchesMpoCableType,
     generatedCableNo: sequence => `MPO ${sequence}`,
     includeBandwidth: true,
-    emptyMessage: '未找到MPO数据：MPO会匹配线缆类型中包含“MPO”且不包含LC/Cat5e等混合类型的行'
+    emptyMessage: '未找到MPO数据：MPO会匹配“线缆类型/接口类型”中包含“MPO”且不包含LC/Cat5e等混合类型的行'
   });
 
   return response;
