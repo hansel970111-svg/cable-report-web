@@ -1,0 +1,56 @@
+# Windows 使用说明
+
+## 环境要求
+
+- Windows 10/11
+- Node.js 20 LTS 或更新版本
+- Python 3.10 或更新版本
+
+## 首次安装
+
+在项目目录打开 PowerShell，执行：
+
+```powershell
+corepack enable
+corepack pnpm install
+python -m pip install -r requirements.txt
+```
+
+如果电脑上同时装了多个 Python，可以改用：
+
+```powershell
+py -3 -m pip install -r requirements.txt
+```
+
+## 开发启动
+
+```powershell
+corepack pnpm dev
+```
+
+启动后打开：
+
+```text
+http://localhost:5000
+```
+
+## 生产构建和启动
+
+```powershell
+corepack pnpm build
+corepack pnpm start
+```
+
+## 构建 Windows 桌面 EXE
+
+```powershell
+corepack pnpm desktop:dist:win
+```
+
+构建完成后，安装包和便携版会在 `release` 目录中。
+
+## 常见问题
+
+- 如果提示找不到 `python`，请安装 Python 并勾选 “Add python.exe to PATH”，或使用 `py -3`。
+- 如果提示找不到 `pnpm`，先执行 `corepack enable`，再用 `corepack pnpm ...`。
+- 生成的 PDF 会同时作为浏览器下载返回，并尝试保存一份到当前 Windows 用户的 `Downloads` 文件夹。
