@@ -46,7 +46,11 @@ jobs:
 
       - name: Install Node dependencies
         shell: pwsh
-        run: pnpm install --frozen-lockfile=false
+        run: |
+          Add-Content -Path .npmrc -Value ""
+          Add-Content -Path .npmrc -Value "node-linker=hoisted"
+          Add-Content -Path .npmrc -Value "virtual-store-dir=.pnpm"
+          pnpm install --frozen-lockfile=false
 
       - name: Install Python dependencies
         shell: pwsh
@@ -58,7 +62,10 @@ jobs:
         shell: pwsh
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
-        run: pnpm desktop:dist:win
+        run: |
+          pnpm build
+          node ./scripts/build-python-workers.mjs
+          pnpm exec electron-builder --win portable
 
       - name: Show build outputs
         shell: pwsh
