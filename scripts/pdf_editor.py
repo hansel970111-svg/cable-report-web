@@ -3570,6 +3570,43 @@ def _replace_template_datetimes(page, page_records):
     replace_dates_in_tj_format(page, page_records, 0)
 
 
+def _field_baseline(field):
+    return field["origin"][1] if field and field.get("origin") else field["bbox"][3]
+
+
+def _field_size(*fields, default=8.0):
+    for field in fields:
+        if field and field.get("size"):
+            return field["size"]
+    return default
+
+
+def _rewrite_lc_datetimes(page, rows, page_records):
+    """Clear and redraw LC Date & Time values so stale template text cannot remain."""
+    redacts = []
+    inserts = []
+
+    for row_idx, record in enumerate(page_records):
+        if row_idx >= len(rows):
+            break
+
+        field = rows[row_idx].get("date_time")
+        if not field:
+            continue
+
+        baseline = _field_baseline(field)
+        redacts.append(fitz.Rect(field["bbox"][0] - 1.4, field["bbox"][1] - 1.0, 505.0, field["bbox"][3] + 1.0))
+        inserts.append({
+            "x": field["bbox"][0],
+            "y": baseline,
+            "text": _format_lc_datetime(record),
+            "size": _field_size(field),
+            "font": "calibri",
+        })
+
+    _apply_redacts_and_inserts(page, redacts, inserts)
+
+
 def _queue_site_header_update(page, site, redacts, inserts):
     if not site:
         return False
@@ -3727,6 +3764,7 @@ def _fill_lc_data_page(page, page_records, site, page_num):
             color=(0, 0, 0),
         )
     _replace_template_datetimes(page, page_records)
+    _rewrite_lc_datetimes(page, rows, page_records)
     _redraw_lc_data_outline(page)
     return len(page_records)
 
@@ -3842,9 +3880,9 @@ def _draw_lc_summary_boxes(page, top_y, site, pass_count, fail_count, total_leng
 
         _draw_lc_fx_icon(page, 29.0, box_top + 22.5)
         _insert_lc_summary_text(page, 39.0, value_y, "Fiber", bold=False)
-        _insert_lc_summary_text(page, 214.0, value_y, str(pass_count))
-        _insert_lc_summary_text(page, 334.0, value_y, str(fail_count))
-        _insert_lc_summary_text(page, 464.0, value_y, total_length_str)
+        _insert_lc_summary_text(page, 214.0, value_y, str(pass_count), bold=False)
+        _insert_lc_summary_text(page, 334.0, value_y, str(fail_count), bold=False)
+        _insert_lc_summary_text(page, 464.0, value_y, total_length_str, bold=False)
 
 
 def _row_baseline(fields):
@@ -3960,9 +3998,9 @@ def _draw_non_lc_summary_boxes(page, top_y, site, pass_count, fail_count, total_
 
         _draw_media_icon(page, 29.0, box_top + 22.5, icon_text, icon_fill)
         _insert_summary_text(page, 39.0, value_y, media_name, bold=False)
-        _insert_summary_text(page, 214.0, value_y, str(pass_count))
-        _insert_summary_text(page, 334.0, value_y, str(fail_count))
-        _insert_summary_text(page, 464.0, value_y, total_length_str)
+        _insert_summary_text(page, 214.0, value_y, str(pass_count), bold=False)
+        _insert_summary_text(page, 334.0, value_y, str(fail_count), bold=False)
+        _insert_summary_text(page, 464.0, value_y, total_length_str, bold=False)
 
 
 def _non_lc_summary_totals(records, is_mpo_template):
@@ -3999,7 +4037,7 @@ def _finish_non_lc_summary_page(page, fields, filled_count, site, records, is_mp
 
 
 def _rewrite_non_lc_datetimes(page, fields, page_records, is_mpo_template=False):
-    """Rewrite visible Date & Time text at the exact template date/time anchors."""
+    """Rewrite visible Date & Time text and remove any stale template fragments."""
     redacts = []
     inserts = []
 
@@ -4017,39 +4055,60 @@ def _rewrite_non_lc_datetimes(page, fields, page_records, is_mpo_template=False)
         row_fields = [item for item in [date_field, time_field] if item]
         y0 = min(item["bbox"][1] for item in row_fields)
         y1 = max(item["bbox"][3] for item in row_fields)
-        x0 = min(item["bbox"][0] for item in row_fields) - 1.2
-        x1 = max(item["bbox"][2] for item in row_fields) + 1.8
+        baseline = (
+            (date_field.get("origin")[1] if date_field and date_field.get("origin") else None)
+            or (time_field.get("origin")[1] if time_field and time_field.get("origin") else None)
+            or y1
+        )
 
-        redacts.append(fitz.Rect(x0, y0 - 0.9, x1, y1 + 0.9))
+        if is_mpo_template:
+            clear_x0, clear_x1 = 274.0, 430.0
+            fallback_date_x = 280.6
+        else:
+            clear_x0, clear_x1 = 425.0, 586.0
+            fallback_date_x = 430.0
 
-        if date_field and date_part:
-            baseline = date_field["origin"][1] if date_field.get("origin") else date_field["bbox"][3]
+        redacts.append(fitz.Rect(clear_x0, y0 - 1.1, clear_x1, y1 + 1.1))
+
+        datetime_text = f"{date_part} {time_part}".strip()
+        if datetime_text:
             inserts.append({
-                "x": date_field["bbox"][0],
+                "x": date_field["bbox"][0] if date_field else fallback_date_x,
                 "y": baseline,
-                "text": date_part,
-                "size": date_field.get("size", 8.0),
+                "text": datetime_text,
+                "size": _field_size(date_field, time_field),
                 "font": "calibri",
             })
+    _apply_redacts_and_inserts(page, redacts, inserts)
 
-        if time_field and time_part:
-            baseline = time_field["origin"][1] if time_field.get("origin") else time_field["bbox"][3]
-            inserts.append({
-                "x": time_field["bbox"][0],
-                "y": baseline,
-                "text": f" {time_part}",
-                "size": time_field.get("size", 8.0),
-                "font": "calibri",
-            })
-        elif not time_field and date_field:
-            baseline = date_field["origin"][1] if date_field.get("origin") else date_field["bbox"][3]
-            inserts.append({
-                "x": date_field["bbox"][0],
-                "y": baseline,
-                "text": _format_lc_datetime(record),
-                "size": date_field.get("size", 8.0),
-                "font": "calibri",
-            })
+
+def _rewrite_non_lc_cable_labels(page, fields, page_records, is_mpo_template=False):
+    """Rewrite Cable Label values as real text instead of limited CID digits."""
+    redacts = []
+    inserts = []
+    clear_x1 = 92.0 if is_mpo_template else 190.0
+
+    for row_idx, record in enumerate(page_records):
+        if row_idx >= len(fields):
+            break
+
+        field = fields[row_idx].get("cable_label")
+        if not field:
+            continue
+
+        label = str(record.get("cable_label") or record.get("cable_number") or "").strip()
+        if not label:
+            continue
+
+        bbox = fitz.Rect(field["bbox"])
+        redacts.append(fitz.Rect(max(0.0, bbox.x0 - 1.4), bbox.y0 - 1.0, clear_x1, bbox.y1 + 1.0))
+        inserts.append({
+            "x": bbox.x0,
+            "y": _field_baseline(field),
+            "text": label,
+            "size": _field_size(field),
+            "font": "calibri",
+        })
 
     _apply_redacts_and_inserts(page, redacts, inserts)
 
@@ -4088,6 +4147,9 @@ def edit_non_lc_pdf(input_path, output_path, records, site=None, template_kind='
             start = page_idx * rows_per_page
             fields_for_page, _ = get_field_positions(page)
             processed = fill_page(page, records, start, page_idx + 1)
+            page_records = records[start:start + processed]
+            _rewrite_non_lc_cable_labels(page, fields_for_page, page_records, is_mpo_template)
+            _rewrite_non_lc_datetimes(page, fields_for_page, page_records, is_mpo_template)
             _redraw_outline(page, _get_data_outline_rect(page, default_bottom=810.0 if is_mpo_template else 800.7659912109375), width=1.0)
             if page_idx == 0 and site:
                 _draw_site_header(page, site)
@@ -4106,6 +4168,9 @@ def edit_non_lc_pdf(input_path, output_path, records, site=None, template_kind='
         else:
             fields_for_summary, _ = get_field_positions(summary_page)
             processed = fill_page(summary_page, records, summary_start_idx, summary_page_num)
+            summary_page_records = records[summary_start_idx:summary_start_idx + processed]
+            _rewrite_non_lc_cable_labels(summary_page, fields_for_summary, summary_page_records, is_mpo_template)
+            _rewrite_non_lc_datetimes(summary_page, fields_for_summary, summary_page_records, is_mpo_template)
             if data_pages_needed == 0 and site:
                 _draw_site_header(summary_page, site)
             _finish_non_lc_summary_page(summary_page, fields_for_summary, processed, site, records, is_mpo_template)
@@ -4205,6 +4270,7 @@ def _fill_lc_summary_page(page, page_records, all_records, site, page_num):
 
     _apply_redacts_and_inserts(page, redacts, inserts)
     _replace_template_datetimes(page, page_records)
+    _rewrite_lc_datetimes(page, rows, page_records)
     _redraw_lc_data_outline(page, data_bottom_y)
     _draw_lc_summary_boxes(page, first_summary_top, site, pass_count, fail_count, total_length_str)
     _draw_final_footer(page, page)

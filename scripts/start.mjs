@@ -2,9 +2,10 @@ import { spawn } from 'node:child_process';
 import process from 'node:process';
 
 const workspace = process.env.COZE_WORKSPACE_PATH || process.cwd();
-const port = process.env.DEPLOY_RUN_PORT || process.env.PORT || '5000';
+const port = process.env.PORT || process.env.DEPLOY_RUN_PORT || '10000';
+const host = process.env.HOST || '0.0.0.0';
 
-console.log(`Starting production server on http://localhost:${port}`);
+console.log(`Starting production server on http://${host}:${port}`);
 
 const child = spawn(process.execPath, ['dist/server.js'], {
   cwd: workspace,
@@ -12,6 +13,7 @@ const child = spawn(process.execPath, ['dist/server.js'], {
     ...process.env,
     COZE_WORKSPACE_PATH: workspace,
     COZE_PROJECT_ENV: process.env.COZE_PROJECT_ENV || 'PROD',
+    HOST: host,
     PORT: port,
     DEPLOY_RUN_PORT: port,
   },

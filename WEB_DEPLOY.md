@@ -15,13 +15,13 @@
 
 ```bash
 docker build -t cable-report-web .
-docker run --rm -p 5000:5000 cable-report-web
+docker run --rm -p 10000:10000 cable-report-web
 ```
 
 然后打开：
 
 ```text
-http://localhost:5000
+http://localhost:10000
 ```
 
 ## 部署到云平台
@@ -30,11 +30,11 @@ http://localhost:5000
 
 ```text
 Build command: docker build -t cable-report-web .
-Start command: docker run -p 5000:5000 cable-report-web
-Port: 5000
+Start command: docker run -p 10000:10000 cable-report-web
+Port: 10000
 ```
 
-如果平台自动识别 `Dockerfile`，通常不需要手动填写构建命令，只需要指定服务端口为 `5000`。
+如果平台自动识别 `Dockerfile`，通常不需要手动填写构建命令。Render 会注入 `PORT`，程序会自动监听这个端口；没有注入时默认监听 `10000`。
 
 ## 注意事项
 
