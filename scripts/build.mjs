@@ -14,7 +14,7 @@ function runRaw(command, args) {
     cwd: workspace,
     env: process.env,
     stdio: 'inherit',
-    shell: false,
+    shell: process.platform === 'win32',
     windowsHide: false,
   });
 }
