@@ -139,13 +139,13 @@
     "win": {
       "target": [
         {
-          "target": "nsis",
+          "target": "portable",
           "arch": [
             "x64"
           ]
         },
         {
-          "target": "portable",
+          "target": "zip",
           "arch": [
             "x64"
           ]
