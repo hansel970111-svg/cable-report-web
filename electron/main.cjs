@@ -2,7 +2,10 @@ const { app, BrowserWindow, dialog, shell } = require('electron');
 const { createServer } = require('node:http');
 const net = require('node:net');
 const path = require('node:path');
-const next = require('next');
+
+if (!process.env.NEXT_TELEMETRY_DISABLED) {
+  process.env.NEXT_TELEMETRY_DISABLED = '1';
+}
 
 let mainWindow = null;
 let nextServer = null;
@@ -46,6 +49,7 @@ async function startNextServer() {
   process.env.NODE_ENV = dev ? 'development' : 'production';
   process.env.PORT = String(port);
 
+  const next = require('next');
   const nextApp = next({
     dev,
     dir: appRoot,

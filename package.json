@@ -117,7 +117,7 @@
       "scripts/pdf_editor.py",
       "scripts/pdf_processor.py",
       "package.json",
-      "next.config.ts",
+      "next.config.mjs",
       "node_modules/**/*"
     ],
     "extraResources": [
