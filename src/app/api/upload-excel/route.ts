@@ -330,6 +330,33 @@ function readFirstSourceLabel(row: ExcelRow, labelCols: number[]): string {
   return '';
 }
 
+function normalizeVerticalRu(value: unknown): string {
+  const text = normalizeCell(value);
+  if (!text) return '';
+
+  const match = text.match(/\d{1,2}/);
+  return match ? match[0] : text;
+}
+
+function verticalRackRoomContainsRu(rackRoom: string, ru: string): boolean {
+  if (!rackRoom || !ru) return false;
+
+  const escapedRu = ru.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`[-_]${escapedRu}(?:$|[._\\s-])`).test(rackRoom);
+}
+
+function buildVerticalCableBase(row: ExcelRow, rackRoomCol: number, ruCol: number): string {
+  const rackRoom = normalizeCell(row[rackRoomCol]);
+  if (!rackRoom) return '';
+
+  const ru = normalizeVerticalRu(row[ruCol]);
+  if (ru && !verticalRackRoomContainsRu(rackRoom, ru)) {
+    return `${rackRoom}-${ru}`;
+  }
+
+  return rackRoom;
+}
+
 function matchesRedCableType(value: unknown): boolean {
   const text = normalizeCell(value);
   const lower = text.toLowerCase();
@@ -389,6 +416,7 @@ function collectMatchingRows(
     generatedCableNo?: (sequence: number) => string;
     replaceConstantExplicitCableNo?: boolean;
     includeBandwidth?: boolean;
+    requirePositiveLength?: boolean;
   }
 ) {
   const filteredRows: ParsedCableRow[] = [];
@@ -422,9 +450,14 @@ function collectMatchingRows(
         detectedColumns = columns.detectedColumns;
       }
 
+      const length = readLength(row, columns.lengthCols, columns.lengthMode);
+      if (options.requirePositiveLength && (!columns.lengthCols.length || length <= 0)) {
+        continue;
+      }
+
       const parsedRow: ParsedCableRow = {
         cableNo,
-        length: readLength(row, columns.lengthCols, columns.lengthMode),
+        length,
         cableType: rowCableType,
         rowIndex: i + 1,
         sheetName,
@@ -567,6 +600,7 @@ function handleLC(workbook: XLSX.WorkBook, cableType: string) {
     typeMatcher: matchesLcCableType,
     generatedCableNo: sequence => String(sequence),
     replaceConstantExplicitCableNo: true,
+    requirePositiveLength: true,
     emptyMessage: '未找到LC数据：LC会匹配“线缆类型/接口类型/Cable Type”列中 LC 作为独立标记的光纤行，例如“SM,LC-LC”，并排除黄网/红网等网线行'
   });
 }
@@ -606,6 +640,7 @@ function handleVerticalCabling(workbook: XLSX.WorkBook, cableType: string) {
   const lengthCols = findLengthColumns(headers);
   const dateTimeCol = findDateTimeColumn(headers);
   const bColIndex = 1;
+  const ruColIndex = 2;
 
   if (cableTypeCol === -1) {
     return NextResponse.json({ error: '未找到"线缆类型/接口类型/Cable Type"列' }, { status: 400 });
@@ -619,14 +654,14 @@ function handleVerticalCabling(workbook: XLSX.WorkBook, cableType: string) {
 
     if (!matchesRedCableType(rowCableType)) continue;
 
-    const bColValue = normalizeCell(row[bColIndex]);
-    if (!bColValue) continue;
+    const cableBase = buildVerticalCableBase(row, bColIndex, ruColIndex);
+    if (!cableBase) continue;
 
     const qty = Math.max(Number.parseInt(normalizeCell(row[qtyCol]), 10) || 1, 1);
 
     for (let j = 1; j <= qty; j++) {
       filteredRows.push({
-        cableNo: `${bColValue}-${j}`,
+        cableNo: `${cableBase}-${j}`,
         length: readLength(row, lengthCols),
         cableType: rowCableType,
         rowIndex: i + 1,
@@ -652,6 +687,7 @@ function handleVerticalCabling(workbook: XLSX.WorkBook, cableType: string) {
     detectedColumns: {
       cableType: normalizeCell(headers[cableTypeCol]),
       cableNo: normalizeCell(headers[bColIndex]) || 'B列',
+      ru: normalizeCell(headers[ruColIndex]) || 'C列',
       qty: qtyCol >= 0 ? normalizeCell(headers[qtyCol]) : null,
       length: lengthCols.length > 0 ? lengthCols.map(col => normalizeCell(headers[col])).join(', ') : null,
       dateTime: dateTimeCol >= 0 ? normalizeCell(headers[dateTimeCol]) : null
