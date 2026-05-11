@@ -48,6 +48,20 @@ corepack pnpm desktop:dist:win
 
 产物在 `release\` 目录，包含安装版和便携版。
 
+## 用 GitHub 自动构建 Windows 版本
+
+项目已配置 GitHub Actions：`Build Windows EXE`。
+
+推送到 `main` 后会自动在 Windows 机器上构建；也可以在 GitHub 仓库的 `Actions` 页面手动运行。
+
+下载方式：
+
+1. 打开 GitHub 仓库。
+2. 进入 `Actions`。
+3. 点击最新的 `Build Windows EXE` 运行记录。
+4. 在页面底部 `Artifacts` 下载 `Cable-Report-Generator-Windows`。
+5. 解压后把 `.exe` 发给 Windows 用户。
+
 ## 重要说明
 
 - macOS 和 Windows 的 Python worker 需要分别在对应系统上构建，不能直接共用。
