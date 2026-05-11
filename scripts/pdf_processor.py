@@ -9,13 +9,6 @@ import json
 import re
 from datetime import datetime
 from typing import List, Dict, Any
-import pdfplumber
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import letter
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
-from reportlab.lib.enums import TA_CENTER, TA_LEFT
 
 
 def parse_pdf(file_path: str, cable_type: str = None) -> Dict[str, Any]:
@@ -449,6 +442,13 @@ def format_datetime_for_display(date_time_str: str) -> str:
 def generate_pdf(data: Dict[str, Any], output_path: str) -> bool:
     """Generate a new PDF with modified data"""
     try:
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import letter
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import inch
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, PageBreak
+        from reportlab.lib.enums import TA_CENTER, TA_LEFT
+
         doc = SimpleDocTemplate(
             output_path,
             pagesize=letter,
