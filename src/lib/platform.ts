@@ -69,6 +69,19 @@ function getBundledWorkerPath(scriptPath: string): string | null {
   return candidates.find(candidate => fs.existsSync(candidate)) || null;
 }
 
+function getPythonEnv(): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...process.env };
+  const localDeps = path.join(process.cwd(), '.codex_pydeps');
+
+  if (fs.existsSync(localDeps)) {
+    env.PYTHONPATH = env.PYTHONPATH
+      ? `${localDeps}${path.delimiter}${env.PYTHONPATH}`
+      : localDeps;
+  }
+
+  return env;
+}
+
 /**
  * 用参数数组运行 Python 脚本，避免 shell 引号、空格路径、反斜杠在 Windows 上出问题。
  */
@@ -85,6 +98,7 @@ export async function runPythonScript(
       {
         maxBuffer: options.maxBuffer ?? 10 * 1024 * 1024,
         cwd: options.cwd,
+        env: getPythonEnv(),
         windowsHide: true,
       }
     );
@@ -100,6 +114,7 @@ export async function runPythonScript(
         {
           maxBuffer: options.maxBuffer ?? 10 * 1024 * 1024,
           cwd: options.cwd,
+          env: getPythonEnv(),
           windowsHide: true,
         }
       );

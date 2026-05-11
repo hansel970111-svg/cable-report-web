@@ -2853,6 +2853,84 @@ FONT_NAME_MAP = {
 # , 
 FONT_SIZE_FACTOR = 1.0
 DEFAULT_FONT_SIZE = 8.0
+_PAGE_FONT_CACHE = set()
+_TEXTWRITER_FONT_CACHE = {}
+
+
+def _page_font_key(page, fontname):
+    return (id(page.parent), page.xref, fontname)
+
+
+def _draw_clear_rect(page, rect):
+    page.draw_rect(fitz.Rect(rect), color=(1, 1, 1), fill=(1, 1, 1), width=0)
+
+
+def _draw_clear_rects(page, rects):
+    rects = list(rects)
+    if not rects:
+        return
+    if len(rects) == 1:
+        _draw_clear_rect(page, rects[0])
+        return
+
+    try:
+        shape = page.new_shape()
+        for rect in rects:
+            shape.draw_rect(fitz.Rect(rect))
+        shape.finish(color=(1, 1, 1), fill=(1, 1, 1), width=0)
+        shape.commit()
+    except Exception:
+        for rect in rects:
+            _draw_clear_rect(page, rect)
+
+
+def _get_textwriter_font(fontname):
+    if fontname == 'calibri' and os.path.exists(CALIBRI_REGULAR_FONT):
+        key = ('file', CALIBRI_REGULAR_FONT)
+        if key not in _TEXTWRITER_FONT_CACHE:
+            _TEXTWRITER_FONT_CACHE[key] = fitz.Font(fontfile=CALIBRI_REGULAR_FONT)
+        return _TEXTWRITER_FONT_CACHE[key]
+
+    if fontname == 'calibri-bold' and os.path.exists(CALIBRI_BOLD_FONT):
+        key = ('file', CALIBRI_BOLD_FONT)
+        if key not in _TEXTWRITER_FONT_CACHE:
+            _TEXTWRITER_FONT_CACHE[key] = fitz.Font(fontfile=CALIBRI_BOLD_FONT)
+        return _TEXTWRITER_FONT_CACHE[key]
+
+    builtin = fontname if fontname in {'helv', 'hebo'} else 'helv'
+    key = ('builtin', builtin)
+    if key not in _TEXTWRITER_FONT_CACHE:
+        _TEXTWRITER_FONT_CACHE[key] = fitz.Font(builtin)
+    return _TEXTWRITER_FONT_CACHE[key]
+
+
+def _insert_text_items(page, inserts):
+    if not inserts:
+        return
+
+    try:
+        writer = fitz.TextWriter(page.rect)
+        for item in inserts:
+            text = str(item.get("text", ""))
+            if not text:
+                continue
+            writer.append(
+                fitz.Point(item["x"], item["y"]),
+                text,
+                font=_get_textwriter_font(item.get("font", "calibri")),
+                fontsize=item.get("size", 8.0),
+            )
+        writer.write_text(page, color=(0, 0, 0))
+    except Exception:
+        for item in inserts:
+            insert_text_with_font(
+                page,
+                fitz.Point(item["x"], item["y"]),
+                item["text"],
+                fontname=item.get("font", "calibri"),
+                fontsize=item.get("size", 8.0),
+                color=(0, 0, 0),
+            )
 
 
 def insert_text_with_font(page, point, text, fontname="helv", fontsize=DEFAULT_FONT_SIZE, color=(0, 0, 0), clip=None):
@@ -2875,13 +2953,19 @@ def insert_text_with_font(page, point, text, fontname="helv", fontsize=DEFAULT_F
     if fontname == 'calibri':
         if os.path.exists(CALIBRI_REGULAR_FONT):
             actual_fontname = "CalibriRegular"
-            page.insert_font(fontfile=CALIBRI_REGULAR_FONT, fontname=actual_fontname)
+            cache_key = _page_font_key(page, actual_fontname)
+            if cache_key not in _PAGE_FONT_CACHE:
+                page.insert_font(fontfile=CALIBRI_REGULAR_FONT, fontname=actual_fontname)
+                _PAGE_FONT_CACHE.add(cache_key)
         else:
             actual_fontname = "helv"
     elif fontname == 'calibri-bold':
         if os.path.exists(CALIBRI_BOLD_FONT):
             actual_fontname = "CalibriBold"
-            page.insert_font(fontfile=CALIBRI_BOLD_FONT, fontname=actual_fontname)
+            cache_key = _page_font_key(page, actual_fontname)
+            if cache_key not in _PAGE_FONT_CACHE:
+                page.insert_font(fontfile=CALIBRI_BOLD_FONT, fontname=actual_fontname)
+                _PAGE_FONT_CACHE.add(cache_key)
         else:
             actual_fontname = "hebo"
     else:
@@ -3097,7 +3181,7 @@ def clear_row_images(page, start_row, end_row, is_mpo_template=False):
             # : yy-1, 12
             # y-2redactiony0, 
             rect = fitz.Rect(x - 1, y - 2, x + width + 1, y + 12)
-            page.add_redact_annot(rect, fill=(1, 1, 1))
+            _draw_clear_rect(page, rect)
 
 
 def fill_page(page, records, start_idx, page_num, is_last_data_page=False):
@@ -3329,13 +3413,14 @@ def fill_page(page, records, start_idx, page_num, is_last_data_page=False):
     
     # Apply redaction for non-date rects only
     # Skip date rects since dates are replaced directly in content stream
+    clear_rects = []
     for rect in redact_rects:
         if rect not in date_rects:
-            page.add_redact_annot(rect, fill=(1, 1, 1))
+            clear_rects.append(rect)
     
     # Do NOT redact date rects - dates are already replaced in content stream (preserves Calibri font)
     # Skip redaction for dates
-    page.apply_redactions()
+    _draw_clear_rects(page, clear_rects)
     
     # Dates are already replaced - no need to redraw
     
@@ -3344,6 +3429,7 @@ def fill_page(page, records, start_idx, page_num, is_last_data_page=False):
     # page.clean_contents()
     
     # 
+    text_inserts = []
     for item in inserts:
         font = item.get('font', 'helv')  # Helvetica
         
@@ -3375,26 +3461,25 @@ def fill_page(page, records, start_idx, page_num, is_last_data_page=False):
             # Helvetica 7.5pt  Calibri 8pt
             adjusted_size = item['size'] * FONT_SIZE_FACTOR
         
-        insert_text_with_font(
-            page,
-            fitz.Point(item['x'], item['y']),
-            item['text'],
-            fontname=font,
-            fontsize=adjusted_size,
-            color=(0, 0, 0)
-        )
+        text_inserts.append({
+            "x": item["x"],
+            "y": item["y"],
+            "text": item["text"],
+            "size": adjusted_size,
+            "font": font,
+        })
     
     #  - 
     #  Page  Calibri 8pt(,  Bold)
     # Carlito  Calibri ,  8.0pt
-    insert_text_with_font(
-        page,
-        fitz.Point(550, 826.6),  # 826.6 = 819.4 + 7.2()
-        f"Page : {page_num}",
-        fontname="calibri",  # Carlito-Regular
-        fontsize=8.0,  #  Calibri 8pt 
-        color=(0, 0, 0)
-    )
+    text_inserts.append({
+        "x": 550,
+        "y": 826.6,  # 826.6 = 819.4 + 7.2()
+        "text": f"Page : {page_num}",
+        "font": "calibri",  # Carlito-Regular
+        "size": 8.0,  #  Calibri 8pt
+    })
+    _insert_text_items(page, text_inserts)
     
     # :  clean_contents(),  ToUnicode 
     # page.clean_contents()
@@ -3693,20 +3778,8 @@ def _queue_page_number_update(page, page_num, redacts, inserts):
 
 
 def _apply_redacts_and_inserts(page, redacts, inserts):
-    for rect in redacts:
-        page.add_redact_annot(rect, fill=(1, 1, 1))
-    if redacts:
-        page.apply_redactions()
-
-    for item in inserts:
-        insert_text_with_font(
-            page,
-            fitz.Point(item["x"], item["y"]),
-            item["text"],
-            fontname=item.get("font", "calibri"),
-            fontsize=item.get("size", 8.0),
-            color=(0, 0, 0),
-        )
+    _draw_clear_rects(page, redacts)
+    _insert_text_items(page, inserts)
 
 
 def _fill_lc_data_page(page, page_records, site, page_num):
@@ -3748,21 +3821,9 @@ def _fill_lc_data_page(page, page_records, site, page_num):
             })
 
     for rect in redacts:
-        page.add_redact_annot(rect, fill=(1, 1, 1))
-    if redacts:
-        page.apply_redactions()
-        for rect in redacts:
-            _cover_rect(page, rect)
+        _cover_rect(page, rect)
 
-    for item in inserts:
-        insert_text_with_font(
-            page,
-            fitz.Point(item["x"], item["y"]),
-            item["text"],
-            fontname=item.get("font", "calibri"),
-            fontsize=item.get("size", 8.0),
-            color=(0, 0, 0),
-        )
+    _insert_text_items(page, inserts)
     _replace_template_datetimes(page, page_records)
     _rewrite_lc_datetimes(page, rows, page_records)
     _redraw_lc_data_outline(page)
@@ -3835,8 +3896,7 @@ def _draw_export_logo(page, logo_rect, logo_stream):
 def _draw_final_footer(page, footer_template_page):
     logo_rect = _get_footer_logo_rect(footer_template_page)
     logo_stream = _render_footer_logo_stream(footer_template_page, logo_rect)
-    page.add_redact_annot(fitz.Rect(0.0, 812.0, 595.0, 842.0), fill=(1, 1, 1))
-    page.apply_redactions()
+    _draw_clear_rect(page, fitz.Rect(0.0, 812.0, 595.0, 842.0))
 
     insert_text_with_font(
         page,
@@ -4011,8 +4071,7 @@ def _non_lc_summary_totals(records, is_mpo_template):
 
 
 def _clear_summary_body(page):
-    page.add_redact_annot(fitz.Rect(8.5, 45.0, 576.5, 805.0), fill=(1, 1, 1))
-    page.apply_redactions()
+    _draw_clear_rect(page, fitz.Rect(8.5, 45.0, 576.5, 805.0))
 
 
 def _finish_empty_non_lc_summary_page(page, site, records, is_mpo_template):
@@ -4027,8 +4086,7 @@ def _finish_non_lc_summary_page(page, fields, filled_count, site, records, is_mp
     summary_top_y = data_bottom_y + 5.0
 
     clear_rect = fitz.Rect(table_rect.x0 - 1.5, data_bottom_y - 0.4, table_rect.x1 + 1.5, table_rect.y1 + 1.5)
-    page.add_redact_annot(clear_rect, fill=(1, 1, 1))
-    page.apply_redactions()
+    _draw_clear_rect(page, clear_rect)
 
     _redraw_outline(page, fitz.Rect(table_rect.x0, table_rect.y0, table_rect.x1, data_bottom_y), width=1.0)
 

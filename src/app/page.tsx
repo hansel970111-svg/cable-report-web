@@ -71,6 +71,32 @@ async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit, tim
   }
 }
 
+async function readApiError(response: Response): Promise<string> {
+  const contentType = response.headers.get('content-type') || '';
+
+  if (contentType.includes('application/json')) {
+    try {
+      const body = await response.json();
+      if (typeof body?.error === 'string' && body.error.trim()) {
+        return body.error;
+      }
+    } catch {
+      // Fall through to text handling below.
+    }
+  }
+
+  const text = await response.text();
+  const isHtmlError = /^\s*<!doctype html/i.test(text) || /<html[\s>]/i.test(text);
+  if (isHtmlError) {
+    if (response.status === 502 || /<title>\s*502\s*<\/title>/i.test(text)) {
+      return '服务器生成 PDF 超时或临时不可用，请稍后重试。';
+    }
+    return `服务器返回了异常页面（HTTP ${response.status}）。`;
+  }
+
+  return text.trim() || `请求失败（HTTP ${response.status}）`;
+}
+
 export default function Home() {
   const [cableType, setCableType] = useState<string>('Cat 5e');
   const [excelFile, setExcelFile] = useState<File | null>(null);
@@ -220,18 +246,18 @@ export default function Home() {
         }))
       };
 
-      const response = await fetch('/api/modify-pdf', {
+      const response = await fetchWithTimeout('/api/modify-pdf', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(modifications),
-      });
+      }, 180000);
 
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('API Error:', errorText);
-        throw new Error('PDF modification failed: ' + errorText);
+        const errorMessage = await readApiError(response);
+        console.error('API Error:', errorMessage);
+        throw new Error(errorMessage);
       }
 
       const blob = await response.blob();
@@ -261,7 +287,10 @@ export default function Home() {
       setModificationStatus('modified');
     } catch (error) {
       console.error('Modify error:', error);
-      alert('PDF修改失败: ' + (error as Error).message);
+      const message = error instanceof DOMException && error.name === 'AbortError'
+        ? 'PDF生成时间过长，请减少数据量或稍后重试。'
+        : (error as Error).message;
+      alert('PDF修改失败: ' + message);
     } finally {
       setLoading(false);
     }
