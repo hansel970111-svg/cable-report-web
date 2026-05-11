@@ -1,5 +1,6 @@
 const { app, BrowserWindow, dialog, shell } = require('electron');
 const { createServer } = require('node:http');
+const fs = require('node:fs');
 const net = require('node:net');
 const path = require('node:path');
 
@@ -48,6 +49,13 @@ async function startNextServer() {
   process.env.COZE_PROJECT_ENV = dev ? 'DEV' : 'PROD';
   process.env.NODE_ENV = dev ? 'development' : 'production';
   process.env.PORT = String(port);
+
+  if (!dev) {
+    const buildIdPath = path.join(appRoot, 'next-build', 'BUILD_ID');
+    if (!fs.existsSync(buildIdPath)) {
+      throw new Error(`未找到生产构建目录: ${buildIdPath}`);
+    }
+  }
 
   const next = require('next');
   const nextApp = next({

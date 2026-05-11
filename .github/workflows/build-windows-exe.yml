@@ -71,6 +71,10 @@ jobs:
         shell: pwsh
         run: Get-ChildItem -Path release -Recurse | Select-Object FullName, Length
 
+      - name: Verify Windows package contents
+        shell: pwsh
+        run: node ./scripts/verify-desktop-package.mjs win
+
       - name: Upload Windows EXE artifacts
         uses: actions/upload-artifact@v4
         with:

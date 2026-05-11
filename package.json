@@ -110,7 +110,7 @@
     "asar": false,
     "files": [
       "electron/**/*",
-      ".next/**/*",
+      "next-build/**/*",
       "public/**/*",
       "assets/**/*",
       "fonts/**/*",

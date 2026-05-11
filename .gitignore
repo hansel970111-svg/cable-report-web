@@ -10,6 +10,7 @@ dist/
 build/
 out/
 .next/
+next-build/
 .rsbuild/
 release/
 resources/bin/
