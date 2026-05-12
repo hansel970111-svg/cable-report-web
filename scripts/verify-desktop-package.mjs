@@ -36,6 +36,15 @@ function requireFile(filePath, description) {
   return true;
 }
 
+function requireAnyFile(filePaths, description) {
+  if (filePaths.some(filePath => fs.existsSync(filePath) && fs.statSync(filePath).isFile())) {
+    return true;
+  }
+
+  fail(`Missing ${description}. Checked: ${filePaths.join(', ')}`);
+  return false;
+}
+
 const unpackedDir = platform === 'win'
   ? path.join(workspace, 'release', 'win-unpacked')
   : path.join(workspace, 'release', 'mac');
@@ -58,9 +67,6 @@ const requiredFiles = [
   [path.join(nextBuildDir, 'routes-manifest.json'), 'Next routes manifest'],
   [path.join(nextBuildDir, 'server'), 'Next server output'],
   [path.join(nextBuildDir, 'static'), 'Next static output'],
-  [path.join(appDir, 'assets', 'M138-DE46-OOB-Cat5e.pdf'), 'Cat 5e template PDF'],
-  [path.join(appDir, 'assets', 'M138-DE46-D-P-cross-LC.pdf'), 'LC template PDF'],
-  [path.join(appDir, 'assets', 'M138-DE46-P-A-MPO.pdf'), 'MPO template PDF'],
   [path.join(resourcesDir, 'bin', `pdf_editor${workerExt}`), 'PDF editor worker'],
   [path.join(resourcesDir, 'bin', `pdf_processor${workerExt}`), 'PDF processor worker'],
 ];
@@ -72,6 +78,19 @@ for (const [filePath, description] of requiredFiles) {
   } else {
     requireFile(filePath, description);
   }
+}
+
+const templateFiles = [
+  ['assets/M138-DE46-OOB-Cat5e.pdf', 'Cat 5e template PDF'],
+  ['assets/M138-DE46-D-P-cross-LC.pdf', 'LC template PDF'],
+  ['assets/M138-DE46-P-A-MPO.pdf', 'MPO template PDF'],
+];
+
+for (const [relativePath, description] of templateFiles) {
+  requireAnyFile([
+    path.join(appDir, relativePath),
+    path.join(resourcesDir, relativePath),
+  ], description);
 }
 
 const staleTsConfig = path.join(appDir, 'next.config.ts');
@@ -86,6 +105,8 @@ const forbiddenPaths = [
   [path.join(appDir, 'public', 'test_lc_fixed.pdf'), 'debug public PDF'],
   [path.join(appDir, 'assets', 'test_lc_final.pdf'), 'debug LC PDF'],
   [path.join(appDir, 'assets', 'FRWE366-N101_MPO.pdf'), 'generated MPO PDF'],
+  [path.join(resourcesDir, 'assets', 'test_lc_final.pdf'), 'debug LC PDF'],
+  [path.join(resourcesDir, 'assets', 'FRWE366-N101_MPO.pdf'), 'generated MPO PDF'],
   [path.join(appDir, 'node_modules', 'electron'), 'Electron npm package'],
   [path.join(appDir, 'node_modules', 'electron-builder'), 'Electron Builder package'],
   [path.join(appDir, 'node_modules', 'app-builder-bin'), 'Electron Builder binary package'],

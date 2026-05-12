@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
-import { runPythonScript } from '@/lib/platform';
+import { resolveAppPath, runPythonScript } from '@/lib/platform';
 
 interface CableRecord {
   cable_label: string;
@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
     await fs.mkdir(tempDir, { recursive: true });
     
     const timestamp = Date.now();
-    const inputPath = path.join(process.cwd(), templatePath);
+    const inputPath = resolveAppPath(templatePath);
     const outputPath = path.join(tempDir, `output-${timestamp}.pdf`);
     
     // Prepare modifications with complete record data
@@ -103,7 +103,7 @@ export async function POST(request: NextRequest) {
     console.log(`[API] 最后一条: ${JSON.stringify(modifications.records[modifications.records.length - 1])}`);
     
     // Execute PDF editor
-    const scriptPath = path.join(process.cwd(), 'scripts', 'pdf_editor.py');
+    const scriptPath = resolveAppPath('scripts', 'pdf_editor.py');
     const modificationsJson = JSON.stringify(modifications);
     console.log(`[API] JSON字符串长度: ${modificationsJson.length} 字符`);
     

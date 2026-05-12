@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import path from 'path';
-import { runPythonScript } from '@/lib/platform';
+import fs from 'fs';
+import { getAppPathCandidates, resolveAppPath, runPythonScript } from '@/lib/platform';
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,24 +24,39 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unsupported cable type' }, { status: 400 });
     }
     
-    // Get project root - use environment variable or process.cwd()
-    const projectRoot = process.env.COZE_WORKSPACE_PATH || process.cwd();
-    
-    // Parse PDF using Python script
-    const scriptPath = path.join(projectRoot, 'scripts', 'pdf_processor.py');
-    const absoluteTemplatePath = path.join(projectRoot, templatePath);
-    
-    const { stdout, stderr } = await runPythonScript(scriptPath, ['parse', absoluteTemplatePath]);
-    
-    if (stderr && !stdout) {
-      console.error('Python error:', stderr);
-      return NextResponse.json({ error: 'Failed to parse template PDF' }, { status: 500 });
+    const absoluteTemplatePath = resolveAppPath(templatePath);
+    if (!fs.existsSync(absoluteTemplatePath)) {
+      console.error('[load-template] Template file not found', {
+        templatePath,
+        candidates: getAppPathCandidates(templatePath),
+      });
+      return NextResponse.json({ error: 'Template file not found' }, { status: 500 });
     }
-    
-    const result = JSON.parse(stdout);
-    
-    if (result.error) {
-      return NextResponse.json({ error: result.error }, { status: 500 });
+
+    const fallbackResult = {
+      site: '',
+      records: [],
+      page_count: 1,
+      cable_type: cableType,
+    };
+
+    let result = fallbackResult;
+    try {
+      const scriptPath = resolveAppPath('scripts', 'pdf_processor.py');
+      const { stdout, stderr } = await runPythonScript(scriptPath, ['parse', absoluteTemplatePath]);
+
+      if (stderr && !stdout) {
+        console.warn('[load-template] Template parser stderr:', stderr);
+      } else if (stdout) {
+        const parsed = JSON.parse(stdout);
+        if (parsed.error) {
+          console.warn('[load-template] Template parser returned error:', parsed.error);
+        } else {
+          result = parsed;
+        }
+      }
+    } catch (parseError) {
+      console.warn('[load-template] Template parser failed; continuing with fallback data.', parseError);
     }
     
     return NextResponse.json({

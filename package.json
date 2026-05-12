@@ -97,9 +97,6 @@
       "!next-build/cache/**",
       "!next-build/diagnostics/**",
       "!next-build/types/**",
-      "assets/M138-DE46-OOB-Cat5e.pdf",
-      "assets/M138-DE46-D-P-cross-LC.pdf",
-      "assets/M138-DE46-P-A-MPO.pdf",
       "fonts/**/*",
       "scripts/pdf_editor.py",
       "scripts/pdf_processor.py",
@@ -172,6 +169,15 @@
       "!node_modules/@react-dev-inspector/**"
     ],
     "extraResources": [
+      {
+        "from": "assets",
+        "to": "assets",
+        "filter": [
+          "M138-DE46-OOB-Cat5e.pdf",
+          "M138-DE46-D-P-cross-LC.pdf",
+          "M138-DE46-P-A-MPO.pdf"
+        ]
+      },
       {
         "from": "resources/bin",
         "to": "bin",

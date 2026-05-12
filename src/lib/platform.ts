@@ -11,6 +11,58 @@ import { promisify } from 'util';
 
 const execFileAsync = promisify(execFile);
 
+function uniquePaths(paths: Array<string | null | undefined>): string[] {
+  return Array.from(new Set(paths.filter(Boolean) as string[]));
+}
+
+function getElectronResourcesPath(): string | null {
+  return (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath || null;
+}
+
+function looksLikeAppRoot(dirPath: string): boolean {
+  return (
+    fs.existsSync(path.join(dirPath, 'package.json')) &&
+    (
+      fs.existsSync(path.join(dirPath, 'next.config.mjs')) ||
+      fs.existsSync(path.join(dirPath, 'next-build')) ||
+      fs.existsSync(path.join(dirPath, 'scripts'))
+    )
+  );
+}
+
+export function getAppRoot(): string {
+  const resourcesPath = getElectronResourcesPath();
+  const candidates = uniquePaths([
+    process.env.COZE_WORKSPACE_PATH,
+    process.cwd(),
+    resourcesPath ? path.join(resourcesPath, 'app') : null,
+    resourcesPath ? path.join(resourcesPath, 'app.asar.unpacked') : null,
+    process.env.PORTABLE_EXECUTABLE_DIR ? path.join(process.env.PORTABLE_EXECUTABLE_DIR, 'resources', 'app') : null,
+  ]);
+
+  return candidates.find(looksLikeAppRoot) || process.env.COZE_WORKSPACE_PATH || process.cwd();
+}
+
+export function getAppPathCandidates(...segments: string[]): string[] {
+  const relativePath = path.join(...segments);
+  if (path.isAbsolute(relativePath)) return [relativePath];
+
+  const resourcesPath = getElectronResourcesPath();
+  return uniquePaths([
+    path.join(getAppRoot(), relativePath),
+    path.join(process.cwd(), relativePath),
+    resourcesPath ? path.join(resourcesPath, 'app', relativePath) : null,
+    resourcesPath ? path.join(resourcesPath, relativePath) : null,
+    process.env.PORTABLE_EXECUTABLE_DIR ? path.join(process.env.PORTABLE_EXECUTABLE_DIR, 'resources', 'app', relativePath) : null,
+    process.env.PORTABLE_EXECUTABLE_DIR ? path.join(process.env.PORTABLE_EXECUTABLE_DIR, 'resources', relativePath) : null,
+  ]);
+}
+
+export function resolveAppPath(...segments: string[]): string {
+  const candidates = getAppPathCandidates(...segments);
+  return candidates.find(candidate => fs.existsSync(candidate)) || candidates[0];
+}
+
 /**
  * 获取跨平台临时目录
  * macOS/Linux: /tmp 或 /var/folders/...
@@ -51,7 +103,7 @@ function getPythonCandidates(): Array<{ command: string; args: string[] }> {
 function getBundledWorkerPath(scriptPath: string): string | null {
   const scriptName = path.basename(scriptPath, '.py');
   const executableName = process.platform === 'win32' ? `${scriptName}.exe` : scriptName;
-  const resourcePath = (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath;
+  const resourcePath = getElectronResourcesPath();
 
   const envKey = scriptName === 'pdf_editor'
     ? 'PDF_EDITOR_BIN'
@@ -71,7 +123,7 @@ function getBundledWorkerPath(scriptPath: string): string | null {
 
 function getPythonEnv(): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ...process.env };
-  const localDeps = path.join(process.cwd(), '.codex_pydeps');
+  const localDeps = path.join(getAppRoot(), '.codex_pydeps');
 
   if (fs.existsSync(localDeps)) {
     env.PYTHONPATH = env.PYTHONPATH
