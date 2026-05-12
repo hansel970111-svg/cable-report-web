@@ -2522,6 +2522,24 @@ def text_to_limit_cid(text, template_type='mpo'):
     return ''.join(result)
 
 
+def _fit_cid_to_hex_length(cid_hex, target_len):
+    """Pad or trim a CID hex string without repeating visible glyphs."""
+    if len(cid_hex) < target_len:
+        missing = target_len - len(cid_hex)
+        cid_hex += '0003' * ((missing + 3) // 4)
+    return cid_hex[:target_len]
+
+
+LIMIT_CID_TO_CHAR = {cid: char for char, cid in LIMIT_CHAR_TO_CID.items()}
+
+
+def _decode_mpo_limit_cid(hex_text):
+    chars = []
+    for i in range(0, len(hex_text), 4):
+        chars.append(LIMIT_CID_TO_CHAR.get(hex_text[i:i + 4].upper(), ''))
+    return ''.join(chars)
+
+
 def text_to_cable_cid(text):
     """
      Cable Label  CID 
@@ -2710,120 +2728,90 @@ def replace_limits_in_page_stream(page, records, start_idx, is_mpo_template=True
     if not contents:
         print(f"[DEBUG] replace_limits_in_page_stream: ", file=sys.stderr)
         return 0
-    
-    content_xref = contents[0]
-    
+
     doc = page.parent
-    # xref
-    xref_len = doc.xref_length()
-    if content_xref >= xref_len:
-        print(f"[DEBUG] replace_limits_in_page_stream: xref (xref={content_xref}, xref_length={xref_len})", file=sys.stderr)
-        return 0
-    
-    stream = doc.xref_stream(content_xref)
-    if stream is None:
-        print(f"[DEBUG] replace_limits_in_page_stream: ", file=sys.stderr)
-        return 0
-    
-    # 
-    print(f"[DEBUG] replace_limits_in_page_stream: is_mpo_template={is_mpo_template}", file=sys.stderr)
-    print(f"[DEBUG] replace_limits_in_page_stream: content_xref={content_xref}, stream_len={len(stream)}", file=sys.stderr)
-    
-    stream_bytes = bytearray(stream)
-    stream_text = stream.decode('latin-1', errors='replace')
-    
-    # MPO  Limit : /C2_3  Tj 
-    # :  <03EE ,  C2_2 
-    #  C2_3 
+
     if is_mpo_template:
-        # MPO : C2_2  Limit 
-        # Limit  hex : 40, 03EE
-        # 2Limit(482=96)
-        # clean_contents , :
-        # 1. : ...100 Tz/C2_2 8 Tf 280.676 yyy Td <hex40>Tj
-        # 2. : ...C2_2 8 Tf 45.385 0 Td <0003>Tj -82.721 -15 Td <hex40>Tj
-        # 
-        limit_pattern1 = re.compile(rb'100 Tz/C2_2 8 Tf 280\.[0-9]+ [0-9.]+ Td <([0-9A-Fa-f]{40})>Tj', re.IGNORECASE)
-        limit_pattern2 = re.compile(rb'/C2_2 8 Tf [0-9.-]+ [0-9.-]+ Td <0003>Tj -82\.[0-9]+ -15 Td <([0-9A-Fa-f]{40})>Tj', re.IGNORECASE)
+        # MPO Limit values are written as CIDs such as "200GBASE-SR10".
+        # They may live in any of the page's content streams after redactions,
+        # so scan all streams and pick only CID runs that decode to a GBASE/SR
+        # limit string.
+        limit_pattern = re.compile(rb'<([0-9A-Fa-f]{40,64})>Tj', re.IGNORECASE)
     else:
         # Cat5e : C2_2 -8 Tf  Tm  -95.734 0 Td
         # : /C2_2 -8 Tf\n1 0 0 -1 x y Tm\n<xxx>Tj\n-95.734 0 Td\n<0064...>Tj
         limit_pattern = re.compile(rb'-95\.734 0 Td\s+<0064[0-9A-Fa-f]+>Tj', re.IGNORECASE)
-    
-    #  Limit ()
-    if is_mpo_template:
-        matches1 = list(re.finditer(limit_pattern1, stream_bytes))
-        matches2 = list(re.finditer(limit_pattern2, stream_bytes))
-        # 
-        all_matches = [(m, 'type1') for m in matches1] + [(m, 'type2') for m in matches2]
-        all_matches.sort(key=lambda x: x[0].start())
-        matches = [m for m, _ in all_matches]
-    else:
-        matches = list(re.finditer(limit_pattern, stream_bytes))
-    
-    if not matches:
-        print(f"[DEBUG] replace_limits_in_page_stream:  Limit  (MPO={is_mpo_template})", file=sys.stderr)
-        return 0
-    
-    print(f"[DEBUG] replace_limits_in_page_stream:  {len(matches)}  Limit  (MPO={is_mpo_template})", file=sys.stderr)
-    
-    # : PDF 
-    #  0  PDF 1()
-    #   PDF ()
-    # : matches[i]  PDF  i+1 
-    #  records[i]  matches[i]
+
     processed = 0
-    
-    for i, match in enumerate(matches):
-        # matches[i]  PDF  i+1 
-        # Note: records is already sliced, so use i directly
-        rec_idx = i
-        
-        if rec_idx >= len(records):
+
+    seen_xrefs = set()
+    for content_xref in contents:
+        if content_xref in seen_xrefs:
             continue
-        
-        record = records[rec_idx]
-        limit = record.get('limit', '')
-        
-        if not limit:
+        seen_xrefs.add(content_xref)
+
+        xref_len = doc.xref_length()
+        if content_xref >= xref_len:
+            print(f"[DEBUG] replace_limits_in_page_stream: xref (xref={content_xref}, xref_length={xref_len})", file=sys.stderr)
             continue
-        
-        #  CID ()
-        new_cid = text_to_limit_cid(limit, 'cat5e' if not is_mpo_template else 'mpo')
-        
-        #  TJ 
-        old_match_text = match.group()
-        
-        # TJ(<Tj)
-        tj_start = old_match_text.rfind(b'<')
-        old_hex = old_match_text[tj_start+1:-3]  #  <  >Tj
-        
-        # CID(/)
-        old_len = len(old_hex)
-        if len(new_cid) < old_len:
-            # (CID)
-            new_cid = (new_cid * ((old_len // len(new_cid)) + 1))[:old_len]
-        elif len(new_cid) > old_len:
-            # 
-            new_cid = new_cid[:old_len]
-        
-        # 
-        new_tj = f"<{new_cid}>Tj".encode('latin-1')
-        replacement = old_match_text[:tj_start] + new_tj
-        
-        # 
-        old_start = match.start()
-        old_end = match.end()
-        stream_bytes[old_start:old_end] = replacement
-        
-        print(f"[DEBUG]  Limit {processed + 1}: PDF{i + 1} record[{rec_idx}] = '{limit}'", file=sys.stderr)
-        processed += 1
-    
-    # 
-    if processed > 0:
-        new_stream = bytes(stream_bytes)
-        doc.update_stream(content_xref, new_stream)
-        print(f"[DEBUG] replace_limits_in_page_stream:  {processed} ", file=sys.stderr)
+
+        stream = doc.xref_stream(content_xref)
+        if stream is None:
+            continue
+
+        stream_bytes = bytearray(stream)
+
+        if is_mpo_template:
+            matches = []
+            for match in re.finditer(limit_pattern, stream_bytes):
+                decoded = _decode_mpo_limit_cid(match.group(1).decode('latin-1'))
+                normalized = decoded.replace(' ', '').upper()
+                if 'GBASE' in normalized and 'SR' in normalized:
+                    matches.append(match)
+        else:
+            matches = list(re.finditer(limit_pattern, stream_bytes))
+
+        if not matches:
+            continue
+
+        print(
+            f"[DEBUG] replace_limits_in_page_stream: xref={content_xref}, matches={len(matches)}, MPO={is_mpo_template}",
+            file=sys.stderr
+        )
+
+        stream_processed = 0
+        for match in matches:
+            if processed >= len(records):
+                break
+
+            record = records[processed]
+            limit = record.get('limit', '')
+            if not limit:
+                processed += 1
+                continue
+
+            new_cid = text_to_limit_cid(limit, 'cat5e' if not is_mpo_template else 'mpo')
+            old_match_text = match.group()
+            tj_start = old_match_text.rfind(b'<')
+            old_hex = old_match_text[tj_start + 1:-3]
+            new_cid = _fit_cid_to_hex_length(new_cid, len(old_hex))
+            new_tj = f"<{new_cid}>Tj".encode('latin-1')
+            replacement = old_match_text[:tj_start] + new_tj
+            stream_bytes[match.start():match.end()] = replacement
+
+            print(f"[DEBUG]  Limit {processed + 1}: record[{processed}] = '{limit}'", file=sys.stderr)
+            processed += 1
+            stream_processed += 1
+
+        if stream_processed > 0:
+            doc.update_stream(content_xref, bytes(stream_bytes))
+            print(f"[DEBUG] replace_limits_in_page_stream: updated {stream_processed} in xref={content_xref}", file=sys.stderr)
+
+        if processed >= len(records):
+            break
+
+    if processed == 0:
+        print(f"[DEBUG] replace_limits_in_page_stream:  Limit  (MPO={is_mpo_template})", file=sys.stderr)
     
     return processed
 
