@@ -11,6 +11,7 @@ build/
 out/
 .next/
 next-build/
+next.config.ts
 .rsbuild/
 release/
 resources/bin/

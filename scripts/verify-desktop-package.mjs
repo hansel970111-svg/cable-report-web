@@ -79,6 +79,24 @@ if (fs.existsSync(staleTsConfig)) {
   fail(`Packaged app still contains next.config.ts, which can trigger runtime npm lookup: ${staleTsConfig}`);
 }
 
+const forbiddenPaths = [
+  [path.join(nextBuildDir, 'cache'), 'Next.js build cache'],
+  [path.join(nextBuildDir, 'diagnostics'), 'Next.js diagnostics output'],
+  [path.join(nextBuildDir, 'types'), 'Next.js type output'],
+  [path.join(appDir, 'public', 'test_lc_fixed.pdf'), 'debug public PDF'],
+  [path.join(appDir, 'assets', 'test_lc_final.pdf'), 'debug LC PDF'],
+  [path.join(appDir, 'assets', 'FRWE366-N101_MPO.pdf'), 'generated MPO PDF'],
+  [path.join(appDir, 'node_modules', 'electron'), 'Electron npm package'],
+  [path.join(appDir, 'node_modules', 'electron-builder'), 'Electron Builder package'],
+  [path.join(appDir, 'node_modules', 'app-builder-bin'), 'Electron Builder binary package'],
+];
+
+for (const [filePath, description] of forbiddenPaths) {
+  if (fs.existsSync(filePath)) {
+    fail(`Packaged app contains unused ${description}: ${filePath}`);
+  }
+}
+
 if (process.exitCode) {
   process.exit(process.exitCode);
 }

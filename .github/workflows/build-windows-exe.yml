@@ -15,7 +15,6 @@ on:
       - "requirements.txt"
       - "scripts/**"
       - "src/**"
-      - "public/**"
       - "next.config.mjs"
       - "tsconfig.json"
 
@@ -81,8 +80,4 @@ jobs:
           name: Cable-Report-Generator-Windows
           path: |
             release/*.exe
-            release/*.zip
-            release/*.blockmap
-            release/latest*.yml
-            release/win-unpacked/**
           if-no-files-found: error
