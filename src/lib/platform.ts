@@ -115,7 +115,9 @@ function getBundledWorkerPath(scriptPath: string): string | null {
     envKey ? process.env[envKey] : null,
     process.env.PDF_WORKER_DIR ? path.join(process.env.PDF_WORKER_DIR, executableName) : null,
     resourcePath ? path.join(resourcePath, 'bin', executableName) : null,
+    path.join(getAppRoot(), 'worker-bin', executableName),
     path.join(getAppRoot(), 'resources', 'bin', executableName),
+    path.join(process.cwd(), 'worker-bin', executableName),
     path.join(process.cwd(), 'resources', 'bin', executableName),
   ].filter(Boolean) as string[];
 

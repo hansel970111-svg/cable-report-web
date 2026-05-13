@@ -52,7 +52,8 @@ const unpackedDir = platform === 'win'
 const resourcesDir = path.join(unpackedDir, 'resources');
 const appDir = path.join(resourcesDir, 'app');
 const nextBuildDir = path.join(appDir, 'next-build');
-const appWorkerDir = path.join(appDir, 'resources', 'bin');
+const appWorkerDir = path.join(appDir, 'worker-bin');
+const legacyAppWorkerDir = path.join(appDir, 'resources', 'bin');
 const externalWorkerDir = path.join(resourcesDir, 'bin');
 const workerExt = platform === 'win' ? '.exe' : '';
 
@@ -88,6 +89,7 @@ const workerFiles = [
 for (const [fileName, description] of workerFiles) {
   requireAnyFile([
     path.join(appWorkerDir, fileName),
+    path.join(legacyAppWorkerDir, fileName),
     path.join(externalWorkerDir, fileName),
   ], description);
 }

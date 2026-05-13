@@ -98,7 +98,7 @@
       "!next-build/diagnostics/**",
       "!next-build/types/**",
       "fonts/**/*",
-      "resources/bin/**/*",
+      "worker-bin/**/*",
       "scripts/pdf_editor.py",
       "scripts/pdf_processor.py",
       "package.json",

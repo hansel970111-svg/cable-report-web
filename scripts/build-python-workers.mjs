@@ -4,7 +4,7 @@ import path from 'node:path';
 import process from 'node:process';
 
 const workspace = process.env.COZE_WORKSPACE_PATH || process.cwd();
-const workerOutputDir = path.join(workspace, 'resources', 'bin');
+const workerOutputDir = path.join(workspace, 'worker-bin');
 const buildRoot = path.join(workspace, '.pyinstaller');
 
 function commandName(name) {
