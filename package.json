@@ -98,6 +98,7 @@
       "!next-build/diagnostics/**",
       "!next-build/types/**",
       "fonts/**/*",
+      "resources/bin/**/*",
       "scripts/pdf_editor.py",
       "scripts/pdf_processor.py",
       "package.json",
@@ -176,13 +177,6 @@
           "M138-DE46-OOB-Cat5e.pdf",
           "M138-DE46-D-P-cross-LC.pdf",
           "M138-DE46-P-A-MPO.pdf"
-        ]
-      },
-      {
-        "from": "resources/bin",
-        "to": "bin",
-        "filter": [
-          "**/*"
         ]
       }
     ],

@@ -52,6 +52,8 @@ const unpackedDir = platform === 'win'
 const resourcesDir = path.join(unpackedDir, 'resources');
 const appDir = path.join(resourcesDir, 'app');
 const nextBuildDir = path.join(appDir, 'next-build');
+const appWorkerDir = path.join(appDir, 'resources', 'bin');
+const externalWorkerDir = path.join(resourcesDir, 'bin');
 const workerExt = platform === 'win' ? '.exe' : '';
 
 requireDir(unpackedDir, 'unpacked desktop app directory');
@@ -67,8 +69,6 @@ const requiredFiles = [
   [path.join(nextBuildDir, 'routes-manifest.json'), 'Next routes manifest'],
   [path.join(nextBuildDir, 'server'), 'Next server output'],
   [path.join(nextBuildDir, 'static'), 'Next static output'],
-  [path.join(resourcesDir, 'bin', `pdf_editor${workerExt}`), 'PDF editor worker'],
-  [path.join(resourcesDir, 'bin', `pdf_processor${workerExt}`), 'PDF processor worker'],
 ];
 
 for (const [filePath, description] of requiredFiles) {
@@ -78,6 +78,18 @@ for (const [filePath, description] of requiredFiles) {
   } else {
     requireFile(filePath, description);
   }
+}
+
+const workerFiles = [
+  [`pdf_editor${workerExt}`, 'PDF editor worker'],
+  [`pdf_processor${workerExt}`, 'PDF processor worker'],
+];
+
+for (const [fileName, description] of workerFiles) {
+  requireAnyFile([
+    path.join(appWorkerDir, fileName),
+    path.join(externalWorkerDir, fileName),
+  ], description);
 }
 
 const templateFiles = [
