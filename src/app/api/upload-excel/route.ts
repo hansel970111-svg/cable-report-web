@@ -401,8 +401,11 @@ function matchesMpoCableType(value: unknown): boolean {
 }
 
 function extractBandwidth(cableType: string): string {
+  const lower = cableType.toLowerCase();
   const match = cableType.match(/(\d+\s*G)/i);
-  return match ? match[1].replace(/\s+/g, '').toUpperCase() : '';
+  if (match) return match[1].replace(/\s+/g, '').toUpperCase();
+  if (cableType.includes('蓝') || lower.includes('blue')) return '100G';
+  return '';
 }
 
 function collectMatchingRows(

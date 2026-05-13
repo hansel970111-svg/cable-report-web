@@ -30,7 +30,7 @@ function packageManagerInvocation() {
 console.log(`Starting development server on http://localhost:${port}`);
 
 const packageManager = packageManagerInvocation();
-const child = spawn(packageManager.command, [...packageManager.argsPrefix, 'tsx', 'watch', 'src/server.ts'], {
+const child = spawn(packageManager.command, [...packageManager.argsPrefix, 'tsx', 'src/server.ts'], {
   cwd: workspace,
   env: {
     ...process.env,

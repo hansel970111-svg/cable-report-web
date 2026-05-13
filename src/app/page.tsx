@@ -57,6 +57,28 @@ interface ParsedData {
   page_count: number;
 }
 
+function extractBandwidth(value: unknown): string {
+  const text = String(value ?? '');
+  const match = text.match(/(\d+)\s*G/i);
+  if (match) return `${match[1]}G`.toUpperCase();
+  if (text.includes('蓝') || text.toLowerCase().includes('blue')) return '100G';
+  return '';
+}
+
+function buildLimitValue(row: Record<string, unknown>, selectedCableType: string, dataSource: unknown): string {
+  const isMPO = selectedCableType === 'MPO' || dataSource === 'MPO';
+  if (isMPO) {
+    const bandwidth = extractBandwidth(row.bandwidth) || extractBandwidth(row.cableType) || '200G';
+    return `${bandwidth}BASE-SR10`;
+  }
+
+  if (selectedCableType === 'LC' || dataSource === 'LC') {
+    return 'Link Validation';
+  }
+
+  return 'TIA - Cat 5e Channel';
+}
+
 async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit, timeoutMs: number): Promise<Response> {
   const controller = new AbortController();
   const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
@@ -238,7 +260,9 @@ export default function Home() {
         site: siteNumber || parsedData.site,  // 优先使用用户输入的项目号
         records: parsedData.records.map((record) => ({
           cable_label: record.cable_label,
-          limit: record.limit || 'TIA - Cat 5e Channel',
+          limit: (cableType === 'MPO' && (!record.limit || record.limit.includes('Cat 5e')))
+            ? buildLimitValue(record as unknown as Record<string, unknown>, cableType, cableType)
+            : record.limit || buildLimitValue(record as unknown as Record<string, unknown>, cableType, cableType),
           result: record.result || 'PASS',
           date_time: record.date_time,
           length: record.length,
@@ -610,15 +634,8 @@ export default function Home() {
                                   cableLabel = cableNo.startsWith('#') ? cableNo : `#${cableNo}`;
                                 }
 
-                                // 根据数据源和线缆类型设置limit
-                                let limitValue = 'TIA - Cat 5e Channel';
-                                if (isMPO && row.bandwidth) {
-                                  // MPO模式：格式为 {带宽}BASE-SR10
-                                  limitValue = `${row.bandwidth}BASE-SR10`;
-                                } else if (cableType === 'LC') {
-                                  // LC模式：显示Link Validation
-                                  limitValue = 'Link Validation';
-                                }
+                                // 根据当前选择的线缆类型设置 limit，避免 MPO 缺少带宽时误退到 Cat 5e。
+                                const limitValue = buildLimitValue(row, cableType, excelResult.dataSource);
 
                                 return {
                                   cable_label: cableLabel,

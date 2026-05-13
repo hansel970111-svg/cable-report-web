@@ -11,6 +11,10 @@ function commandName(name) {
   return process.platform === 'win32' ? `${name}.exe` : name;
 }
 
+function pyinstallerDataArg(source, destination) {
+  return `${source}${process.platform === 'win32' ? ';' : ':'}${destination}`;
+}
+
 function pythonCandidates() {
   if (process.env.PYTHON_CMD) return [{ command: process.env.PYTHON_CMD, argsPrefix: [] }];
   if (process.env.PYTHON) return [{ command: process.env.PYTHON, argsPrefix: [] }];
@@ -99,6 +103,16 @@ const workers = [
 
 for (const worker of workers) {
   console.log(`Building Python worker: ${worker.name}`);
+  const dataArgs = [];
+  if (worker.name === 'pdf_editor') {
+    dataArgs.push(
+      '--add-data',
+      pyinstallerDataArg(path.join('fonts', 'LiberationSans-Regular.ttf'), 'fonts'),
+      '--add-data',
+      pyinstallerDataArg(path.join('fonts', 'LiberationSans-Bold.ttf'), 'fonts'),
+    );
+  }
+
   runPython(python, [
     '-m',
     'PyInstaller',
@@ -113,6 +127,7 @@ for (const worker of workers) {
     path.join(buildRoot, 'build'),
     '--specpath',
     path.join(buildRoot, 'spec'),
+    ...dataArgs,
     worker.script,
   ]);
 

@@ -15,6 +15,21 @@ interface CableRecord {
   page: number;
 }
 
+function defaultLimitForCableType(cableType: string): string {
+  if (cableType === 'MPO') return '200GBASE-SR10';
+  if (cableType === 'LC') return 'Link Validation';
+  return 'TIA - Cat 5e Channel';
+}
+
+function normalizeRecordLimit(cableType: string, record: CableRecord): string {
+  const limit = record.limit || '';
+  if (cableType === 'MPO' && (!limit || limit.includes('Cat 5e'))) {
+    return defaultLimitForCableType(cableType);
+  }
+
+  return limit || defaultLimitForCableType(cableType);
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -89,7 +104,7 @@ export async function POST(request: NextRequest) {
       site: site ? site.toUpperCase() : '',
       records: records.map((record: CableRecord) => ({
         cable_label: record.cable_label || record.cable_number || '',
-        limit: record.limit || 'TIA - Cat 5e Channel', // 默认值
+        limit: normalizeRecordLimit(cableType, record),
         result: record.result || 'PASS', // 默认值为 PASS
         date_time: record.date_time,
         length: record.length,

@@ -7,11 +7,50 @@ import fitz  # PyMuPDF
 import os
 from datetime import datetime
 
-# 
-FONT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'assets', 'fonts')
-PROJECT_FONT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'fonts')
-CALIBRI_REGULAR_FONT = os.path.join(PROJECT_FONT_DIR, 'LiberationSans-Regular.ttf')
-CALIBRI_BOLD_FONT = os.path.join(PROJECT_FONT_DIR, 'LiberationSans-Bold.ttf')
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, '..'))
+
+
+def _resource_path(*parts):
+    roots = []
+    meipass = getattr(sys, "_MEIPASS", None)
+    if meipass:
+        roots.append(meipass)
+    roots.extend([PROJECT_ROOT, SCRIPT_DIR])
+
+    for root in roots:
+        candidate = os.path.join(root, *parts)
+        if os.path.exists(candidate):
+            return candidate
+
+    return os.path.join(PROJECT_ROOT, *parts)
+
+
+def _first_existing_path(*paths):
+    for path in paths:
+        if path and os.path.exists(path):
+            return path
+    return paths[0] if paths else ""
+
+
+def _windows_font_path(filename):
+    windir = os.environ.get("WINDIR") or os.environ.get("SystemRoot") or r"C:\Windows"
+    return os.path.join(windir, "Fonts", filename)
+
+
+# Font files are used for text we redraw after clearing template values.
+FONT_DIR = _resource_path('assets', 'fonts')
+PROJECT_FONT_DIR = _resource_path('fonts')
+CALIBRI_REGULAR_FONT = _first_existing_path(
+    _windows_font_path('calibri.ttf'),
+    '/Library/Fonts/Calibri.ttf',
+    _resource_path('fonts', 'LiberationSans-Regular.ttf'),
+)
+CALIBRI_BOLD_FONT = _first_existing_path(
+    _windows_font_path('calibrib.ttf'),
+    '/Library/Fonts/Calibri Bold.ttf',
+    _resource_path('fonts', 'LiberationSans-Bold.ttf'),
+)
 
 # 
 _font_cache = {}
@@ -3300,7 +3339,7 @@ def fill_page(page, records, start_idx, page_num, is_last_data_page=False):
                     'y': get_insert_y(field),
                     'text': length_str,
                     'size': field['size'],
-                    'font': 'helv'
+                    'font': 'calibri'
                 })
 
         # NEXT Margin - MPO, 
@@ -3320,7 +3359,7 @@ def fill_page(page, records, start_idx, page_num, is_last_data_page=False):
                     'y': get_insert_y(field),
                     'text': margin_str,
                     'size': field['size'],
-                    'font': 'helv'
+                    'font': 'calibri'
                 })
         
         # Date & Time - CID(Calibri)
@@ -3654,6 +3693,16 @@ def _field_size(*fields, default=8.0):
     return default
 
 
+def _text_width_for_insert(fontname, text, size):
+    try:
+        return _get_textwriter_font(fontname).text_length(str(text), fontsize=size)
+    except Exception:
+        try:
+            return fitz.Font('helv').text_length(str(text), fontsize=size)
+        except Exception:
+            return 0.0
+
+
 def _rewrite_lc_datetimes(page, rows, page_records):
     """Clear and redraw LC Date & Time values so stale template text cannot remain."""
     redacts = []
@@ -3692,7 +3741,15 @@ def _queue_site_header_update(page, site, redacts, inserts):
         and span["x"] < 130
     ]
     if not anchor_spans:
-        return False
+        redacts.append(fitz.Rect(18.5, 57.5, 210.0, 73.4))
+        inserts.append({
+            "x": 20.0,
+            "y": 70.0,
+            "text": f"Site: {site}",
+            "size": 8.0,
+            "font": "calibri-bold",
+        })
+        return True
 
     anchor = min(anchor_spans, key=lambda span: span["bbox"][0])
     anchor_center_y = (anchor["bbox"][1] + anchor["bbox"][3]) / 2
@@ -4065,7 +4122,8 @@ def _clear_summary_body(page):
 def _finish_empty_non_lc_summary_page(page, site, records, is_mpo_template):
     _clear_summary_body(page)
     pass_count, fail_count, total_length_str = _non_lc_summary_totals(records, is_mpo_template)
-    _draw_non_lc_summary_boxes(page, 55.0, site, pass_count, fail_count, total_length_str, is_mpo_template)
+    summary_top_y = 80.0 if site else 55.0
+    _draw_non_lc_summary_boxes(page, summary_top_y, site, pass_count, fail_count, total_length_str, is_mpo_template)
 
 
 def _finish_non_lc_summary_page(page, fields, filled_count, site, records, is_mpo_template):
@@ -4116,15 +4174,39 @@ def _rewrite_non_lc_datetimes(page, fields, page_records, is_mpo_template=False)
 
         redacts.append(fitz.Rect(clear_x0, y0 - 1.1, clear_x1, y1 + 1.1))
 
-        datetime_text = f"{date_part} {time_part}".strip()
-        if datetime_text:
-            inserts.append({
-                "x": date_field["bbox"][0] if date_field else fallback_date_x,
-                "y": baseline,
-                "text": datetime_text,
-                "size": _field_size(date_field, time_field),
-                "font": "calibri",
-            })
+        if date_field and time_field:
+            date_size = _field_size(date_field)
+            time_size = _field_size(time_field)
+            if date_part:
+                inserts.append({
+                    "x": date_field["bbox"][0],
+                    "y": date_field.get("origin", (None, baseline))[1] if date_field.get("origin") else baseline,
+                    "text": date_part,
+                    "size": date_size,
+                    "font": "calibri",
+                })
+            if time_part:
+                time_x = time_field["bbox"][0]
+                if date_part:
+                    min_time_x = date_field["bbox"][0] + _text_width_for_insert("calibri", date_part, date_size) + 2.0
+                    time_x = max(time_x, min_time_x)
+                inserts.append({
+                    "x": time_x,
+                    "y": time_field.get("origin", (None, baseline))[1] if time_field.get("origin") else baseline,
+                    "text": time_part,
+                    "size": time_size,
+                    "font": "calibri",
+                })
+        else:
+            datetime_text = f"{date_part} {time_part}".strip()
+            if datetime_text:
+                inserts.append({
+                    "x": date_field["bbox"][0] if date_field else fallback_date_x,
+                    "y": baseline,
+                    "text": datetime_text,
+                    "size": _field_size(date_field, time_field),
+                    "font": "calibri",
+                })
     _apply_redacts_and_inserts(page, redacts, inserts)
 
 
@@ -4211,13 +4293,15 @@ def edit_non_lc_pdf(input_path, output_path, records, site=None, template_kind='
         summary_page_num = data_pages_needed + 1
         if summary_record_count == 0:
             _finish_empty_non_lc_summary_page(summary_page, site, records, is_mpo_template)
+            if site:
+                _draw_site_header(summary_page, site)
         else:
             fields_for_summary, _ = get_field_positions(summary_page)
             processed = fill_page(summary_page, records, summary_start_idx, summary_page_num)
             summary_page_records = records[summary_start_idx:summary_start_idx + processed]
             _rewrite_non_lc_cable_labels(summary_page, fields_for_summary, summary_page_records, is_mpo_template)
             _rewrite_non_lc_datetimes(summary_page, fields_for_summary, summary_page_records, is_mpo_template)
-            if data_pages_needed == 0 and site:
+            if site:
                 _draw_site_header(summary_page, site)
             _finish_non_lc_summary_page(summary_page, fields_for_summary, processed, site, records, is_mpo_template)
         _draw_final_footer(summary_page, template_doc[-1])
@@ -4243,6 +4327,7 @@ def _fill_lc_summary_page(page, page_records, all_records, site, page_num):
     redacts = []
     inserts = []
     rows = _get_lc_rows(page, max_y=440)
+    _queue_lc_site_update(page, site, redacts, inserts)
 
     fail_count = sum(1 for record in all_records if str(record.get("result", "")).strip().upper() == "FAIL")
     pass_count = len(all_records) - fail_count
