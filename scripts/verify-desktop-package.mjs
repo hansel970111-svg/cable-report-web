@@ -4,6 +4,7 @@ import process from 'node:process';
 
 const workspace = process.env.COZE_WORKSPACE_PATH || process.cwd();
 const platform = process.argv[2] || (process.platform === 'win32' ? 'win' : 'mac');
+const productName = 'Cable Report Generator';
 
 function fail(message) {
   console.error(`[verify-desktop-package] ${message}`);
@@ -45,11 +46,32 @@ function requireAnyFile(filePaths, description) {
   return false;
 }
 
+function firstExistingDir(paths) {
+  return paths.find(dirPath => fs.existsSync(dirPath) && fs.statSync(dirPath).isDirectory()) || paths[0];
+}
+
+function findMacAppDir(unpackedDir) {
+  const preferred = path.join(unpackedDir, `${productName}.app`);
+  if (fs.existsSync(preferred) && fs.statSync(preferred).isDirectory()) return preferred;
+
+  if (!fs.existsSync(unpackedDir)) return preferred;
+  const appName = fs.readdirSync(unpackedDir).find(name => name.endsWith('.app'));
+  return appName ? path.join(unpackedDir, appName) : preferred;
+}
+
 const unpackedDir = platform === 'win'
   ? path.join(workspace, 'release', 'win-unpacked')
-  : path.join(workspace, 'release', 'mac');
+  : firstExistingDir([
+      path.join(workspace, 'release', 'mac'),
+      path.join(workspace, 'release', 'mac-arm64'),
+      path.join(workspace, 'release', 'mac-x64'),
+      path.join(workspace, 'release', 'mac-universal'),
+    ]);
 
-const resourcesDir = path.join(unpackedDir, 'resources');
+const macAppDir = platform === 'win' ? null : findMacAppDir(unpackedDir);
+const resourcesDir = platform === 'win'
+  ? path.join(unpackedDir, 'resources')
+  : path.join(macAppDir, 'Contents', 'Resources');
 const appDir = path.join(resourcesDir, 'app');
 const nextBuildDir = path.join(appDir, 'next-build');
 const appWorkerDir = path.join(appDir, 'worker-bin');

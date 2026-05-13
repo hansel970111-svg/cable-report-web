@@ -15,6 +15,7 @@ next.config.ts
 .rsbuild/
 release/
 resources/bin/
+worker-bin/
 .pyinstaller/
 .codex_pydeps/
 __pycache__/

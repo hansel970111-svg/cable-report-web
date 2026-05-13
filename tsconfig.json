@@ -40,6 +40,11 @@
   ],
   "exclude": [
     "node_modules",
-    "dist"
+    "dist",
+    "build",
+    "release",
+    "worker-bin",
+    "resources/bin",
+    ".pyinstaller"
   ]
 }

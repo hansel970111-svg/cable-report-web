@@ -107,9 +107,9 @@ for (const worker of workers) {
   if (worker.name === 'pdf_editor') {
     dataArgs.push(
       '--add-data',
-      pyinstallerDataArg(path.join('fonts', 'LiberationSans-Regular.ttf'), 'fonts'),
+      pyinstallerDataArg(path.join(workspace, 'fonts', 'LiberationSans-Regular.ttf'), 'fonts'),
       '--add-data',
-      pyinstallerDataArg(path.join('fonts', 'LiberationSans-Bold.ttf'), 'fonts'),
+      pyinstallerDataArg(path.join(workspace, 'fonts', 'LiberationSans-Bold.ttf'), 'fonts'),
     );
   }
 
@@ -132,9 +132,17 @@ for (const worker of workers) {
   ]);
 
   const executablePath = path.join(workerOutputDir, commandName(worker.name));
-  if (fs.existsSync(executablePath) && process.platform !== 'win32') {
+  if (!fs.existsSync(executablePath)) {
+    const files = fs.existsSync(workerOutputDir) ? fs.readdirSync(workerOutputDir) : [];
+    console.error(`Python worker build did not produce expected executable: ${executablePath}`);
+    console.error(`Files in ${workerOutputDir}: ${files.join(', ') || '(empty)'}`);
+    process.exit(1);
+  }
+
+  if (process.platform !== 'win32') {
     fs.chmodSync(executablePath, 0o755);
   }
 }
 
 console.log(`Python workers built in: ${workerOutputDir}`);
+console.log(fs.readdirSync(workerOutputDir).map(file => `- ${file}`).join('\n'));
