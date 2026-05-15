@@ -91,9 +91,11 @@
       "output": "release"
     },
     "asar": false,
+    "afterPack": "scripts/electron-after-pack.cjs",
     "files": [
       "electron/**/*",
       "next-build/**/*",
+      "!next-build/dev/**",
       "!next-build/cache/**",
       "!next-build/diagnostics/**",
       "!next-build/types/**",
@@ -187,6 +189,7 @@
       }
     ],
     "mac": {
+      "identity": null,
       "target": [
         "dmg",
         "zip"

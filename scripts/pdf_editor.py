@@ -2884,6 +2884,21 @@ _PAGE_FONT_CACHE = set()
 _TEXTWRITER_FONT_CACHE = {}
 
 
+def _save_pdf_compact(doc, output_path):
+    """Save a generated report with lossless PDF cleanup/compression."""
+    try:
+        doc.save(
+            output_path,
+            garbage=4,
+            deflate=True,
+            encryption=fitz.PDF_ENCRYPT_NONE,
+        )
+    except TypeError:
+        # Older PyMuPDF builds may not support every save option; keep a safe
+        # fallback so packaged desktop builds still produce a readable PDF.
+        doc.save(output_path, encryption=fitz.PDF_ENCRYPT_NONE)
+
+
 def _page_font_key(page, fontname):
     return (id(page.parent), page.xref, fontname)
 
@@ -4306,7 +4321,7 @@ def edit_non_lc_pdf(input_path, output_path, records, site=None, template_kind='
             _finish_non_lc_summary_page(summary_page, fields_for_summary, processed, site, records, is_mpo_template)
         _draw_final_footer(summary_page, template_doc[-1])
 
-        doc.save(output_path, garbage=4, deflate=True, encryption=fitz.PDF_ENCRYPT_NONE)
+        _save_pdf_compact(doc, output_path)
         doc.close()
         template_doc.close()
 
@@ -4440,7 +4455,7 @@ def edit_lc_pdf(input_path, output_path, records, site=None):
         doc.insert_pdf(template_doc, from_page=len(template_doc) - 1, to_page=len(template_doc) - 1)
         _fill_lc_summary_page(doc[-1], summary_records, records, site, data_pages_needed + 1)
 
-        doc.save(output_path, garbage=4, deflate=True, encryption=fitz.PDF_ENCRYPT_NONE)
+        _save_pdf_compact(doc, output_path)
         doc.close()
         template_doc.close()
 
@@ -4924,11 +4939,7 @@ def edit_pdf(input_path, output_path, records, site=None):
         
         #  PDF - 
         # , 
-        try:
-            doc.save(output_path, incremental=True, encryption=fitz.PDF_ENCRYPT_NONE)
-        except ValueError:
-            # 
-            doc.save(output_path, encryption=fitz.PDF_ENCRYPT_NONE)
+        _save_pdf_compact(doc, output_path)
         doc.close()
         template_doc.close()
         
