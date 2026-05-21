@@ -42,15 +42,20 @@ def _windows_font_path(filename):
 FONT_DIR = _resource_path('assets', 'fonts')
 PROJECT_FONT_DIR = _resource_path('fonts')
 CALIBRI_REGULAR_FONT = _first_existing_path(
+    _resource_path('assets', 'fonts', 'calibri.ttf'),
+    _resource_path('assets', 'fonts', 'Calibri-Embedded.ttf'),
     _windows_font_path('calibri.ttf'),
     '/Library/Fonts/Calibri.ttf',
     _resource_path('fonts', 'LiberationSans-Regular.ttf'),
 )
 CALIBRI_BOLD_FONT = _first_existing_path(
+    _resource_path('assets', 'fonts', 'calibri_bold.ttf'),
+    _resource_path('assets', 'fonts', 'Calibri-Bold-Embedded.ttf'),
     _windows_font_path('calibrib.ttf'),
     '/Library/Fonts/Calibri Bold.ttf',
     _resource_path('fonts', 'LiberationSans-Bold.ttf'),
 )
+EMBED_INSERT_FONTS = os.environ.get("CABLE_REPORT_EMBED_INSERT_FONTS") == "1"
 
 # 
 _font_cache = {}
@@ -2887,6 +2892,11 @@ _TEXTWRITER_FONT_CACHE = {}
 def _save_pdf_compact(doc, output_path):
     """Save a generated report with lossless PDF cleanup/compression."""
     try:
+        doc.subset_fonts()
+    except Exception as exc:
+        print(f"[WARN] Font subsetting skipped: {exc}", file=sys.stderr)
+
+    try:
         doc.save(
             output_path,
             garbage=4,
@@ -2927,6 +2937,13 @@ def _draw_clear_rects(page, rects):
 
 
 def _get_textwriter_font(fontname):
+    if not EMBED_INSERT_FONTS:
+        builtin = "hebo" if fontname in {"calibri-bold", "hebo"} else "helv"
+        key = ("builtin", builtin)
+        if key not in _TEXTWRITER_FONT_CACHE:
+            _TEXTWRITER_FONT_CACHE[key] = fitz.Font(builtin)
+        return _TEXTWRITER_FONT_CACHE[key]
+
     if fontname == 'calibri' and os.path.exists(CALIBRI_REGULAR_FONT):
         key = ('file', CALIBRI_REGULAR_FONT)
         if key not in _TEXTWRITER_FONT_CACHE:
@@ -2991,6 +3008,16 @@ def insert_text_with_font(page, point, text, fontname="helv", fontsize=DEFAULT_F
         clip: , 
     """
     actual_fontname = fontname
+
+    if not EMBED_INSERT_FONTS:
+        if fontname == 'calibri':
+            actual_fontname = "helv"
+        elif fontname == 'calibri-bold':
+            actual_fontname = "hebo"
+        else:
+            actual_fontname = FONT_NAME_MAP.get(fontname, fontname)
+        page.insert_text(point, text, fontname=actual_fontname, fontsize=fontsize, color=color)
+        return
 
     if fontname == 'calibri':
         if os.path.exists(CALIBRI_REGULAR_FONT):
