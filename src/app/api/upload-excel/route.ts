@@ -177,6 +177,15 @@ function combineColumnNames(headers: ExcelRow, columns: number[]): string | null
   return names.length > 0 ? names.join(', ') : null;
 }
 
+function hasCableDataHeaders(headers: ExcelRow): boolean {
+  return (
+    findCableNoColumn(headers) >= 0 ||
+    findLengthColumns(headers).length > 0 ||
+    findDateTimeColumn(headers) >= 0 ||
+    findSourceLabelColumns(headers).length > 0
+  );
+}
+
 function inferCableTypeColumn(
   jsonData: ExcelRow[],
   headers: ExcelRow,
@@ -234,6 +243,9 @@ function detectSheetColumns(
   const headerRowCount = useTwoRowHeader ? 2 : 1;
   const primaryHeaders = useTwoRowHeader ? secondHeaders : firstHeaders;
   const fallbackHeaders = useTwoRowHeader ? firstHeaders : secondHeaders;
+  const hasDataHeaders = hasCableDataHeaders(primaryHeaders) || hasCableDataHeaders(fallbackHeaders);
+
+  if (!hasDataHeaders) return null;
 
   let cableTypeCol = useTwoRowHeader
     ? firstCableTypeCol
@@ -443,8 +455,11 @@ function collectMatchingRows(
       const rowCableType = normalizeCell(row[columns.cableTypeCol]);
       if (!rowCableType || !options.typeMatcher(rowCableType)) continue;
 
-      const explicitCableNo = columns.cableNoCol >= 0 ? normalizeCell(row[columns.cableNoCol]) : '';
-      const generatedCableNo = explicitCableNo ? '' : options.generatedCableNo?.(filteredRows.length + 1) || '';
+      const hasCableNoColumn = columns.cableNoCol >= 0;
+      const explicitCableNo = hasCableNoColumn ? normalizeCell(row[columns.cableNoCol]) : '';
+      if (hasCableNoColumn && !explicitCableNo) continue;
+
+      const generatedCableNo = hasCableNoColumn ? '' : options.generatedCableNo?.(filteredRows.length + 1) || '';
       const cableNo = explicitCableNo || generatedCableNo;
 
       if (!cableNo) continue;
@@ -715,6 +730,7 @@ function handleMPO(workbook: XLSX.WorkBook, cableType: string) {
     typeMatcher: matchesMpoCableType,
     generatedCableNo: sequence => `MPO ${sequence}`,
     includeBandwidth: true,
+    requirePositiveLength: true,
     emptyMessage: '未找到MPO数据：MPO会匹配“线缆类型/接口类型”中包含“MPO”且不包含LC/Cat5e等混合类型的行'
   });
 

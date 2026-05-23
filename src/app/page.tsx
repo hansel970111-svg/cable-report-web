@@ -55,6 +55,8 @@ interface ParsedData {
   site: string;
   records: CableRecord[];
   page_count: number;
+  cableType?: string;
+  dataSource?: string;
 }
 
 function extractBandwidth(value: unknown): string {
@@ -137,8 +139,19 @@ export default function Home() {
   } | null>(null);
   // 用于在Excel上传时访问模板数据（setState是异步的，所以使用ref）
   const templateDataRef = useRef<ParsedData | null>(null);
+  const importRequestIdRef = useRef(0);
   const [siteNumber, setSiteNumber] = useState<string>(''); // 项目号输入
   const [fileInputKey, setFileInputKey] = useState<number>(0); // 用于强制刷新文件选择器
+
+  const resetImportedData = () => {
+    importRequestIdRef.current += 1;
+    templateDataRef.current = null;
+    setParsedData(null);
+    setExcelInfo(null);
+    setEditingRecords(new Set());
+    setTempValues({});
+    setModificationStatus('idle');
+  };
 
   // 监控parsedData变化，确保数据完整性
   useEffect(() => {
@@ -152,15 +165,21 @@ export default function Home() {
     if (e.target.files && e.target.files.length > 0) {
       const selectedFile = e.target.files[0];
       setExcelFile(selectedFile);
-      setExcelInfo(null);
+      resetImportedData();
     }
   };
 
   // 清除选中的文件
   const handleClearFile = () => {
     setExcelFile(null);
-    setExcelInfo(null);
+    resetImportedData();
     setFileInputKey(prev => prev + 1); // 强制刷新文件选择器
+  };
+
+  const handleCableTypeChange = (value: string) => {
+    if (value === cableType) return;
+    setCableType(value);
+    resetImportedData();
   };
 
   const handleBatchEdit = () => {
@@ -221,6 +240,11 @@ export default function Home() {
 
   const handleModifyPDF = async () => {
     if (!parsedData) return;
+
+    if (parsedData.cableType && parsedData.cableType !== cableType) {
+      alert(`当前预览数据属于 ${parsedData.cableType}，但你现在选择的是 ${cableType}。请重新点击“加载并导入”后再生成测试报告。`);
+      return;
+    }
 
     // 数据验证：检查必需字段
     const invalidRecords: number[] = [];
@@ -387,7 +411,7 @@ export default function Home() {
               {/* 线缆类型选择 */}
               <div className="space-y-2">
                 <Label>线缆类型</Label>
-                <Select value={cableType} onValueChange={setCableType}>
+                <Select value={cableType} onValueChange={handleCableTypeChange}>
                   <SelectTrigger>
                     <SelectValue placeholder="选择线缆类型" />
                   </SelectTrigger>
@@ -452,16 +476,21 @@ export default function Home() {
                       return;
                     }
 
+                    const requestId = importRequestIdRef.current + 1;
+                    importRequestIdRef.current = requestId;
+                    const selectedCableType = cableType;
+                    const selectedExcelFile = excelFile;
+
                     // 先加载模板
                     setLoadingTemplate(true);
-                    console.log('开始加载模板, cableType:', cableType);
+                    console.log('开始加载模板, cableType:', selectedCableType);
                     try {
                       const templateResponse = await fetchWithTimeout('/api/load-template', {
                         method: 'POST',
                         headers: {
                           'Content-Type': 'application/json',
                         },
-                        body: JSON.stringify({ cableType }),
+                        body: JSON.stringify({ cableType: selectedCableType }),
                       }, 60000);
 
                       console.log('模板API响应状态:', templateResponse.status);
@@ -469,6 +498,8 @@ export default function Home() {
                       console.log('模板API响应:', templateResult);
 
                       if (templateResult.success) {
+                        if (requestId !== importRequestIdRef.current) return;
+
                         // 保存模板数据到state，供后续Excel导入时使用
                         if (templateResult.data && templateResult.data.records) {
                           console.log('[模板加载] 保存模板数据到state，records数量:', templateResult.data.records.length);
@@ -480,6 +511,8 @@ export default function Home() {
                             site: templateResult.data.site || '',
                             records: templateResult.data.records,
                             page_count: templateResult.data.page_count || 1,
+                            cableType: selectedCableType,
+                            dataSource: 'template',
                           };
                           setParsedData(templateDataRef.current);
                         }
@@ -487,8 +520,8 @@ export default function Home() {
                         // 直接上传Excel
                         setUploadingExcel(true);
                         const formData = new FormData();
-                        formData.append('file', excelFile);
-                        formData.append('cableType', cableType);
+                        formData.append('file', selectedExcelFile);
+                        formData.append('cableType', selectedCableType);
 
                         try {
                           const excelResponse = await fetchWithTimeout('/api/upload-excel', {
@@ -527,6 +560,8 @@ export default function Home() {
                           });
 
                           if (excelResult.success) {
+                            if (requestId !== importRequestIdRef.current) return;
+
                             // 保存Excel信息
                             setExcelInfo({
                               sheetName: excelResult.sheetName,
@@ -635,7 +670,7 @@ export default function Home() {
                                 }
 
                                 // 根据当前选择的线缆类型设置 limit，避免 MPO 缺少带宽时误退到 Cat 5e。
-                                const limitValue = buildLimitValue(row, cableType, excelResult.dataSource);
+                                const limitValue = buildLimitValue(row, selectedCableType, excelResult.dataSource);
 
                                 return {
                                   cable_label: cableLabel,
@@ -663,13 +698,15 @@ export default function Home() {
                                 site: siteNumber,
                                 records: newRecords,
                                 page_count: 1,
+                                cableType: excelResult.cableType || selectedCableType,
+                                dataSource: excelResult.dataSource,
                               });
 
                               setModificationStatus('ready');
                               
                               console.log('✓ Excel数据导入完成，已更新parsedData');
                             } else {
-                              alert(`未找到匹配 ${cableType} 的线缆数据`);
+                              alert(`未找到匹配 ${selectedCableType} 的线缆数据`);
                             }
                           } else {
                             alert('Excel解析失败: ' + excelResult.error);
