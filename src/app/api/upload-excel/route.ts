@@ -36,6 +36,17 @@ type SheetColumnProfile = {
   detectedColumns: DetectedColumns;
 };
 
+type VerticalColumnProfile = {
+  headerRowIndex: number;
+  headers: ExcelRow;
+  cableTypeCol: number;
+  qtyCol: number;
+  lengthCols: number[];
+  dateTimeCol: number;
+  rackRoomCol: number;
+  ruCol: number;
+};
+
 /**
  * 将 Date 对象转换为 "DD-MM-YYYY HH:MM:SS AM/PM" 格式
  */
@@ -120,11 +131,27 @@ function findCableNoColumn(headers: ExcelRow): number {
 }
 
 function findLengthColumns(headers: ExcelRow): number[] {
-  return findColumns(headers, headerLower =>
+  const columns = findColumns(headers, headerLower =>
     headerLower.includes('线长') ||
     headerLower.includes('长度') ||
     headerLower.includes('length')
   );
+
+  return columns.sort((a, b) => {
+    const priorityA = getLengthColumnPriority(headers[a]);
+    const priorityB = getLengthColumnPriority(headers[b]);
+    return priorityA - priorityB || a - b;
+  });
+}
+
+function getLengthColumnPriority(value: unknown): number {
+  const headerLower = normalizeLower(value);
+
+  if (headerLower.includes('线长')) return 0;
+  if (headerLower === 'length' || headerLower.includes('length (m)')) return 1;
+  if (headerLower.includes('长度') && !headerLower.includes('距离')) return 2;
+  if (headerLower.includes('length')) return 3;
+  return 4;
 }
 
 function findDateTimeColumn(headers: ExcelRow): number {
@@ -139,11 +166,83 @@ function findDateTimeColumn(headers: ExcelRow): number {
   );
 }
 
+function findQtyColumn(headers: ExcelRow): number {
+  return findColumn(headers, headerLower =>
+    headerLower === 'qty' ||
+    headerLower === 'quantity' ||
+    headerLower.includes('数量')
+  );
+}
+
+function findRackRoomColumn(headers: ExcelRow): number {
+  return findColumn(headers, headerLower =>
+    headerLower.includes('rack&room') ||
+    headerLower.includes('rack room') ||
+    headerLower.includes('rack') ||
+    headerLower.includes('机柜') ||
+    headerLower.includes('机房') ||
+    headerLower.includes('包间')
+  );
+}
+
+function findRuColumn(headers: ExcelRow): number {
+  return findColumn(headers, headerLower =>
+    headerLower === 'ru' ||
+    headerLower.includes('u位')
+  );
+}
+
 function findSourceLabelColumns(headers: ExcelRow): number[] {
   return findColumns(headers, headerLower =>
     headerLower.includes('临时标签') ||
     headerLower.includes('source label')
   );
+}
+
+function detectVerticalColumns(jsonData: ExcelRow[]): VerticalColumnProfile | null {
+  let bestProfile: VerticalColumnProfile | null = null;
+  let bestScore = -1;
+
+  for (let headerRowIndex = 0; headerRowIndex < Math.min(jsonData.length, 12); headerRowIndex++) {
+    const headers = jsonData[headerRowIndex] || [];
+    const cableTypeCol = findCableTypeColumn(headers);
+    if (cableTypeCol < 0) continue;
+
+    const qtyCol = findQtyColumn(headers);
+    const lengthCols = findLengthColumns(headers);
+    const dateTimeCol = findDateTimeColumn(headers);
+    const rackRoomCol = findRackRoomColumn(headers);
+    const ruCol = findRuColumn(headers);
+
+    let redMatches = 0;
+    for (let rowIndex = headerRowIndex + 1; rowIndex < Math.min(jsonData.length, headerRowIndex + 120); rowIndex++) {
+      if (matchesRedCableType(jsonData[rowIndex]?.[cableTypeCol])) redMatches++;
+    }
+
+    const score =
+      redMatches * 10 +
+      (qtyCol >= 0 ? 3 : 0) +
+      lengthCols.length * 2 +
+      (rackRoomCol >= 0 ? 2 : 0) +
+      (ruCol >= 0 ? 2 : 0) +
+      (dateTimeCol >= 0 ? 1 : 0);
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestProfile = {
+        headerRowIndex,
+        headers,
+        cableTypeCol,
+        qtyCol,
+        lengthCols,
+        dateTimeCol,
+        rackRoomCol,
+        ruCol
+      };
+    }
+  }
+
+  return bestProfile;
 }
 
 function readNumber(row: ExcelRow, col: number): number | null {
@@ -184,6 +283,32 @@ function hasCableDataHeaders(headers: ExcelRow): boolean {
     findDateTimeColumn(headers) >= 0 ||
     findSourceLabelColumns(headers).length > 0
   );
+}
+
+function isYYBXWorkbook(workbook: XLSX.WorkBook, fileName: string): boolean {
+  if (/yybx/i.test(fileName)) return true;
+
+  for (const sheetName of workbook.SheetNames.slice(0, 5)) {
+    const rows = readSheetRows(workbook.Sheets[sheetName]).slice(0, 30);
+    for (const row of rows) {
+      if (row.some(cell => /yybx/i.test(normalizeCell(cell)))) return true;
+    }
+  }
+
+  return false;
+}
+
+function isWorkloadSheet(sheetName: string): boolean {
+  return sheetName.toLowerCase().includes('workload');
+}
+
+function isBeforeWorkloadSheet(workbook: XLSX.WorkBook, sheetName: string): boolean {
+  if (isWorkloadSheet(sheetName)) return false;
+
+  const sheetIndex = workbook.SheetNames.indexOf(sheetName);
+  const workloadIndex = workbook.SheetNames.findIndex(isWorkloadSheet);
+
+  return workloadIndex < 0 || sheetIndex < workloadIndex;
 }
 
 function inferCableTypeColumn(
@@ -369,6 +494,13 @@ function buildVerticalCableBase(row: ExcelRow, rackRoomCol: number, ruCol: numbe
   return rackRoom;
 }
 
+function buildVerticalCableBaseWithFallback(row: ExcelRow, rackRoomCol: number, ruCol: number): string {
+  const rackRoomBase = buildVerticalCableBase(row, rackRoomCol, ruCol);
+  if (rackRoomBase) return rackRoomBase;
+
+  return normalizeCell(row[0]) || normalizeCell(row[4]);
+}
+
 function matchesRedCableType(value: unknown): boolean {
   const text = normalizeCell(value);
   const lower = text.toLowerCase();
@@ -486,7 +618,7 @@ function collectMatchingRows(
       if (sourceLabel) parsedRow.sourceLabel = sourceLabel;
 
       if (options.includeBandwidth) {
-        parsedRow.bandwidth = extractBandwidth(rowCableType);
+        parsedRow.bandwidth = extractBandwidth(`${rowCableType} ${sourceLabel || ''}`);
       }
 
       explicitCableNos.push(explicitCableNo);
@@ -567,19 +699,21 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(bytes);
     const workbook = XLSX.read(buffer, { type: 'buffer' });
 
+    const yybxWorkbook = isYYBXWorkbook(workbook, file.name || '');
+
     if (cableType === 'MPO') {
-      return handleMPO(workbook, cableType);
+      return handleMPO(workbook, cableType, yybxWorkbook);
     }
 
     if (cableType === 'LC') {
-      return handleLC(workbook, cableType);
+      return handleLC(workbook, cableType, yybxWorkbook);
     }
 
     if (cableType.includes('Vertical Cabling')) {
       return handleVerticalCabling(workbook, cableType);
     }
 
-    return handleOOB(workbook, cableType);
+    return handleOOB(workbook, cableType, yybxWorkbook);
   } catch (error) {
     console.error('Excel parse error:', error);
     return NextResponse.json(
@@ -592,13 +726,22 @@ export async function POST(request: NextRequest) {
 /**
  * Cat 5e: 只导入 OOB 工作表中线缆类型包含“红”或“red/RED”的线号。
  */
-function handleOOB(workbook: XLSX.WorkBook, cableType: string) {
+function handleOOB(workbook: XLSX.WorkBook, cableType: string, yybxWorkbook: boolean) {
   return collectMatchingRows(workbook, {
     cableType,
     dataSource: 'OOB',
     sheetFilter: sheetName => {
       const lower = sheetName.toLowerCase();
-      return lower.includes('oob') && !lower.includes('crosse') && !lower.includes('cross');
+
+      if (yybxWorkbook) {
+        return isBeforeWorkloadSheet(workbook, sheetName);
+      }
+
+      return (
+        lower.includes('oob') &&
+        !lower.includes('crosse') &&
+        !lower.includes('cross')
+      );
     },
     typeMatcher: matchesRedCableType,
     generatedCableNo: sequence => String(sequence),
@@ -610,11 +753,16 @@ function handleOOB(workbook: XLSX.WorkBook, cableType: string) {
 /**
  * LC: 导入线缆类型中 LC 作为独立标记的数据，例如 SM,LC-LC；排除黄网/红网/Cat 等网线类型。
  */
-function handleLC(workbook: XLSX.WorkBook, cableType: string) {
+function handleLC(workbook: XLSX.WorkBook, cableType: string, yybxWorkbook: boolean) {
   return collectMatchingRows(workbook, {
     cableType,
     dataSource: 'LC',
-    sheetFilter: sheetName => !sheetName.toLowerCase().includes('vertical cabling'),
+    sheetFilter: sheetName => {
+      if (yybxWorkbook) return isBeforeWorkloadSheet(workbook, sheetName);
+
+      const lower = sheetName.toLowerCase();
+      return !lower.includes('vertical cabling') && !isWorkloadSheet(sheetName);
+    },
     typeMatcher: matchesLcCableType,
     generatedCableNo: sequence => String(sequence),
     replaceConstantExplicitCableNo: true,
@@ -648,43 +796,37 @@ function handleVerticalCabling(workbook: XLSX.WorkBook, cableType: string) {
     return NextResponse.json({ error: 'Vertical Cabling工作表为空' }, { status: 400 });
   }
 
-  const headers = jsonData[0];
-  const cableTypeCol = findCableTypeColumn(headers);
-  const qtyCol = findColumn(headers, headerLower =>
-    headerLower === 'qty' ||
-    headerLower === 'quantity' ||
-    headerLower.includes('数量')
-  );
-  const lengthCols = findLengthColumns(headers);
-  const dateTimeCol = findDateTimeColumn(headers);
-  const bColIndex = 1;
-  const ruColIndex = 2;
+  const columns = detectVerticalColumns(jsonData);
 
-  if (cableTypeCol === -1) {
+  if (!columns) {
     return NextResponse.json({ error: '未找到"线缆类型/接口类型/Cable Type"列' }, { status: 400 });
   }
 
   const filteredRows: ParsedCableRow[] = [];
 
-  for (let i = 1; i < jsonData.length; i++) {
+  for (let i = columns.headerRowIndex + 1; i < jsonData.length; i++) {
     const row = jsonData[i];
-    const rowCableType = normalizeCell(row[cableTypeCol]);
+    const rowCableType = normalizeCell(row[columns.cableTypeCol]);
 
     if (!matchesRedCableType(rowCableType)) continue;
 
-    const cableBase = buildVerticalCableBase(row, bColIndex, ruColIndex);
+    const rackRoomCol = columns.rackRoomCol >= 0 ? columns.rackRoomCol : 1;
+    const ruCol = columns.ruCol >= 0 ? columns.ruCol : 2;
+    const cableBase = buildVerticalCableBaseWithFallback(row, rackRoomCol, ruCol);
     if (!cableBase) continue;
 
-    const qty = Math.max(Number.parseInt(normalizeCell(row[qtyCol]), 10) || 1, 1);
+    const qty = columns.qtyCol >= 0
+      ? Math.max(Number.parseInt(normalizeCell(row[columns.qtyCol]), 10) || 1, 1)
+      : 1;
 
     for (let j = 1; j <= qty; j++) {
       filteredRows.push({
         cableNo: `${cableBase}-${j}`,
-        length: readLength(row, lengthCols),
+        length: readLength(row, columns.lengthCols),
         cableType: rowCableType,
         rowIndex: i + 1,
         sheetName,
-        dateTime: readDateTime(row, dateTimeCol),
+        dateTime: readDateTime(row, columns.dateTimeCol),
         qtyIndex: j,
         originalQty: qty
       });
@@ -692,8 +834,20 @@ function handleVerticalCabling(workbook: XLSX.WorkBook, cableType: string) {
   }
 
   if (filteredRows.length === 0) {
+    const sampleTypes = Array.from(new Set(
+      jsonData
+        .slice(columns.headerRowIndex + 1)
+        .map(row => normalizeCell(row[columns.cableTypeCol]))
+        .filter(Boolean)
+    )).slice(0, 8);
+
     return NextResponse.json({
-      error: '未找到Vertical Cat 5e红网数据：该类型会匹配“线缆类型/接口类型/Cable Type”中包含“红”或“red/RED”的行'
+      error: [
+        '未找到Vertical Cat 5e红网数据：该类型会匹配“线缆类型/接口类型/Cable Type”中包含“红”或“red/RED”的行。',
+        sampleTypes.length > 0
+          ? `当前识别到的类型示例：${sampleTypes.join('、')}`
+          : '当前识别到的类型列没有有效内容。'
+      ].join('')
     }, { status: 400 });
   }
 
@@ -703,12 +857,12 @@ function handleVerticalCabling(workbook: XLSX.WorkBook, cableType: string) {
     success: true,
     sheetName,
     detectedColumns: {
-      cableType: normalizeCell(headers[cableTypeCol]),
-      cableNo: normalizeCell(headers[bColIndex]) || 'B列',
-      ru: normalizeCell(headers[ruColIndex]) || 'C列',
-      qty: qtyCol >= 0 ? normalizeCell(headers[qtyCol]) : null,
-      length: lengthCols.length > 0 ? lengthCols.map(col => normalizeCell(headers[col])).join(', ') : null,
-      dateTime: dateTimeCol >= 0 ? normalizeCell(headers[dateTimeCol]) : null
+      cableType: normalizeCell(columns.headers[columns.cableTypeCol]),
+      cableNo: normalizeCell(columns.headers[columns.rackRoomCol >= 0 ? columns.rackRoomCol : 1]) || 'B列',
+      ru: normalizeCell(columns.headers[columns.ruCol >= 0 ? columns.ruCol : 2]) || 'C列',
+      qty: columns.qtyCol >= 0 ? normalizeCell(columns.headers[columns.qtyCol]) : null,
+      length: columns.lengthCols.length > 0 ? columns.lengthCols.map(col => normalizeCell(columns.headers[col])).join(', ') : null,
+      dateTime: columns.dateTimeCol >= 0 ? normalizeCell(columns.headers[columns.dateTimeCol]) : null
     },
     filteredRows,
     totalCount: filteredRows.length,
@@ -722,11 +876,13 @@ function handleVerticalCabling(workbook: XLSX.WorkBook, cableType: string) {
 /**
  * MPO: 导入线缆类型包含 MPO 的数据；没有显式“线号”的工作表使用 MPO 顺序号。
  */
-function handleMPO(workbook: XLSX.WorkBook, cableType: string) {
+function handleMPO(workbook: XLSX.WorkBook, cableType: string, yybxWorkbook: boolean) {
   const response = collectMatchingRows(workbook, {
     cableType,
     dataSource: 'MPO',
-    sheetFilter: () => true,
+    sheetFilter: sheetName => yybxWorkbook
+      ? isBeforeWorkloadSheet(workbook, sheetName)
+      : !isWorkloadSheet(sheetName),
     typeMatcher: matchesMpoCableType,
     generatedCableNo: sequence => `MPO ${sequence}`,
     includeBandwidth: true,

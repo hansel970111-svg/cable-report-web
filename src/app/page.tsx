@@ -70,7 +70,11 @@ function extractBandwidth(value: unknown): string {
 function buildLimitValue(row: Record<string, unknown>, selectedCableType: string, dataSource: unknown): string {
   const isMPO = selectedCableType === 'MPO' || dataSource === 'MPO';
   if (isMPO) {
-    const bandwidth = extractBandwidth(row.bandwidth) || extractBandwidth(row.cableType) || '200G';
+    const bandwidth =
+      extractBandwidth(row.bandwidth) ||
+      extractBandwidth(row.cableType) ||
+      extractBandwidth(row.sourceLabel) ||
+      '200G';
     return `${bandwidth}BASE-SR10`;
   }
 
