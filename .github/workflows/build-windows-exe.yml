@@ -64,7 +64,7 @@ jobs:
         run: |
           pnpm build
           node ./scripts/build-python-workers.mjs
-          pnpm exec electron-builder --win
+          pnpm exec electron-builder --win --publish never
 
       - name: Show build outputs
         shell: pwsh
