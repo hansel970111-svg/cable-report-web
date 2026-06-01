@@ -74,6 +74,8 @@ const resourcesDir = platform === 'win'
   : path.join(macAppDir, 'Contents', 'Resources');
 const appDir = path.join(resourcesDir, 'app');
 const nextBuildDir = path.join(appDir, 'next-build');
+const standaloneDir = path.join(nextBuildDir, 'standalone');
+const standaloneNextBuildDir = path.join(standaloneDir, 'next-build');
 const appWorkerDir = path.join(appDir, 'worker-bin');
 const legacyAppWorkerDir = path.join(appDir, 'resources', 'bin');
 const externalWorkerDir = path.join(resourcesDir, 'bin');
@@ -84,15 +86,29 @@ requireDir(resourcesDir, 'desktop resources directory');
 requireDir(appDir, 'packaged app directory');
 requireDir(nextBuildDir, 'Next.js production build directory');
 
-const requiredFiles = [
-  [path.join(appDir, 'package.json'), 'packaged package.json'],
-  [path.join(appDir, 'next.config.mjs'), 'Next config'],
-  [path.join(appDir, 'electron', 'main.cjs'), 'Electron main process'],
-  [path.join(nextBuildDir, 'BUILD_ID'), 'Next build id'],
-  [path.join(nextBuildDir, 'routes-manifest.json'), 'Next routes manifest'],
-  [path.join(nextBuildDir, 'server'), 'Next server output'],
-  [path.join(nextBuildDir, 'static'), 'Next static output'],
-];
+const hasStandaloneRuntime = fs.existsSync(path.join(standaloneDir, 'server.js'));
+const requiredFiles = hasStandaloneRuntime
+  ? [
+      [path.join(appDir, 'package.json'), 'packaged package.json'],
+      [path.join(appDir, 'next.config.mjs'), 'Next config'],
+      [path.join(appDir, 'electron', 'main.cjs'), 'Electron main process'],
+      [path.join(standaloneDir, 'server.js'), 'Next standalone server'],
+      [path.join(standaloneDir, 'package.json'), 'Next standalone package metadata'],
+      [path.join(standaloneDir, 'node_modules'), 'Next standalone node modules'],
+      [path.join(standaloneNextBuildDir, 'BUILD_ID'), 'Next standalone build id'],
+      [path.join(standaloneNextBuildDir, 'routes-manifest.json'), 'Next standalone routes manifest'],
+      [path.join(standaloneNextBuildDir, 'server'), 'Next standalone server output'],
+      [path.join(standaloneNextBuildDir, 'static'), 'Next standalone static output'],
+    ]
+  : [
+      [path.join(appDir, 'package.json'), 'packaged package.json'],
+      [path.join(appDir, 'next.config.mjs'), 'Next config'],
+      [path.join(appDir, 'electron', 'main.cjs'), 'Electron main process'],
+      [path.join(nextBuildDir, 'BUILD_ID'), 'Next build id'],
+      [path.join(nextBuildDir, 'routes-manifest.json'), 'Next routes manifest'],
+      [path.join(nextBuildDir, 'server'), 'Next server output'],
+      [path.join(nextBuildDir, 'static'), 'Next static output'],
+    ];
 
 for (const [filePath, description] of requiredFiles) {
   const stat = fs.existsSync(filePath) ? fs.statSync(filePath) : null;
@@ -151,6 +167,7 @@ const forbiddenPaths = [
   [path.join(appDir, 'assets', 'FRWE366-N101_MPO.pdf'), 'generated MPO PDF'],
   [path.join(resourcesDir, 'assets', 'test_lc_final.pdf'), 'debug LC PDF'],
   [path.join(resourcesDir, 'assets', 'FRWE366-N101_MPO.pdf'), 'generated MPO PDF'],
+  [path.join(appDir, 'node_modules'), 'full root node_modules tree'],
   [path.join(appDir, 'node_modules', 'electron'), 'Electron npm package'],
   [path.join(appDir, 'node_modules', 'electron-builder'), 'Electron Builder package'],
   [path.join(appDir, 'node_modules', 'app-builder-bin'), 'Electron Builder binary package'],

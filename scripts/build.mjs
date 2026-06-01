@@ -47,6 +47,38 @@ function runPnpm(args) {
   run(commandName('corepack'), ['pnpm', ...args]);
 }
 
+function copyDirIfExists(sourceDir, targetDir, label) {
+  if (!fs.existsSync(sourceDir)) return;
+
+  fs.rmSync(targetDir, { recursive: true, force: true });
+  fs.mkdirSync(path.dirname(targetDir), { recursive: true });
+  fs.cpSync(sourceDir, targetDir, { recursive: true });
+  console.log(`Copied ${label} into standalone runtime.`);
+}
+
+function prepareStandaloneRuntime() {
+  const nextBuildDir = path.join(workspace, 'next-build');
+  const standaloneDir = path.join(nextBuildDir, 'standalone');
+
+  if (!fs.existsSync(standaloneDir)) return;
+
+  for (const relativeDir of ['worker-bin', path.join('resources', 'bin')]) {
+    fs.rmSync(path.join(standaloneDir, relativeDir), { recursive: true, force: true });
+  }
+
+  copyDirIfExists(
+    path.join(nextBuildDir, 'static'),
+    path.join(standaloneDir, 'next-build', 'static'),
+    'Next.js static files'
+  );
+
+  copyDirIfExists(
+    path.join(workspace, 'public'),
+    path.join(standaloneDir, 'public'),
+    'public assets'
+  );
+}
+
 if (fs.existsSync(path.join(workspace, 'node_modules'))) {
   console.log('Dependencies already installed; skipping install.');
 } else {
@@ -63,6 +95,7 @@ if (fs.existsSync(path.join(workspace, 'node_modules'))) {
 
 console.log('Building the Next.js project...');
 runPnpm(['next', 'build', '--webpack']);
+prepareStandaloneRuntime();
 
 console.log('Bundling server with tsup...');
 runPnpm([

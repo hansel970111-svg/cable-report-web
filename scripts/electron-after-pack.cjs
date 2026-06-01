@@ -5,16 +5,25 @@ const path = require('node:path');
 module.exports = async function afterPack(context) {
   const workerSourceDir = path.join(context.packager.projectDir, 'worker-bin');
 
+  function copyWorkerFiles(workerDestDir) {
+    if (!fs.existsSync(workerSourceDir)) return;
+
+    fs.rmSync(workerDestDir, { recursive: true, force: true });
+    fs.mkdirSync(workerDestDir, { recursive: true });
+
+    for (const fileName of fs.readdirSync(workerSourceDir)) {
+      if (!/^pdf_worker(\.exe)?$/.test(fileName)) continue;
+      fs.copyFileSync(path.join(workerSourceDir, fileName), path.join(workerDestDir, fileName));
+    }
+  }
+
   if (context.electronPlatformName === 'darwin') {
     const appName = `${context.packager.appInfo.productFilename}.app`;
     const appPath = path.join(context.appOutDir, appName);
     if (!fs.existsSync(appPath)) return;
 
     const workerDestDir = path.join(appPath, 'Contents', 'Resources', 'bin');
-    if (fs.existsSync(workerSourceDir)) {
-      fs.rmSync(workerDestDir, { recursive: true, force: true });
-      fs.cpSync(workerSourceDir, workerDestDir, { recursive: true });
-    }
+    copyWorkerFiles(workerDestDir);
 
     execFileSync('xattr', ['-cr', appPath], { stdio: 'inherit' });
     return;
@@ -22,7 +31,6 @@ module.exports = async function afterPack(context) {
 
   if (context.electronPlatformName === 'win32' && fs.existsSync(workerSourceDir)) {
     const workerDestDir = path.join(context.appOutDir, 'resources', 'bin');
-    fs.rmSync(workerDestDir, { recursive: true, force: true });
-    fs.cpSync(workerSourceDir, workerDestDir, { recursive: true });
+    copyWorkerFiles(workerDestDir);
   }
 };

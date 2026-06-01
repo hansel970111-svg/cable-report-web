@@ -39,9 +39,37 @@ function getFreePort(preferredPort) {
   });
 }
 
+function waitForPort(port, timeoutMs = 30000) {
+  const startedAt = Date.now();
+
+  return new Promise((resolve, reject) => {
+    const tryConnect = () => {
+      const socket = net.createConnection({ host: '127.0.0.1', port });
+
+      socket.once('connect', () => {
+        socket.destroy();
+        resolve();
+      });
+
+      socket.once('error', error => {
+        socket.destroy();
+        if (Date.now() - startedAt >= timeoutMs) {
+          reject(new Error(`本地服务启动超时: ${error.message}`));
+          return;
+        }
+
+        setTimeout(tryConnect, 250);
+      });
+    };
+
+    tryConnect();
+  });
+}
+
 async function startNextServer() {
   const appRoot = getAppRoot();
   const port = await getFreePort(Number(process.env.PORT || 5000));
+  const hostname = '127.0.0.1';
   const dev = !app.isPackaged && process.env.ELECTRON_NEXT_DEV !== 'false';
 
   process.chdir(appRoot);
@@ -49,8 +77,17 @@ async function startNextServer() {
   process.env.COZE_PROJECT_ENV = dev ? 'DEV' : 'PROD';
   process.env.NODE_ENV = dev ? 'development' : 'production';
   process.env.PORT = String(port);
+  process.env.HOSTNAME = hostname;
+  process.env.HOST = hostname;
 
   if (!dev) {
+    const standaloneServerPath = path.join(appRoot, 'next-build', 'standalone', 'server.js');
+    if (fs.existsSync(standaloneServerPath)) {
+      require(standaloneServerPath);
+      await waitForPort(port);
+      return `http://${hostname}:${port}`;
+    }
+
     const buildIdPath = path.join(appRoot, 'next-build', 'BUILD_ID');
     if (!fs.existsSync(buildIdPath)) {
       throw new Error(`未找到生产构建目录: ${buildIdPath}`);
@@ -61,7 +98,7 @@ async function startNextServer() {
   const nextApp = next({
     dev,
     dir: appRoot,
-    hostname: '127.0.0.1',
+    hostname,
     port,
   });
   const handle = nextApp.getRequestHandler();
@@ -78,10 +115,10 @@ async function startNextServer() {
 
   await new Promise((resolve, reject) => {
     nextServer.once('error', reject);
-    nextServer.listen(port, '127.0.0.1', resolve);
+    nextServer.listen(port, hostname, resolve);
   });
 
-  return `http://127.0.0.1:${port}`;
+  return `http://${hostname}:${port}`;
 }
 
 function createMainWindow(url) {

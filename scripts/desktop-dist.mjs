@@ -63,4 +63,4 @@ const targetArg = requestedTarget === 'mac'
     ? '--win'
     : `--${requestedTarget}`;
 
-run(builder.command, [...builder.argsPrefix, targetArg]);
+run(builder.command, [...builder.argsPrefix, targetArg, '--publish=never']);
