@@ -192,11 +192,15 @@ function findRuColumn(headers: ExcelRow): number {
   );
 }
 
-function findSourceLabelColumns(headers: ExcelRow): number[] {
-  return findColumns(headers, headerLower =>
+function isSourceLabelHeader(headerLower: string): boolean {
+  return (
     headerLower.includes('临时标签') ||
     headerLower.includes('source label')
   );
+}
+
+function findSourceLabelColumns(headers: ExcelRow): number[] {
+  return findColumns(headers, headerLower => isSourceLabelHeader(headerLower));
 }
 
 function detectVerticalColumns(jsonData: ExcelRow[]): VerticalColumnProfile | null {
@@ -322,7 +326,8 @@ function inferCableTypeColumn(
   let bestMatches = 0;
 
   for (let col = 0; col < width; col++) {
-    if (normalizeCell(headers[col])) continue;
+    const headerLower = normalizeLower(headers[col]);
+    if (headerLower && !isSourceLabelHeader(headerLower)) continue;
 
     let matches = 0;
     for (let rowIndex = startRow; rowIndex < Math.min(jsonData.length, startRow + 80); rowIndex++) {

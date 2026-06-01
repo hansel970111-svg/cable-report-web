@@ -100,9 +100,10 @@ function getPythonCandidates(): Array<{ command: string; args: string[] }> {
   return candidates;
 }
 
-function getBundledWorkerPath(scriptPath: string): string | null {
+function getBundledWorker(scriptPath: string): { command: string; argsPrefix: string[] } | null {
   const scriptName = path.basename(scriptPath, '.py');
   const executableName = process.platform === 'win32' ? `${scriptName}.exe` : scriptName;
+  const sharedWorkerName = process.platform === 'win32' ? 'pdf_worker.exe' : 'pdf_worker';
   const resourcePath = getElectronResourcesPath();
 
   const envKey = scriptName === 'pdf_editor'
@@ -121,7 +122,23 @@ function getBundledWorkerPath(scriptPath: string): string | null {
     path.join(process.cwd(), 'resources', 'bin', executableName),
   ].filter(Boolean) as string[];
 
-  return candidates.find(candidate => fs.existsSync(candidate)) || null;
+  const directWorker = candidates.find(candidate => fs.existsSync(candidate));
+  if (directWorker) {
+    return { command: directWorker, argsPrefix: [] };
+  }
+
+  const sharedCandidates = [
+    process.env.PDF_WORKER_BIN,
+    process.env.PDF_WORKER_DIR ? path.join(process.env.PDF_WORKER_DIR, sharedWorkerName) : null,
+    resourcePath ? path.join(resourcePath, 'bin', sharedWorkerName) : null,
+    path.join(getAppRoot(), 'worker-bin', sharedWorkerName),
+    path.join(getAppRoot(), 'resources', 'bin', sharedWorkerName),
+    path.join(process.cwd(), 'worker-bin', sharedWorkerName),
+    path.join(process.cwd(), 'resources', 'bin', sharedWorkerName),
+  ].filter(Boolean) as string[];
+
+  const sharedWorker = sharedCandidates.find(candidate => fs.existsSync(candidate));
+  return sharedWorker ? { command: sharedWorker, argsPrefix: [scriptName] } : null;
 }
 
 function getPythonEnv(): NodeJS.ProcessEnv {
@@ -145,11 +162,11 @@ export async function runPythonScript(
   args: string[],
   options: { maxBuffer?: number; cwd?: string } = {}
 ) {
-  const bundledWorkerPath = getBundledWorkerPath(scriptPath);
-  if (bundledWorkerPath) {
+  const bundledWorker = getBundledWorker(scriptPath);
+  if (bundledWorker) {
     return execFileAsync(
-      bundledWorkerPath,
-      args,
+      bundledWorker.command,
+      [...bundledWorker.argsPrefix, ...args],
       {
         maxBuffer: options.maxBuffer ?? 10 * 1024 * 1024,
         cwd: options.cwd,

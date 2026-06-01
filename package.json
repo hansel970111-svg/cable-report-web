@@ -90,6 +90,7 @@
     "directories": {
       "output": "release"
     },
+    "compression": "maximum",
     "asar": false,
     "afterPack": "scripts/electron-after-pack.cjs",
     "files": [
@@ -168,7 +169,70 @@
       "!node_modules/.pnpm/react-dev-inspector@*/**",
       "!node_modules/react-dev-inspector/**",
       "!node_modules/.pnpm/@react-dev-inspector+*/**",
-      "!node_modules/@react-dev-inspector/**"
+      "!node_modules/@react-dev-inspector/**",
+      "!node_modules/.pnpm/coze-coding-dev-sdk@*/**",
+      "!node_modules/coze-coding-dev-sdk/**",
+      "!node_modules/.pnpm/@langchain+*/**",
+      "!node_modules/@langchain/**",
+      "!node_modules/.pnpm/langsmith@*/**",
+      "!node_modules/langsmith/**",
+      "!node_modules/.pnpm/openai@*/**",
+      "!node_modules/openai/**",
+      "!node_modules/.pnpm/@modelcontextprotocol+*/**",
+      "!node_modules/@modelcontextprotocol/**",
+      "!node_modules/.pnpm/msw@*/**",
+      "!node_modules/msw/**",
+      "!node_modules/.pnpm/@mswjs+*/**",
+      "!node_modules/@mswjs/**",
+      "!node_modules/.pnpm/drizzle-*@*/**",
+      "!node_modules/drizzle-*/**",
+      "!node_modules/.pnpm/@drizzle-team+*/**",
+      "!node_modules/@drizzle-team/**",
+      "!node_modules/.pnpm/pg@*/**",
+      "!node_modules/pg/**",
+      "!node_modules/.pnpm/@types+pg@*/**",
+      "!node_modules/.pnpm/recharts@*/**",
+      "!node_modules/recharts/**",
+      "!node_modules/.pnpm/recharts-scale@*/**",
+      "!node_modules/recharts-scale/**",
+      "!node_modules/.pnpm/react-hook-form@*/**",
+      "!node_modules/react-hook-form/**",
+      "!node_modules/.pnpm/embla-carousel*@*/**",
+      "!node_modules/embla-carousel*/**",
+      "!node_modules/.pnpm/cmdk@*/**",
+      "!node_modules/cmdk/**",
+      "!node_modules/.pnpm/input-otp@*/**",
+      "!node_modules/input-otp/**",
+      "!node_modules/.pnpm/next-themes@*/**",
+      "!node_modules/next-themes/**",
+      "!node_modules/.pnpm/react-resizable-panels@*/**",
+      "!node_modules/react-resizable-panels/**",
+      "!node_modules/.pnpm/sonner@*/**",
+      "!node_modules/sonner/**",
+      "!node_modules/.pnpm/vaul@*/**",
+      "!node_modules/vaul/**",
+      "!node_modules/.pnpm/@radix-ui+react-accordion@*/**",
+      "!node_modules/.pnpm/@radix-ui+react-alert-dialog@*/**",
+      "!node_modules/.pnpm/@radix-ui+react-aspect-ratio@*/**",
+      "!node_modules/.pnpm/@radix-ui+react-avatar@*/**",
+      "!node_modules/.pnpm/@radix-ui+react-checkbox@*/**",
+      "!node_modules/.pnpm/@radix-ui+react-collapsible@*/**",
+      "!node_modules/.pnpm/@radix-ui+react-context-menu@*/**",
+      "!node_modules/.pnpm/@radix-ui+react-dialog@*/**",
+      "!node_modules/.pnpm/@radix-ui+react-dropdown-menu@*/**",
+      "!node_modules/.pnpm/@radix-ui+react-hover-card@*/**",
+      "!node_modules/.pnpm/@radix-ui+react-menubar@*/**",
+      "!node_modules/.pnpm/@radix-ui+react-navigation-menu@*/**",
+      "!node_modules/.pnpm/@radix-ui+react-progress@*/**",
+      "!node_modules/.pnpm/@radix-ui+react-radio-group@*/**",
+      "!node_modules/.pnpm/@radix-ui+react-scroll-area@*/**",
+      "!node_modules/.pnpm/@radix-ui+react-separator@*/**",
+      "!node_modules/.pnpm/@radix-ui+react-slider@*/**",
+      "!node_modules/.pnpm/@radix-ui+react-switch@*/**",
+      "!node_modules/.pnpm/@radix-ui+react-tabs@*/**",
+      "!node_modules/.pnpm/@radix-ui+react-toggle@*/**",
+      "!node_modules/.pnpm/@radix-ui+react-toggle-group@*/**",
+      "!node_modules/.pnpm/@radix-ui+react-tooltip@*/**"
     ],
     "extraResources": [
       {
@@ -184,7 +248,11 @@
         "from": "worker-bin",
         "to": "bin",
         "filter": [
-          "**/*"
+          "pdf_worker*",
+          "pdf_editor",
+          "pdf_editor.exe",
+          "pdf_processor",
+          "pdf_processor.exe"
         ]
       }
     ],
@@ -199,7 +267,7 @@
     "win": {
       "target": [
         {
-          "target": "portable",
+          "target": "nsis",
           "arch": [
             "x64"
           ]

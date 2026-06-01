@@ -97,20 +97,27 @@ fs.mkdirSync(workerOutputDir, { recursive: true });
 fs.mkdirSync(buildRoot, { recursive: true });
 
 const workers = [
-  { name: 'pdf_editor', script: path.join('scripts', 'pdf_editor.py') },
-  { name: 'pdf_processor', script: path.join('scripts', 'pdf_processor.py') },
+  {
+    name: 'pdf_worker',
+    script: path.join('scripts', 'pdf_worker.py'),
+    data: [
+      pyinstallerDataArg(path.join(workspace, 'fonts', 'LiberationSans-Regular.ttf'), 'fonts'),
+      pyinstallerDataArg(path.join(workspace, 'fonts', 'LiberationSans-Bold.ttf'), 'fonts'),
+    ],
+    hiddenImports: ['pdf_editor', 'pdf_processor'],
+  },
 ];
 
 for (const worker of workers) {
   console.log(`Building Python worker: ${worker.name}`);
   const dataArgs = [];
-  if (worker.name === 'pdf_editor') {
-    dataArgs.push(
-      '--add-data',
-      pyinstallerDataArg(path.join(workspace, 'fonts', 'LiberationSans-Regular.ttf'), 'fonts'),
-      '--add-data',
-      pyinstallerDataArg(path.join(workspace, 'fonts', 'LiberationSans-Bold.ttf'), 'fonts'),
-    );
+  for (const dataArg of worker.data || []) {
+    dataArgs.push('--add-data', dataArg);
+  }
+
+  const hiddenImportArgs = [];
+  for (const hiddenImport of worker.hiddenImports || []) {
+    hiddenImportArgs.push('--hidden-import', hiddenImport);
   }
 
   runPython(python, [
@@ -127,6 +134,7 @@ for (const worker of workers) {
     path.join(buildRoot, 'build'),
     '--specpath',
     path.join(buildRoot, 'spec'),
+    ...hiddenImportArgs,
     ...dataArgs,
     worker.script,
   ]);
