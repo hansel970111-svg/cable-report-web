@@ -5,6 +5,10 @@ const path = require('node:path');
 module.exports = async function afterPack(context) {
   const workerSourceDir = path.join(context.packager.projectDir, 'worker-bin');
 
+  function removeRootNodeModules(appContentDir) {
+    fs.rmSync(path.join(appContentDir, 'node_modules'), { recursive: true, force: true });
+  }
+
   function copyWorkerFiles(workerDestDir) {
     if (!fs.existsSync(workerSourceDir)) return;
 
@@ -22,6 +26,8 @@ module.exports = async function afterPack(context) {
     const appPath = path.join(context.appOutDir, appName);
     if (!fs.existsSync(appPath)) return;
 
+    removeRootNodeModules(path.join(appPath, 'Contents', 'Resources', 'app'));
+
     const workerDestDir = path.join(appPath, 'Contents', 'Resources', 'bin');
     copyWorkerFiles(workerDestDir);
 
@@ -29,7 +35,9 @@ module.exports = async function afterPack(context) {
     return;
   }
 
-  if (context.electronPlatformName === 'win32' && fs.existsSync(workerSourceDir)) {
+  if (context.electronPlatformName === 'win32') {
+    removeRootNodeModules(path.join(context.appOutDir, 'resources', 'app'));
+
     const workerDestDir = path.join(context.appOutDir, 'resources', 'bin');
     copyWorkerFiles(workerDestDir);
   }

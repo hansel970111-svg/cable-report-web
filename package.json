@@ -98,7 +98,9 @@
       "electron/**/*",
       "next-build/standalone/**/*",
       "package.json",
-      "next.config.mjs"
+      "next.config.mjs",
+      "!node_modules",
+      "!node_modules/**/*"
     ],
     "extraResources": [
       {
