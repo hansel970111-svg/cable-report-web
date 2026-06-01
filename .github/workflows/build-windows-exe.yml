@@ -79,5 +79,5 @@ jobs:
         with:
           name: Cable-Report-Generator-Windows
           path: |
-            release/*.exe
+            release/*.zip
           if-no-files-found: error
