@@ -29,6 +29,7 @@ type SheetColumnProfile = {
   headerRowCount: number;
   cableTypeCol: number;
   cableNoCol: number;
+  cableNoCols: number[];
   lengthCols: number[];
   lengthMode: LengthMode;
   dateTimeCol: number;
@@ -124,9 +125,15 @@ function findCableNoColumn(headers: ExcelRow): number {
   return findColumn(headers, headerLower =>
     headerLower.includes('线号') ||
     headerLower.includes('cable no') ||
-    headerLower.includes('cable label') ||
-    headerLower === 'no' ||
-    headerLower === 'number'
+    headerLower.includes('cable label')
+  );
+}
+
+function findCableNoColumns(headers: ExcelRow): number[] {
+  return findColumns(headers, headerLower =>
+    headerLower.includes('线号') ||
+    headerLower.includes('cable no') ||
+    headerLower.includes('cable label')
   );
 }
 
@@ -392,6 +399,7 @@ function detectSheetColumns(
   const explicitCableNoCol = useTwoRowHeader
     ? secondCableNoCol
     : findCableNoColumn(primaryHeaders);
+  const explicitCableNoCols = findCableNoColumns(primaryHeaders);
   const inferredCableNoCol = inferredCableTypeCol
     ? inferCableNoColumnAfterType(jsonData, primaryHeaders, cableTypeCol, headerRowCount)
     : -1;
@@ -400,6 +408,11 @@ function detectSheetColumns(
     : inferredCableNoCol >= 0
     ? inferredCableNoCol
     : -1;
+  const cableNoCols = explicitCableNoCols.length > 0
+    ? explicitCableNoCols
+    : inferredCableNoCol >= 0
+    ? [inferredCableNoCol]
+    : [];
   const lengthCols = useTwoRowHeader
     ? secondLengthCols
     : findLengthColumns(primaryHeaders);
@@ -416,24 +429,35 @@ function detectSheetColumns(
     ? 'sumFirstTwoPlus50'
     : 'firstNumeric';
   const lengthName = combineColumnNames(primaryHeaders, lengthCols);
+  const cableNoName = combineColumnNames(primaryHeaders, cableNoCols);
 
   return {
     headerRowCount,
     cableTypeCol,
     cableNoCol,
+    cableNoCols,
     lengthCols,
     lengthMode,
     dateTimeCol,
     sourceLabelCols,
     detectedColumns: {
       cableType: normalizeCell(firstHeaders[cableTypeCol]) || normalizeCell(secondHeaders[cableTypeCol]) || `推断列 ${XLSX.utils.encode_col(cableTypeCol)}`,
-      cableNo: cableNoCol >= 0 ? normalizeCell(primaryHeaders[cableNoCol]) || `推断列 ${XLSX.utils.encode_col(cableNoCol)}` : '自动序号',
+      cableNo: cableNoName || (cableNoCol >= 0 ? `推断列 ${XLSX.utils.encode_col(cableNoCol)}` : '自动序号'),
       length: lengthName ? (lengthMode === 'sumFirstTwoPlus50' ? `${lengthName} + 50m` : lengthName) : null,
       dateTime: dateTimeCol >= 0
         ? normalizeCell(primaryHeaders[dateTimeCol]) || normalizeCell(fallbackHeaders[dateTimeCol])
         : null
     }
   };
+}
+
+function readFirstCableNo(row: ExcelRow, cableNoCols: number[]): string {
+  for (const col of cableNoCols) {
+    const value = normalizeCell(row[col]);
+    if (value) return value;
+  }
+
+  return '';
 }
 
 function readDateTime(row: ExcelRow, dateTimeCol: number): string | null {
@@ -592,8 +616,8 @@ function collectMatchingRows(
       const rowCableType = normalizeCell(row[columns.cableTypeCol]);
       if (!rowCableType || !options.typeMatcher(rowCableType)) continue;
 
-      const hasCableNoColumn = columns.cableNoCol >= 0;
-      const explicitCableNo = hasCableNoColumn ? normalizeCell(row[columns.cableNoCol]) : '';
+      const hasCableNoColumn = columns.cableNoCols.length > 0;
+      const explicitCableNo = hasCableNoColumn ? readFirstCableNo(row, columns.cableNoCols) : '';
       if (hasCableNoColumn && !explicitCableNo) continue;
 
       const generatedCableNo = hasCableNoColumn ? '' : options.generatedCableNo?.(filteredRows.length + 1) || '';
