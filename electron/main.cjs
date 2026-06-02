@@ -1,6 +1,7 @@
-const { app, BrowserWindow, dialog, shell } = require('electron');
+const { app, BrowserWindow, dialog, Menu, shell } = require('electron');
 const { createServer } = require('node:http');
 const fs = require('node:fs');
+const https = require('node:https');
 const net = require('node:net');
 const path = require('node:path');
 
@@ -10,6 +11,11 @@ if (!process.env.NEXT_TELEMETRY_DISABLED) {
 
 let mainWindow = null;
 let nextServer = null;
+let checkingForUpdates = false;
+
+const UPDATE_REPO = 'hansel970111-svg/cable-report-web';
+const RELEASES_URL = `https://github.com/${UPDATE_REPO}/releases/latest`;
+const LATEST_RELEASE_API = `https://api.github.com/repos/${UPDATE_REPO}/releases/latest`;
 
 function getAppRoot() {
   if (app.isPackaged) {
@@ -64,6 +70,193 @@ function waitForPort(port, timeoutMs = 30000) {
 
     tryConnect();
   });
+}
+
+function normalizeVersion(version) {
+  const text = String(version || '')
+    .trim()
+    .replace(/^v/i, '')
+    .split(/[+-]/)[0];
+  const match = text.match(/\d+(?:\.\d+)*/);
+  return match ? match[0] : '';
+}
+
+function compareVersions(left, right) {
+  const leftParts = normalizeVersion(left).split('.').map(value => Number.parseInt(value, 10) || 0);
+  const rightParts = normalizeVersion(right).split('.').map(value => Number.parseInt(value, 10) || 0);
+  const length = Math.max(leftParts.length, rightParts.length);
+
+  for (let i = 0; i < length; i++) {
+    const delta = (leftParts[i] || 0) - (rightParts[i] || 0);
+    if (delta !== 0) return delta;
+  }
+
+  return 0;
+}
+
+function getJson(url) {
+  return new Promise((resolve, reject) => {
+    const request = https.get(
+      url,
+      {
+        headers: {
+          Accept: 'application/vnd.github+json',
+          'User-Agent': `${app.getName()}/${app.getVersion()}`,
+        },
+        timeout: 12000,
+      },
+      response => {
+        let body = '';
+
+        response.setEncoding('utf8');
+        response.on('data', chunk => {
+          body += chunk;
+        });
+        response.on('end', () => {
+          if (response.statusCode === 404) {
+            reject(new Error('暂时没有找到发布版本'));
+            return;
+          }
+
+          if (!response.statusCode || response.statusCode < 200 || response.statusCode >= 300) {
+            reject(new Error(`GitHub 返回状态 ${response.statusCode || '未知'}`));
+            return;
+          }
+
+          try {
+            resolve(JSON.parse(body));
+          } catch (error) {
+            reject(error);
+          }
+        });
+      },
+    );
+
+    request.on('timeout', () => {
+      request.destroy(new Error('检查更新超时'));
+    });
+    request.on('error', reject);
+  });
+}
+
+function getPreferredAsset(release) {
+  const assets = Array.isArray(release?.assets) ? release.assets : [];
+  const candidates = process.platform === 'darwin'
+    ? ['.dmg', 'mac', '.zip']
+    : process.platform === 'win32'
+    ? ['.exe', 'windows', 'win']
+    : [];
+
+  for (const keyword of candidates) {
+    const asset = assets.find(item => String(item?.name || '').toLowerCase().includes(keyword));
+    if (asset?.browser_download_url) return asset.browser_download_url;
+  }
+
+  return release?.html_url || RELEASES_URL;
+}
+
+function showMessageBox(options) {
+  return mainWindow
+    ? dialog.showMessageBox(mainWindow, options)
+    : dialog.showMessageBox(options);
+}
+
+async function checkForUpdates({ manual = false } = {}) {
+  if (checkingForUpdates) return;
+  checkingForUpdates = true;
+
+  try {
+    const release = await getJson(LATEST_RELEASE_API);
+    const currentVersion = app.getVersion();
+    const latestTag = release.tag_name || release.name || '';
+    const latestVersion = normalizeVersion(latestTag);
+
+    if (!latestVersion) {
+      throw new Error('最新版没有有效版本号');
+    }
+
+    if (compareVersions(latestVersion, currentVersion) <= 0) {
+      if (manual) {
+        await showMessageBox({
+          type: 'info',
+          title: '检查更新',
+          message: '当前已经是最新版本',
+          detail: `当前版本：${currentVersion}\n最新版本：${latestTag}`,
+        });
+      }
+      return;
+    }
+
+    const result = await showMessageBox({
+      type: 'info',
+      title: '发现新版本',
+      message: `发现新版本 ${latestTag}`,
+      detail: `当前版本：${currentVersion}\n是否打开下载页面？`,
+      buttons: ['打开下载页', '稍后'],
+      defaultId: 0,
+      cancelId: 1,
+    });
+
+    if (result.response === 0) {
+      shell.openExternal(getPreferredAsset(release));
+    }
+  } catch (error) {
+    if (manual) {
+      const result = await showMessageBox({
+        type: 'warning',
+        title: '检查更新失败',
+        message: error instanceof Error ? error.message : String(error),
+        detail: '可以手动打开 GitHub Releases 页面查看最新版。',
+        buttons: ['打开发布页', '取消'],
+        defaultId: 0,
+        cancelId: 1,
+      });
+
+      if (result.response === 0) {
+        shell.openExternal(RELEASES_URL);
+      }
+    }
+  } finally {
+    checkingForUpdates = false;
+  }
+}
+
+function setupApplicationMenu() {
+  const template = [
+    ...(process.platform === 'darwin'
+      ? [{
+          label: app.getName(),
+          submenu: [
+            { role: 'about', label: `关于 ${app.getName()}` },
+            { type: 'separator' },
+            { role: 'quit', label: `退出 ${app.getName()}` },
+          ],
+        }]
+      : []),
+    {
+      label: '文件',
+      submenu: [
+        process.platform === 'darwin'
+          ? { role: 'close', label: '关闭窗口' }
+          : { role: 'quit', label: '退出' },
+      ],
+    },
+    {
+      label: '帮助',
+      submenu: [
+        {
+          label: '检查更新',
+          click: () => checkForUpdates({ manual: true }),
+        },
+        {
+          label: '打开下载页',
+          click: () => shell.openExternal(RELEASES_URL),
+        },
+      ],
+    },
+  ];
+
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
 async function startNextServer() {
@@ -149,8 +342,12 @@ function createMainWindow(url) {
 
 app.whenReady().then(async () => {
   try {
+    setupApplicationMenu();
     const url = await startNextServer();
     createMainWindow(url);
+    if (app.isPackaged) {
+      setTimeout(() => checkForUpdates(), 3000);
+    }
   } catch (error) {
     console.error(error);
     dialog.showErrorBox('启动失败', error instanceof Error ? error.message : String(error));
