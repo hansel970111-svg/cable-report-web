@@ -5,6 +5,8 @@
 **目标仓库：** `/Users/lhs/Documents/线缆测试报告/extracted_project/projects`  
 **基线版本：** `v0.1.1`（提交 `9f9e022`）
 
+**发布版本增补：** `docs/superpowers/specs/2026-07-10-calver-release-versioning-design.md`
+
 ## 1. 背景
 
 Cable Report Generator 是一个以 Electron 为桌面壳、Next.js 为本机应用服务、Python/PyMuPDF 为 PDF 引擎的线缆测试报告生成工具。当前应用可以从 Excel 中识别 Cat 5e、Cat 5e Vertical Cabling、LC 和 MPO 数据，生成相应 PDF 报告，并支持 macOS 与 Windows 打包。
@@ -35,6 +37,7 @@ Cable Report Generator 是一个以 Electron 为桌面壳、Next.js 为本机应
 5. **允许清理遗留代码。** 在测试锁定现有行为后，可以删除未使用 API、冗余模板解析、幽灵依赖和不可达 Python 实现。
 6. **macOS 与 Windows 都是发布门槛。** 两个平台都必须能够构建、启动、生成并保存报告。
 7. **采用渐进式分层重构。** 每个阶段先建立回归保护，再重构对应层；不进行无测试的整体重写。
+8. **正式发布使用时间版本。** 下一次正式发布起使用 Europe/Berlin `YYYY.MDD.N`，同日序号递增；详细生成、macOS 构建号映射、校验和回滚规则以发布版本增补规格为准。
 
 ## 3. 目标与非目标
 
@@ -485,6 +488,7 @@ Playwright Electron 测试使用临时用户目录：
 10. 锁文件与清单一致，CI 使用 frozen install，依赖审计没有未接受的 high/critical 直接依赖漏洞。
 11. 未压缩 macOS 应用包比 818 MiB 基线至少缩小 25%。
 12. 当前 3 个未跟踪 logo 文件保持未修改、未提交。
+13. 每次正式发布都通过版本准备命令生成 CalVer，且应用页脚、About、安装包、Tag、GitHub Release 与平台元数据通过增补规格的一致性门禁。
 
 ## 11. 风险与缓解
 
@@ -498,6 +502,8 @@ Playwright Electron 测试使用临时用户目录：
 | 随机逻辑移动改变调用顺序 | 注入固定随机序列，比较每条记录的调用次数和输出 |
 | ASAR 影响资源/worker 路径 | Python worker 与模板放入 extraResources；双平台打包测试验证实际路径 |
 | Golden 因 PDF metadata 波动不稳定 | 比较规范化文本、页数与固定 DPI 页面渲染，不比较原始文件字节 |
+| 时间版本与 macOS 内部构建号限制冲突 | 公开版本保持 `YYYY.MDD.N`，`CFBundleVersion` 使用批准的 `YYMM.DD.N` 映射并检查 Info.plist |
+| 两名发布人员生成相同同日序号 | 准备前强制 fetch Tag，CI 再校验 Tag/package/最高版本，冲突时停止而不猜号 |
 
 ## 12. 设计自洽说明
 
