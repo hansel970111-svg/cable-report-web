@@ -3549,6 +3549,13 @@ def fill_page(page, records, start_idx, page_num, is_last_data_page=False):
         "size": 8.0,  #  Calibri 8pt
     })
     _insert_text_items(page, text_inserts)
+
+    template_kind = "mpo" if is_mpo_template else "cat5e"
+    _draw_failed_result_icons(
+        page,
+        records[start_idx:start_idx + processed],
+        template_kind,
+    )
     
     # :  clean_contents(),  ToUnicode 
     # page.clean_contents()
@@ -3835,6 +3842,54 @@ def _cover_rect(page, rect):
     page.draw_rect(rect, color=(1, 1, 1), fill=(1, 1, 1), width=0)
 
 
+_RESULT_ICON_FIRST_RECTS = {
+    "cat5e": fitz.Rect(271.000, 109.766, 283.000, 121.766),
+    "mpo": fitz.Rect(170.777, 88.000, 182.777, 100.000),
+    "lc": fitz.Rect(162.109, 109.766, 174.109, 121.766),
+}
+_RESULT_ICON_ROW_PITCH = 15.0
+_FAIL_ICON_RED = (220 / 255, 38 / 255, 38 / 255)
+
+
+def _result_icon_rect(template_kind, row_index):
+    first = _RESULT_ICON_FIRST_RECTS[template_kind]
+    y_offset = row_index * _RESULT_ICON_ROW_PITCH
+    return fitz.Rect(first.x0, first.y0 + y_offset, first.x1, first.y1 + y_offset)
+
+
+def _draw_fail_result_icon(page, rect):
+    _cover_rect(page, rect)
+    center = fitz.Point((rect.x0 + rect.x1) / 2, (rect.y0 + rect.y1) / 2)
+    page.draw_circle(
+        center,
+        5.5,
+        color=_FAIL_ICON_RED,
+        fill=_FAIL_ICON_RED,
+        width=0.5,
+    )
+    cross_offset = 2.5
+    page.draw_line(
+        fitz.Point(center.x - cross_offset, center.y - cross_offset),
+        fitz.Point(center.x + cross_offset, center.y + cross_offset),
+        color=(1, 1, 1),
+        width=1.5,
+        lineCap=1,
+    )
+    page.draw_line(
+        fitz.Point(center.x - cross_offset, center.y + cross_offset),
+        fitz.Point(center.x + cross_offset, center.y - cross_offset),
+        color=(1, 1, 1),
+        width=1.5,
+        lineCap=1,
+    )
+
+
+def _draw_failed_result_icons(page, records, template_kind):
+    for row_index, record in enumerate(records):
+        if record.get("result") == "FAIL":
+            _draw_fail_result_icon(page, _result_icon_rect(template_kind, row_index))
+
+
 def _redraw_outline(page, rect, width=1.0):
     pad = 1.4
     _cover_rect(page, fitz.Rect(rect.x0 - pad, rect.y0 - pad, rect.x1 + pad, rect.y0 + pad))
@@ -3914,6 +3969,7 @@ def _fill_lc_data_page(page, page_records, site, page_num):
     _replace_template_datetimes(page, page_records)
     _rewrite_lc_datetimes(page, rows, page_records)
     _redraw_lc_data_outline(page)
+    _draw_failed_result_icons(page, page_records, "lc")
     return len(page_records)
 
 
@@ -4445,6 +4501,7 @@ def _fill_lc_summary_page(page, page_records, all_records, site, page_num):
     _replace_template_datetimes(page, page_records)
     _rewrite_lc_datetimes(page, rows, page_records)
     _redraw_lc_data_outline(page, data_bottom_y)
+    _draw_failed_result_icons(page, page_records, "lc")
     _draw_lc_summary_boxes(page, first_summary_top, site, pass_count, fail_count, total_length_str)
     _draw_final_footer(page, page)
 
