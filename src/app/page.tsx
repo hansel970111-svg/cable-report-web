@@ -15,6 +15,10 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { DateTimePicker, generateDecreasingTimes } from '@/components/ui/date-time-picker';
+import { defaultLimitForCableType } from '@/domain/report/cable-rules';
+import type { CableImportRow, CableType as ReportCableType } from '@/domain/report/model';
+import { mathRandomSource } from '@/domain/report/random-source';
+import { defaultRecordIdFactory, mapImportedRows } from '@/domain/report/record-mapper';
 import { 
   Select,
   SelectContent,
@@ -57,32 +61,6 @@ interface ParsedData {
   page_count: number;
   cableType?: string;
   dataSource?: string;
-}
-
-function extractBandwidth(value: unknown): string {
-  const text = String(value ?? '');
-  const match = text.match(/(\d+)\s*G/i);
-  if (match) return `${match[1]}G`.toUpperCase();
-  if (text.includes('蓝') || text.toLowerCase().includes('blue')) return '100G';
-  return '';
-}
-
-function buildLimitValue(row: Record<string, unknown>, selectedCableType: string, dataSource: unknown): string {
-  const isMPO = selectedCableType === 'MPO' || dataSource === 'MPO';
-  if (isMPO) {
-    const bandwidth =
-      extractBandwidth(row.bandwidth) ||
-      extractBandwidth(row.cableType) ||
-      extractBandwidth(row.sourceLabel) ||
-      '200G';
-    return `${bandwidth}BASE-SR10`;
-  }
-
-  if (selectedCableType === 'LC' || dataSource === 'LC') {
-    return 'Link Validation';
-  }
-
-  return 'TIA - Cat 5e Channel';
 }
 
 async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit, timeoutMs: number): Promise<Response> {
@@ -289,8 +267,8 @@ export default function Home() {
         records: parsedData.records.map((record) => ({
           cable_label: record.cable_label,
           limit: (cableType === 'MPO' && (!record.limit || record.limit.includes('Cat 5e')))
-            ? buildLimitValue(record as unknown as Record<string, unknown>, cableType, cableType)
-            : record.limit || buildLimitValue(record as unknown as Record<string, unknown>, cableType, cableType),
+            ? defaultLimitForCableType(cableType as ReportCableType)
+            : record.limit || defaultLimitForCableType(cableType as ReportCableType),
           result: record.result || 'PASS',
           date_time: record.date_time,
           length: record.length,
@@ -588,107 +566,70 @@ export default function Home() {
                               }
 
                               // 如果没有 Excel Date & Time 数据，使用用户设置的起始时间
-                              // 优先使用 startingDateTime（用户设置的），只有当用户没有设置时才使用模板时间
                               const effectiveStartTime = startingDateTime;
-                              
-                              // 生成递增的时间序列
-                              const workingTimes = generateDecreasingTimes(effectiveStartTime, filteredRows.length);
-                              
-                              console.log(`[Excel导入] 数据源: ${excelResult.dataSource}`);
-                              console.log(`[Excel导入] startingDateTime: ${startingDateTime}`);
-                              console.log(`[Excel导入] detectedColumns:`, excelResult.detectedColumns);
-                              console.log(`[Excel导入] detectedColumns.dateTime列名: "${excelResult.detectedColumns?.dateTime || '未检测到'}"`);
-                              console.log(`[Excel导入] filteredRows[0]:`, JSON.stringify(filteredRows[0]));
-                              console.log(`[Excel导入] filteredRows[1]:`, JSON.stringify(filteredRows[1]));
-                              console.log(`[Excel导入] filteredRows[0] dateTime: "${filteredRows[0]?.dateTime || 'null/undefined'}"`);
-                              console.log(`[Excel导入] filteredRows[1] dateTime: "${filteredRows[1]?.dateTime || 'null/undefined'}"`);
-                              console.log(`[Excel导入] workingTimes[0]: ${workingTimes[0]}`);
-                              console.log(`[Excel导入] workingTimes[1]: ${workingTimes[1]}`);
-                              console.log(`[Excel导入] workingTimes长度: ${workingTimes.length}`);
-                              
-                              // 判断是否使用了Excel中的Date & Time数据
+                              const reportCableType = selectedCableType as ReportCableType;
+
+                              console.log('[Excel导入] 数据源:', excelResult.dataSource);
+                              console.log('[Excel导入] startingDateTime:', startingDateTime);
+                              console.log('[Excel导入] detectedColumns:', excelResult.detectedColumns);
+                              console.log('[Excel导入] filteredRows[0]:', JSON.stringify(filteredRows[0]));
+                              console.log('[Excel导入] filteredRows[1]:', JSON.stringify(filteredRows[1]));
+
                               const hasExcelDateTime = filteredRows.some((row: Record<string, unknown>) =>
                                 typeof row.dateTime === 'string' && row.dateTime.trim().length > 0
                               );
-                              console.log(`[Excel导入] Excel中是否有Date & Time数据: ${hasExcelDateTime}`);
-                              if (hasExcelDateTime) {
-                                console.log(`[Excel导入] 将使用Excel中的Date & Time数据`);
-                              } else {
-                                console.log(`[Excel导入] Excel中无Date & Time数据，将使用自动生成的时间序列`);
-                              }
-                              
-                              // 验证第一条记录的时间
-                              if (workingTimes.length > 0) {
-                                console.log(`[Excel导入] 第一条记录将使用时间: ${workingTimes[0]}`);
-                              } else {
-                                console.warn(`[Excel导入] WARNING: workingTimes为空，将使用默认起始时间: ${startingDateTime}`);
-                              }
+                              console.log('[Excel导入] Excel中是否有Date & Time数据:', hasExcelDateTime);
 
-                              // 生成新的测试数据记录
-                              const newRecords: CableRecord[] = filteredRows.map((row: Record<string, unknown>, index: number) => {
-                                const cableNo = String(row.cableNo || '').trim();
-                                // 优先使用 Excel 中的 Date & Time 数据
-                                // 如果 Excel 中没有该数据，则使用自动生成的时间序列
-                                let usedTime: string;
-                                const excelDateTime = row.dateTime as string | null | undefined;
-                                if (excelDateTime && excelDateTime.trim()) {
-                                  // Excel 中有 Date & Time 数据，直接使用
-                                  usedTime = excelDateTime;
-                                } else {
-                                  // Excel 中没有 Date & Time 数据，使用自动生成的时间序列
-                                  usedTime = workingTimes[index] || startingDateTime;
-                                }
-                                
-                                // 调试：打印前10条的信息
-                                if (index < 10) {
-                                  console.log(`[Excel导入] newRecords[${index}]: cableNo="${cableNo}", excelDateTime="${excelDateTime || 'N/A'}", workingTimes[${index}]="${workingTimes[index] || 'N/A'}", 最终使用="${usedTime}"`);
-                                }
-                                const rawLength = row.length;
-                                const baseLength = rawLength !== undefined && rawLength !== null && rawLength !== ''
-                                  ? parseFloat(String(rawLength))
-                                  : 19;
-                                // Length乘以0.97-1.03之间的随机系数，保留一位小数
-                                const randomCoefficient = 0.97 + Math.random() * 0.06; // 0.97-1.03
-                                const length = parseFloat((baseLength * randomCoefficient).toFixed(1));
-                                // NEXT Margin: 80%概率>11，范围11.0-13.0；20%概率<=11，范围9.0-11.0
-                                let nextMargin: number;
-                                if (Math.random() < 0.8) {
-                                  // 80%概率 > 11
-                                  nextMargin = parseFloat((Math.random() * 2 + 11).toFixed(1));
-                                } else {
-                                  // 20%概率 <= 11
-                                  nextMargin = parseFloat((Math.random() * 2 + 9).toFixed(1));
-                                }
+                              const importRows: CableImportRow[] = filteredRows.map(
+                                (row: Record<string, unknown>, index: number) => {
+                                  const rawLength = row.length;
+                                  const length = rawLength !== undefined && rawLength !== null && rawLength !== ''
+                                    ? Number.parseFloat(String(rawLength))
+                                    : null;
+                                  const rawRowNumber = Number(row.rowIndex);
+                                  const rawExpansionIndex = Number(row.qtyIndex);
 
-                                // Vertical Cabling: 使用纯数据，不加前缀
-                                // MPO: 提取纯数字部分，添加#前缀（模板中MPO是图像，#是文本的一部分）
-                                const isVerticalCabling = excelResult.dataSource === 'Vertical Cabling';
-                                const isMPO = excelResult.dataSource === 'MPO';
-                                let cableLabel: string;
-                                if (isVerticalCabling) {
-                                  cableLabel = cableNo.replace(/^#/, '');
-                                } else if (isMPO) {
-                                  // MPO模板中MPO是图像，只需要编号部分（带#号）
-                                  const numPart = cableNo.replace(/^MPO\s*/i, '').replace(/^#/, '');
-                                  cableLabel = '#' + numPart;
-                                } else {
-                                  cableLabel = cableNo.startsWith('#') ? cableNo : `#${cableNo}`;
-                                }
+                                  return {
+                                    cableNumber: String(row.cableNo || '').trim(),
+                                    cableTypeText: String(row.cableType || ''),
+                                    length,
+                                    dateTime: typeof row.dateTime === 'string' ? row.dateTime : null,
+                                    sourceLabel: typeof row.sourceLabel === 'string' ? row.sourceLabel : null,
+                                    bandwidth: typeof row.bandwidth === 'string' ? row.bandwidth : null,
+                                    source: {
+                                      sheetName: String(row.sheetName || excelResult.sheetName || ''),
+                                      rowNumber: Number.isFinite(rawRowNumber) ? rawRowNumber : index + 1,
+                                      expansionIndex: Number.isFinite(rawExpansionIndex)
+                                        ? Math.max(rawExpansionIndex - 1, 0)
+                                        : 0,
+                                      rule: reportCableType === 'Cat 5e (Vertical Cabling)'
+                                        ? 'vertical-cabling'
+                                        : reportCableType === 'LC'
+                                          ? 'lc'
+                                          : reportCableType === 'MPO'
+                                            ? 'mpo'
+                                            : 'cat5e-oob',
+                                    },
+                                  };
+                                },
+                              );
 
-                                // 根据当前选择的线缆类型设置 limit，避免 MPO 缺少带宽时误退到 Cat 5e。
-                                const limitValue = buildLimitValue(row, selectedCableType, excelResult.dataSource);
-
-                                return {
-                                  cable_label: cableLabel,
-                                  cable_number: cableNo.replace('#', ''),
-                                  limit: limitValue,
-                                  result: 'PASS',
-                                  length: length,
-                                  next_margin: nextMargin,
-                                  date_time: usedTime,
-                                  page: 1,
-                                };
+                              const mappedRecords = mapImportedRows(importRows, {
+                                cableType: reportCableType,
+                                startingDateTime: effectiveStartTime,
+                                random: mathRandomSource,
+                                idFactory: defaultRecordIdFactory,
                               });
+                              const newRecords: CableRecord[] = mappedRecords.map(record => ({
+                                cable_label: record.cableLabel,
+                                cable_number: record.cableNumber,
+                                limit: record.limit,
+                                result: record.result,
+                                length: record.length,
+                                next_margin: record.nextMargin,
+                                date_time: record.dateTime,
+                                page: 1,
+                              }));
 
                               // 调试：打印前10条的时间，确保Cable Label和Date & Time一一对应
                               console.log(`[Excel导入] === Cable Label 与 Date & Time 对应关系（前10条）===`);
