@@ -1,18 +1,30 @@
 import { spawnSync } from 'node:child_process';
 import process from 'node:process';
 
-const candidates = process.env.PYTHON_CMD
-  ? [[process.env.PYTHON_CMD, []]]
-  : process.platform === 'win32'
-    ? [['python', []], ['py', ['-3']]]
-    : [['python3', []], ['python', []]];
+import {
+  findCompatiblePython,
+  formatPythonSelectionError,
+} from './python-runtime.mjs';
 
-for (const [command, prefix] of candidates) {
-  const result = spawnSync(command, [...prefix, ...process.argv.slice(2)], {
-    stdio: 'inherit', shell: false, windowsHide: true,
-  });
-  if (!result.error) process.exit(result.status ?? 1);
+const selection = findCompatiblePython();
+if (!selection.python) {
+  console.error(formatPythonSelectionError(selection));
+  process.exit(1);
 }
 
-console.error('Python 3.10+ was not found; set PYTHON_CMD.');
-process.exit(1);
+const result = spawnSync(
+  selection.python.command,
+  [...selection.python.argsPrefix, ...process.argv.slice(2)],
+  {
+    stdio: 'inherit',
+    shell: false,
+    windowsHide: true,
+  },
+);
+
+if (result.error) {
+  console.error(result.error);
+  process.exit(1);
+}
+
+process.exit(result.status ?? 1);

@@ -18,7 +18,7 @@ GOLDEN_ROOT = ROOT / "tests/python/golden"
 
 MANIFEST_SCHEMA_VERSION = 1
 RENDERER_NAME = "PyMuPDF"
-RENDERER_VERSION = "1.26.5"
+RENDERER_VERSION = "1.26.7"
 RENDER_DPI = 144
 RENDER_COLORSPACE = "RGB"
 RENDER_ALPHA = False
@@ -562,7 +562,7 @@ def _render_page(page: fitz.Page, render_dpi: int) -> Image.Image:
 def _dominant_result_pixels(image: Image.Image) -> tuple[int, int]:
     red = 0
     green = 0
-    for r, g, b in image.convert("RGB").getdata():
+    for r, g, b in image.convert("RGB").get_flattened_data():
         if r >= 140 and r >= g + 30 and r >= b + 30:
             red += 1
         if g >= 110 and g >= r + 20 and g >= b + 10:

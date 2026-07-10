@@ -3,8 +3,8 @@
 ## 环境要求
 
 - Windows 10/11
-- Node.js 20 LTS 或更新版本
-- Python 3.10 或更新版本
+- Node.js 24.14.0
+- Python 3.12.13
 
 ## 首次安装
 
@@ -12,14 +12,16 @@
 
 ```powershell
 corepack enable
-corepack pnpm install
-python -m pip install -r requirements.txt
+corepack prepare pnpm@9.15.9 --activate
+corepack pnpm install --frozen-lockfile
+node ./scripts/run-python.mjs -m pip install --require-hashes --only-binary=:all: -r requirements.lock
 ```
 
-如果电脑上同时装了多个 Python，可以改用：
+如果电脑上同时装了多个 Python，可以显式指定 3.12：
 
 ```powershell
-py -3 -m pip install -r requirements.txt
+$env:PYTHON_CMD = "C:\path\to\python3.12.exe"
+node ./scripts/run-python.mjs -m pip install --require-hashes --only-binary=:all: -r requirements.lock
 ```
 
 ## 开发启动
@@ -51,6 +53,6 @@ corepack pnpm desktop:dist:win
 
 ## 常见问题
 
-- 如果提示找不到 `python`，请安装 Python 并勾选 “Add python.exe to PATH”，或使用 `py -3`。
+- 如果提示找不到 `python`，请安装 Python 3.12，并勾选 “Add python.exe to PATH”，或使用 `py -3.12`。
 - 如果提示找不到 `pnpm`，先执行 `corepack enable`，再用 `corepack pnpm ...`。
 - 生成的 PDF 会同时作为浏览器下载返回，并尝试保存一份到当前 Windows 用户的 `Downloads` 文件夹。

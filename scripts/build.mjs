@@ -33,17 +33,6 @@ function run(command, args) {
 }
 
 function runPnpm(args) {
-  const pnpmResult = runRaw(commandName('pnpm'), args);
-  if (!pnpmResult.error) {
-    if (pnpmResult.status !== 0) process.exit(pnpmResult.status ?? 1);
-    return;
-  }
-
-  if (pnpmResult.error.code !== 'ENOENT') {
-    console.error(pnpmResult.error);
-    process.exit(1);
-  }
-
   run(commandName('corepack'), ['pnpm', ...args]);
 }
 
@@ -79,19 +68,15 @@ function prepareStandaloneRuntime() {
   );
 }
 
-if (fs.existsSync(path.join(workspace, 'node_modules'))) {
-  console.log('Dependencies already installed; skipping install.');
-} else {
-  console.log('Installing dependencies...');
-  runPnpm([
-    'install',
-    '--prefer-frozen-lockfile',
-    '--prefer-offline',
-    '--loglevel',
-    'debug',
-    '--reporter=append-only',
-  ]);
-}
+console.log('Verifying dependencies against the frozen lock...');
+runPnpm([
+  'install',
+  '--frozen-lockfile',
+  '--prefer-offline',
+  '--loglevel',
+  'debug',
+  '--reporter=append-only',
+]);
 
 console.log('Building the Next.js project...');
 runPnpm(['next', 'build', '--webpack']);
@@ -106,7 +91,7 @@ runPnpm([
   '--platform',
   'node',
   '--target',
-  'node20',
+  'node24',
   '--outDir',
   'dist',
   '--no-splitting',

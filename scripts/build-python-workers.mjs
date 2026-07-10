@@ -3,6 +3,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 
+import {
+  findCompatiblePython,
+  formatPythonSelectionError,
+} from './python-runtime.mjs';
+
 const workspace = process.env.COZE_WORKSPACE_PATH || process.cwd();
 const workerOutputDir = path.join(workspace, 'worker-bin');
 const buildRoot = path.join(workspace, '.pyinstaller');
@@ -13,40 +18,6 @@ function commandName(name) {
 
 function pyinstallerDataArg(source, destination) {
   return `${source}${process.platform === 'win32' ? ';' : ':'}${destination}`;
-}
-
-function pythonCandidates() {
-  if (process.env.PYTHON_CMD) return [{ command: process.env.PYTHON_CMD, argsPrefix: [] }];
-  if (process.env.PYTHON) return [{ command: process.env.PYTHON, argsPrefix: [] }];
-
-  return process.platform === 'win32'
-    ? [
-        { command: 'python', argsPrefix: [] },
-        { command: 'py', argsPrefix: ['-3'] },
-      ]
-    : [
-        { command: 'python3', argsPrefix: [] },
-        { command: 'python', argsPrefix: [] },
-      ];
-}
-
-function findPython() {
-  for (const candidate of pythonCandidates()) {
-    const result = spawnSync(candidate.command, [
-      ...candidate.argsPrefix,
-      '-c',
-      'import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 1)',
-    ], {
-      cwd: workspace,
-      stdio: 'ignore',
-      shell: false,
-      windowsHide: true,
-    });
-
-    if (!result.error && result.status === 0) return candidate;
-  }
-
-  return null;
 }
 
 function runPython(python, args, options = {}) {
@@ -70,9 +41,13 @@ function runPython(python, args, options = {}) {
   return result;
 }
 
-const python = findPython();
+const pythonSelection = findCompatiblePython({
+  cwd: workspace,
+  includePythonEnv: true,
+});
+const python = pythonSelection.python;
 if (!python) {
-  console.error('未找到 Python 3.10+。请先安装 Python 3.10+，或设置 PYTHON_CMD 指向 Python 可执行文件。');
+  console.error(formatPythonSelectionError(pythonSelection));
   process.exit(1);
 }
 
@@ -88,7 +63,9 @@ const pyinstallerCheck = spawnSync(
 );
 
 if (pyinstallerCheck.error || pyinstallerCheck.status !== 0) {
-  console.error('未找到 PyInstaller。请先运行: python -m pip install pyinstaller -r requirements.txt');
+  console.error(
+    '未找到 PyInstaller。请先运行: node ./scripts/run-python.mjs -m pip install --require-hashes --only-binary=:all: -r requirements-dev.lock',
+  );
   process.exit(1);
 }
 

@@ -108,6 +108,11 @@ def test_exact_six_case_matrix_is_validated() -> None:
     assert all((ROOT / case.template).is_file() for case in cases)
 
 
+def test_renderer_contract_uses_the_security_fixed_runtime() -> None:
+    assert pdf_golden.RENDERER_VERSION == "1.26.7"
+    assert fitz.VersionBind == pdf_golden.RENDERER_VERSION
+
+
 def test_case_loader_rejects_traversal_and_matrix_shrinkage(tmp_path: Path) -> None:
     raw = json.loads((ROOT / "tests/python/fixtures/pdf-cases.json").read_text(encoding="utf-8"))
     raw[0]["name"] = "../cat5e-minimal"

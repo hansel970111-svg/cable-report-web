@@ -1,7 +1,10 @@
+import * as fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
-import XLSX from 'xlsx';
+import * as XLSX from 'xlsx';
+
+XLSX.set_fs(fs);
 
 const fixtureDirectory = path.dirname(fileURLToPath(import.meta.url));
 

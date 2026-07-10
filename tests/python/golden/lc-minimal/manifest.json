@@ -28,7 +28,7 @@
       "height": 1684,
       "index": 0,
       "mode": "RGB",
-      "sha256": "658948ee381969beaec49a8bd95bac5b9bcb4bf0f0ac55e4d48a923e6b1bb63f",
+      "sha256": "d417d938c7d4f0679b285b36e63395fa8ed2399bb3c78de776714a2a1f388863",
       "width": 1190
     }
   ],
@@ -71,7 +71,7 @@
     "colorspace": "RGB",
     "dpi": 144,
     "name": "PyMuPDF",
-    "version": "1.26.5"
+    "version": "1.26.7"
   },
   "schema_version": 1,
   "semantics": {

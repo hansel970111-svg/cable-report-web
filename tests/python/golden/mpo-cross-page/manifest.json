@@ -38,7 +38,7 @@
       "height": 1684,
       "index": 0,
       "mode": "RGB",
-      "sha256": "98f61c6d34f4f9e05eeced8b2c76363bc9320607604d9bb717d2eada60b4e38a",
+      "sha256": "5ac66ceb75623ac16aea52456eb5c38724e6061b3698b4824d84001942a053c4",
       "width": 1190
     },
     {
@@ -46,7 +46,7 @@
       "height": 1684,
       "index": 1,
       "mode": "RGB",
-      "sha256": "b0d2aa6b70b51bcd3941531425d42a315b456d0f6fa172a631a7b2cc4f8c616c",
+      "sha256": "58266a21dfaa739db3dacc99b24172023eb181ce0c8f70037a60bc3c5f7ec845",
       "width": 1190
     }
   ],
@@ -91,7 +91,7 @@
     "colorspace": "RGB",
     "dpi": 144,
     "name": "PyMuPDF",
-    "version": "1.26.5"
+    "version": "1.26.7"
   },
   "schema_version": 1,
   "semantics": {

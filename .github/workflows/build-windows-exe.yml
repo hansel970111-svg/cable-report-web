@@ -9,14 +9,21 @@ on:
       - "v*"
     paths:
       - ".github/workflows/build-windows-exe.yml"
+      - ".npmrc"
       - "assets/**"
       - "electron/**"
       - "fonts/**"
       - "package.json"
       - "pnpm-lock.yaml"
       - "requirements.txt"
+      - "requirements.lock"
+      - "requirements-dev.txt"
+      - "requirements-dev.lock"
+      - "requirements-lock-tools.txt"
       - "scripts/**"
       - "src/**"
+      - "tests/**"
+      - "vendor/**"
       - "next.config.mjs"
       - "tsconfig.json"
 
@@ -26,7 +33,7 @@ permissions:
 jobs:
   build-windows-exe:
     name: Build Windows desktop app
-    runs-on: windows-latest
+    runs-on: windows-2025
 
     steps:
       - name: Checkout repository
@@ -35,18 +42,18 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24.14.0"
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.12.13"
 
       - name: Enable pnpm
         shell: pwsh
         run: |
           corepack enable
-          corepack prepare pnpm@9.0.0 --activate
+          corepack prepare pnpm@9.15.9 --activate
 
       - name: Install Node dependencies
         shell: pwsh
@@ -54,22 +61,35 @@ jobs:
           Add-Content -Path .npmrc -Value ""
           Add-Content -Path .npmrc -Value "node-linker=hoisted"
           Add-Content -Path .npmrc -Value "virtual-store-dir=.pnpm"
-          pnpm install --frozen-lockfile=false
+          corepack pnpm install --frozen-lockfile
 
       - name: Install Python dependencies
         shell: pwsh
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt
+          python -m pip install --require-hashes --only-binary=:all: -r requirements-dev.lock
+          python -m pip check
+
+      - name: Verify dependency locks and security
+        shell: pwsh
+        run: |
+          node scripts/verify-dependency-policy.mjs
+          python scripts/verify_python_locks.py
+          corepack pnpm audit --audit-level high --registry=https://registry.npmjs.org
+
+      - name: Run release quality gates
+        shell: pwsh
+        run: |
+          corepack pnpm check:fast
+          corepack pnpm test:python
 
       - name: Build Windows EXE
         shell: pwsh
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
         run: |
-          pnpm build
+          corepack pnpm build
           node ./scripts/build-python-workers.mjs
-          pnpm exec electron-builder --win --publish=never
+          corepack pnpm exec electron-builder --win --publish=never
 
       - name: Show build outputs
         shell: pwsh

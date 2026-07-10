@@ -10,16 +10,21 @@
 
 每个平台都需要：
 
+- Node.js 24.14.0
+- Python 3.12.13
+
 ```bash
 corepack enable
-corepack pnpm install
-python -m pip install -r requirements.txt
+corepack prepare pnpm@9.15.9 --activate
+corepack pnpm install --frozen-lockfile
+node ./scripts/run-python.mjs -m pip install --require-hashes --only-binary=:all: -r requirements.lock
 ```
 
 Windows 如果 `python` 不可用，可改用：
 
 ```powershell
-py -3 -m pip install -r requirements.txt
+$env:PYTHON_CMD = "C:\path\to\python3.12.exe"
+node ./scripts/run-python.mjs -m pip install --require-hashes --only-binary=:all: -r requirements.lock
 ```
 
 ## 本机调试桌面版

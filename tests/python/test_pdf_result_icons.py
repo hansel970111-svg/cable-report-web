@@ -73,7 +73,7 @@ def _crop(page_image: Image.Image, rect: fitz.Rect, scale: float = 2.0) -> Image
 def _dominant_pixel_counts(image: Image.Image) -> tuple[int, int]:
     red = 0
     green = 0
-    for r, g, b in image.convert("RGB").getdata():
+    for r, g, b in image.convert("RGB").get_flattened_data():
         if r >= 140 and r >= g + 30 and r >= b + 30:
             red += 1
         if g >= 110 and g >= r + 20 and g >= b + 10:
