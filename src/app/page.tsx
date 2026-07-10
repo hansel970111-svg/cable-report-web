@@ -19,6 +19,11 @@ import { defaultLimitForCableType } from '@/domain/report/cable-rules';
 import type { CableImportRow, CableType as ReportCableType } from '@/domain/report/model';
 import { mathRandomSource } from '@/domain/report/random-source';
 import { defaultRecordIdFactory, mapImportedRows } from '@/domain/report/record-mapper';
+import {
+  ensureUiRecordIds,
+  toUiCableRecords,
+  type UiCableRecord as CableRecord,
+} from '@/lib/reportRecordAdapter';
 import { 
   Select,
   SelectContent,
@@ -43,17 +48,6 @@ import {
   getDefaultStartingDateTime,
   TIME_RANGES 
 } from '@/lib/timeUtils';
-
-interface CableRecord {
-  cable_label: string;
-  cable_number: string;
-  limit: string;
-  result: string;
-  length: number;
-  next_margin: number;
-  date_time: string;
-  page: number;
-}
 
 interface ParsedData {
   site: string;
@@ -489,9 +483,13 @@ export default function Home() {
                             console.log('[模板加载] 第一条记录时间:', templateResult.data.records[0].date_time);
                           }
                           // 保存到ref，确保Excel上传时可以立即访问（setState是异步的）
+                          const templateRecords = ensureUiRecordIds(
+                            templateResult.data.records,
+                            `template:${selectedCableType}`,
+                          );
                           templateDataRef.current = {
                             site: templateResult.data.site || '',
-                            records: templateResult.data.records,
+                            records: templateRecords,
                             page_count: templateResult.data.page_count || 1,
                             cableType: selectedCableType,
                             dataSource: 'template',
@@ -620,16 +618,7 @@ export default function Home() {
                                 random: mathRandomSource,
                                 idFactory: defaultRecordIdFactory,
                               });
-                              const newRecords: CableRecord[] = mappedRecords.map(record => ({
-                                cable_label: record.cableLabel,
-                                cable_number: record.cableNumber,
-                                limit: record.limit,
-                                result: record.result,
-                                length: record.length,
-                                next_margin: record.nextMargin,
-                                date_time: record.dateTime,
-                                page: 1,
-                              }));
+                              const newRecords = toUiCableRecords(mappedRecords);
 
                               // 调试：打印前10条的时间，确保Cable Label和Date & Time一一对应
                               console.log(`[Excel导入] === Cable Label 与 Date & Time 对应关系（前10条）===`);
@@ -854,7 +843,7 @@ export default function Home() {
                           const isTimeValid = isValidWorkingTime(timeStr);
 
                           return (
-                            <TableRow key={index} className="hover:bg-slate-50 dark:hover:bg-slate-700">
+                            <TableRow key={record.id} className="hover:bg-slate-50 dark:hover:bg-slate-700">
                               <TableCell className="font-medium">
                                 {index + 1}
                               </TableCell>
