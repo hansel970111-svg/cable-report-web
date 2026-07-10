@@ -12,9 +12,13 @@
     "desktop:dist:win": "node ./scripts/desktop-dist.mjs win",
     "dev": "node ./scripts/dev.mjs",
     "preinstall": "npx only-allow pnpm",
-    "lint": "eslint",
+    "lint": "eslint . --max-warnings=0",
     "start": "node ./scripts/start.mjs",
-    "ts-check": "tsc -p tsconfig.json"
+    "ts-check": "tsc -p tsconfig.json",
+    "test:unit": "vitest run",
+    "test:python": "node scripts/run-python.mjs -m pytest -q",
+    "test": "pnpm test:unit && pnpm test:python",
+    "check:fast": "pnpm lint && pnpm ts-check && pnpm test:unit"
   },
   "dependencies": {
     "@floating-ui/utils": "^0.2.11",
@@ -65,22 +69,30 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "6.9.1",
+    "@testing-library/react": "16.3.2",
+    "@testing-library/user-event": "14.6.1",
     "@tailwindcss/postcss": "^4",
+    "@types/jest-axe": "3.5.9",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitest/coverage-v8": "4.1.10",
     "eslint": "^9",
     "eslint-config-next": "16.1.1",
     "electron": "^38.0.0",
     "electron-builder": "^26.0.0",
+    "jest-axe": "10.0.0",
+    "jsdom": "29.1.1",
     "only-allow": "^1.2.2",
     "shadcn": "latest",
     "tailwindcss": "^4",
     "tsup": "^8.3.5",
     "tsx": "^4.19.2",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "4.1.10"
   },
-  "packageManager": "pnpm@9.0.0",
+  "packageManager": "pnpm@9.15.9",
   "engines": {
     "pnpm": ">=9.0.0"
   },

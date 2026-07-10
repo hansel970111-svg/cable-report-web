@@ -273,7 +273,6 @@ export function generateIncreasingTimes(startTime: string, count: number): strin
     if (d < 1) d = 1;
     if (d > 31) d = 31;
     // 检查该月的实际最大天数
-    const tempDate = new Date(y, m - 1, 1);
     const maxDay = new Date(y, m, 0).getDate();
     if (d > maxDay) d = maxDay;
     return d;

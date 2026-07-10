@@ -578,8 +578,8 @@ export default function Home() {
                               const filteredRows = excelResult.filteredRows;
                               
                               console.log(`[Excel导入] filteredRows 数量: ${filteredRows.length}`);
-                              console.log(`[Excel导入] filteredRows 前5条:`, filteredRows.slice(0, 5).map((r: any) => r.cableNo));
-                              console.log(`[Excel导入] filteredRows 最后5条:`, filteredRows.slice(-5).map((r: any) => r.cableNo));
+                              console.log(`[Excel导入] filteredRows 前5条:`, filteredRows.slice(0, 5).map((row: Record<string, unknown>) => row.cableNo));
+                              console.log(`[Excel导入] filteredRows 最后5条:`, filteredRows.slice(-5).map((row: Record<string, unknown>) => row.cableNo));
 
                               // 验证filteredRows完整性 - 如果数据被截断则发出警告
                               if (filteredRows.length !== excelResult.totalCount) {
@@ -607,7 +607,9 @@ export default function Home() {
                               console.log(`[Excel导入] workingTimes长度: ${workingTimes.length}`);
                               
                               // 判断是否使用了Excel中的Date & Time数据
-                              const hasExcelDateTime = filteredRows.some((row: any) => row.dateTime);
+                              const hasExcelDateTime = filteredRows.some((row: Record<string, unknown>) =>
+                                typeof row.dateTime === 'string' && row.dateTime.trim().length > 0
+                              );
                               console.log(`[Excel导入] Excel中是否有Date & Time数据: ${hasExcelDateTime}`);
                               if (hasExcelDateTime) {
                                 console.log(`[Excel导入] 将使用Excel中的Date & Time数据`);

@@ -5,19 +5,23 @@ import { defineConfig, globalIgnores } from 'eslint/config';
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
-  // Override default ignores of eslint-config-next.
   globalIgnores([
-    // Default ignores of eslint-config-next:
     '.next/**',
+    'next-build/**',
     'out/**',
     'build/**',
-    'next-env.d.ts',
-    // Build artifacts:
-    'server.js',
     'dist/**',
-    // Script files (CommonJS):
-    'scripts/**/*.js',
+    'release/**',
+    'worker-bin/**',
+    '.pyinstaller/**',
+    '.superpowers/**',
+    'coverage/**',
+    'next-env.d.ts',
   ]),
+  {
+    files: ['electron/**/*.cjs', 'scripts/**/*.cjs'],
+    rules: { '@typescript-eslint/no-require-imports': 'off' },
+  },
 ]);
 
 export default eslintConfig;

@@ -30,21 +30,23 @@
   },
   "include": [
     "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
-    ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts",
-    "**/*.mts",
-    "next-build/types/**/*.ts",
-    "next-build/dev/types/**/*.ts"
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "tests/**/*.ts",
+    "tests/**/*.tsx",
+    "vitest.config.ts",
+    "next-build/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",
+    ".next",
+    "next-build/dev",
     "dist",
     "build",
     "release",
     "worker-bin",
     "resources/bin",
-    ".pyinstaller"
+    ".pyinstaller",
+    ".superpowers"
   ]
 }
