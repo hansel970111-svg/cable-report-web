@@ -4,6 +4,11 @@ import type { WorkbookContext } from './contracts';
 
 export type ExcelRow = unknown[];
 
+export type SheetRowsContext = {
+  rows: ExcelRow[];
+  firstRowNumber: number;
+};
+
 export type DetectedColumns = Readonly<Record<string, string | null>>;
 
 export type LengthMode = 'firstNumeric' | 'sumFirstTwoPlus50';
@@ -39,11 +44,15 @@ export function normalizeLower(value: unknown): string {
   return normalizeCell(value).toLowerCase();
 }
 
-export function readSheetRows(worksheet: XLSX.WorkSheet): ExcelRow[] {
-  return XLSX.utils.sheet_to_json(worksheet, {
-    header: 1,
-    defval: '',
-  }) as ExcelRow[];
+export function readSheetRows(worksheet: XLSX.WorkSheet): SheetRowsContext {
+  const reference = worksheet['!ref'];
+  return {
+    rows: XLSX.utils.sheet_to_json(worksheet, {
+      header: 1,
+      defval: '',
+    }) as ExcelRow[],
+    firstRowNumber: reference ? XLSX.utils.decode_range(reference).s.r + 1 : 1,
+  };
 }
 
 function findColumn(
@@ -272,7 +281,7 @@ export function isYYBXWorkbook(context: WorkbookContext): boolean {
   if (/yybx/i.test(context.fileName)) return true;
 
   for (const sheetName of context.workbook.SheetNames.slice(0, 5)) {
-    const rows = readSheetRows(context.workbook.Sheets[sheetName]).slice(0, 30);
+    const rows = readSheetRows(context.workbook.Sheets[sheetName]).rows.slice(0, 30);
     for (const row of rows) {
       if (row.some(cell => /yybx/i.test(normalizeCell(cell)))) return true;
     }

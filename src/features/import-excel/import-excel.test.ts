@@ -49,6 +49,29 @@ function makeWorkbookBytes(sheets: readonly SheetFixture[]): Uint8Array {
   return new Uint8Array(XLSX.write(workbook, { type: 'array', bookType: 'xlsx' }));
 }
 
+function makeOffsetWorkbookBytes(
+  sheetName: string,
+  rows: readonly (readonly unknown[])[],
+  origin = 'A5',
+): Uint8Array {
+  const workbook = XLSX.utils.book_new();
+  const worksheet: XLSX.WorkSheet = {};
+  XLSX.utils.sheet_add_aoa(
+    worksheet,
+    rows.map(row => [...row]),
+    { origin, cellDates: true },
+  );
+  const start = XLSX.utils.decode_cell(origin);
+  const width = Math.max(...rows.map(row => row.length));
+  worksheet['!ref'] = XLSX.utils.encode_range({
+    s: start,
+    e: { r: start.r + rows.length - 1, c: start.c + width - 1 },
+  });
+  XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+
+  return new Uint8Array(XLSX.write(workbook, { type: 'array', bookType: 'xlsx' }));
+}
+
 function workbookInput(
   sheets: readonly SheetFixture[],
   fileName = 'generated.xlsx',
@@ -285,6 +308,38 @@ describe('legacy parsing rules', () => {
     expect(result.rows.map(row => row.dateTime)).toEqual([
       '10-07-2026 09:00:00 AM',
       '10-07-2026 09:01:00 AM',
+    ]);
+  });
+
+  it('records the physical Excel row number when a regular sheet starts at A5', () => {
+    const bytes = makeOffsetWorkbookBytes('OOB', [
+      ['线缆类型', '线号', '线长'],
+      ['红', 'OFFSET', 10],
+    ]);
+
+    const result = importExcel({
+      fileName: 'offset.xlsx', mimeType: XLSX_MIME, bytes,
+    }, 'Cat 5e');
+
+    expect(result.rows[0].source.rowNumber).toBe(6);
+  });
+
+  it('records the physical Excel row number for Vertical expansions starting at A5', () => {
+    const bytes = makeOffsetWorkbookBytes('Vertical Cabling', [
+      ['Rack&Room', 'RU', '线缆类型', 'QTY', 'Length'],
+      ['DE46', 'RU01', '红', 2, 30],
+    ]);
+
+    const result = importExcel({
+      fileName: 'offset-vertical.xlsx', mimeType: XLSX_MIME, bytes,
+    }, 'Cat 5e (Vertical Cabling)');
+
+    expect(result.rows.map(row => ({
+      rowNumber: row.source.rowNumber,
+      expansionIndex: row.source.expansionIndex,
+    }))).toEqual([
+      { rowNumber: 6, expansionIndex: 0 },
+      { rowNumber: 6, expansionIndex: 1 },
     ]);
   });
 

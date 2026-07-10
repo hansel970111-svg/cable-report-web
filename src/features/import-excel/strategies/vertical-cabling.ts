@@ -82,7 +82,9 @@ export const verticalCablingStrategy = defineStrategy(
     );
     if (!sheetName) return emptyExtraction();
 
-    const sheetRows = readSheetRows(context.workbook.Sheets[sheetName]);
+    const { rows: sheetRows, firstRowNumber } = readSheetRows(
+      context.workbook.Sheets[sheetName],
+    );
     if (sheetRows.length === 0) return emptyExtraction();
 
     const columns = detectVerticalColumns(sheetRows);
@@ -128,7 +130,7 @@ export const verticalCablingStrategy = defineStrategy(
           bandwidth: null,
           source: {
             sheetName,
-            rowNumber: rowIndex + 1,
+            rowNumber: firstRowNumber + rowIndex,
             expansionIndex,
             rule: 'vertical-cabling',
           },

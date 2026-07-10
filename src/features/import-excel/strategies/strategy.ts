@@ -73,7 +73,7 @@ export function collectMatchingRows(
     if (!options.sheetFilter(sheetName)) continue;
 
     const worksheet = context.workbook.Sheets[sheetName];
-    const sheetRows = readSheetRows(worksheet);
+    const { rows: sheetRows, firstRowNumber } = readSheetRows(worksheet);
     if (sheetRows.length === 0) continue;
 
     const columns = detectSheetColumns(sheetRows, sheetName, options.typeMatcher);
@@ -115,7 +115,7 @@ export function collectMatchingRows(
         bandwidth: options.bandwidth?.(cableTypeText, sourceLabel) ?? null,
         source: {
           sheetName,
-          rowNumber: rowIndex + 1,
+          rowNumber: firstRowNumber + rowIndex,
           expansionIndex: 0,
           rule: options.rule,
         },
