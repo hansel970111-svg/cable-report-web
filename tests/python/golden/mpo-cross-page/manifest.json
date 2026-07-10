@@ -1,0 +1,994 @@
+{
+  "case": {
+    "expected_pages": 2,
+    "kind": "mpo",
+    "name": "mpo-cross-page",
+    "record_count": 49,
+    "site": "M138-DE46"
+  },
+  "critical_rois": [
+    {
+      "name": "page-1-result-column",
+      "page_index": 0,
+      "rect": [
+        170.777,
+        88.0,
+        182.777,
+        805.0
+      ]
+    },
+    {
+      "name": "page-2-result-column",
+      "page_index": 1,
+      "rect": [
+        170.777,
+        88.0,
+        182.777,
+        715.0
+      ]
+    }
+  ],
+  "fixture": {
+    "path": "tests/python/fixtures/pdf-cases.json",
+    "sha256": "7edfd829973ce9494d1559b4168861d66dceb351d287509208918d5eaa668a43"
+  },
+  "pages": [
+    {
+      "file": "page-001.png",
+      "height": 1684,
+      "index": 0,
+      "mode": "RGB",
+      "sha256": "98f61c6d34f4f9e05eeced8b2c76363bc9320607604d9bb717d2eada60b4e38a",
+      "width": 1190
+    },
+    {
+      "file": "page-002.png",
+      "height": 1684,
+      "index": 1,
+      "mode": "RGB",
+      "sha256": "b0d2aa6b70b51bcd3941531425d42a315b456d0f6fa172a631a7b2cc4f8c616c",
+      "width": 1190
+    }
+  ],
+  "pdf": {
+    "metadata": {
+      "author": "",
+      "creationDate": "",
+      "creator": "",
+      "encryption": null,
+      "format": "PDF 1.7",
+      "keywords": "",
+      "modDate": "",
+      "producer": "",
+      "subject": "",
+      "title": "",
+      "trapped": ""
+    },
+    "normalized_text": [
+      "Summary Report\nSite:  DE46-M138\nCable Label\nLimit\nResult Length (m) Margin (dB) Date & Time\n-\n-\n15-05-2026 09:00:00 AM\n-\n-\n-\n-\n-\n-\n-\n# 001\n# 002\n# 003\n# 004\n# 005\n# 006\n# 007\n# 008\n# 009\n# 010\n# 011\n# 012\n# 013\n# 014\n# 015\n# 016\n# 017\n# 018\n# 019\n# 020\n# 021\n# 022\n# 023\n# 024\n# 025\n# 026\n# 027\n# 028\n# 029\n# 030\n# 031\n# 032\n# 033\n# 034\n# 035\n# 036\n# 037\n# 038\n# 039\n# 040\n# 041\n# 042\n# 043\n# 044\n# 045\n# 046\n# 047\n# 048\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n15-05-2026 09:05:00 AM\n15-05-2026 09:10:00 AM\n15-05-2026 09:15:00 AM\n15-05-2026 09:20:00 AM\n15-05-2026 09:25:00 AM\n15-05-2026 09:30:00 AM\n15-05-2026 09:35:00 AM\n15-05-2026 09:40:00 AM\n15-05-2026 09:45:00 AM\n15-05-2026 09:50:00 AM\n15-05-2026 09:55:00 AM\n15-05-2026 10:00:00 AM\n15-05-2026 10:05:00 AM\n15-05-2026 10:10:00 AM\n15-05-2026 10:15:00 AM\n15-05-2026 10:20:00 AM\n15-05-2026 10:25:00 AM\n15-05-2026 10:30:00 AM\n15-05-2026 10:35:00 AM\n15-05-2026 10:40:00 AM\n15-05-2026 10:45:00 AM\n15-05-2026 10:50:00 AM\n15-05-2026 10:55:00 AM\n15-05-2026 11:00:00 AM\n15-05-2026 11:05:00 AM\n15-05-2026 11:10:00 AM\n15-05-2026 11:15:00 AM\n15-05-2026 11:20:00 AM\n15-05-2026 11:25:00 AM\n15-05-2026 11:30:00 AM\n15-05-2026 11:35:00 AM\n15-05-2026 11:40:00 AM\n15-05-2026 11:45:00 AM\n15-05-2026 11:50:00 AM\n15-05-2026 11:55:00 AM\n15-05-2026 12:00:00 PM\n15-05-2026 12:05:00 PM\n15-05-2026 12:10:00 PM\n15-05-2026 12:15:00 PM\n15-05-2026 12:20:00 PM\n15-05-2026 12:25:00 PM\n15-05-2026 12:30:00 PM\n15-05-2026 12:35:00 PM\n15-05-2026 12:40:00 PM\n15-05-2026 12:45:00 PM\n15-05-2026 12:50:00 PM\n15-05-202615-05-2026 12PM\nPage : 1\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\nPage : 1\n#M001\n#M002\n#M003\n#M004\n#M005\n#M006\n#M007\n#M008\n#M009\n#M010\n#M011\n#M012\n#M013\n#M014\n#M015\n#M016\n#M017\n#M018\n#M019\n#M020\n#M021\n#M022\n#M023\n#M024\n#M025\n#M026\n#M027\n#M028\n#M029\n#M030\n#M031\n#M032\n#M033\n#M034\n#M035\n#M036\n#M037\n#M038\n#M039\n#M040\n#M041\n#M042\n#M043\n#M044\n#M045\n#M046\n#M047\n#M048\n15-05-2026 09:00:00 AM\n15-05-2026 09:05:00 AM\n15-05-2026 09:10:00 AM\n15-05-2026 09:15:00 AM\n15-05-2026 09:20:00 AM\n15-05-2026 09:25:00 AM\n15-05-2026 09:30:00 AM\n15-05-2026 09:35:00 AM\n15-05-2026 09:40:00 AM\n15-05-2026 09:45:00 AM\n15-05-2026 09:50:00 AM\n15-05-2026 09:55:00 AM\n15-05-2026 10:00:00 AM\n15-05-2026 10:05:00 AM\n15-05-2026 10:10:00 AM\n15-05-2026 10:15:00 AM\n15-05-2026 10:20:00 AM\n15-05-2026 10:25:00 AM\n15-05-2026 10:30:00 AM\n15-05-2026 10:35:00 AM\n15-05-2026 10:40:00 AM\n15-05-2026 10:45:00 AM\n15-05-2026 10:50:00 AM\n15-05-2026 10:55:00 AM\n15-05-2026 11:00:00 AM\n15-05-2026 11:05:00 AM\n15-05-2026 11:10:00 AM\n15-05-2026 11:15:00 AM\n15-05-2026 11:20:00 AM\n15-05-2026 11:25:00 AM\n15-05-2026 11:30:00 AM\n15-05-2026 11:35:00 AM\n15-05-2026 11:40:00 AM\n15-05-2026 11:45:00 AM\n15-05-2026 11:50:00 AM\n15-05-2026 11:55:00 AM\n15-05-2026 12:00:00 PM\n15-05-2026 12:05:00 PM\n15-05-2026 12:10:00 PM\n15-05-2026 12:15:00 PM\n15-05-2026 12:20:00 PM\n15-05-2026 12:25:00 PM\n15-05-2026 12:30:00 PM\n15-05-2026 12:35:00 PM\n15-05-2026 12:40:00 PM\n15-05-2026 12:45:00 PM\n15-05-2026 12:50:00 PM\n15-05-2026 12:55:00 PM\nSite: M138-DE46",
+      "Summary Report\nCable Label\nResult Length (m) Margin (dB)\nLimit\nDate & Time\n-\n-\n15-05-2026 01:12:57 PM\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n29-01-2026 01:12:28 PM\n29-01-2026 01:12:02 PM\n29-01-2026 01:11:41 PM\n29-01-2026 01:11:11 PM\n29-01-2026 01:10:34 PM\n29-01-2026 01:10:12 PM\n29-01-2026 01:09:45 PM\n29-01-2026 01:09:13 PM\n29-01-2026 01:08:33 PM\n29-01-2026 11:54:32 AM\n29-01-2026 11:54:09 AM\n29-01-2026 11:53:33 AM\n29-01-2026 11:53:11 AM\n29-01-2026 11:52:35 AM\n29-01-2026 11:51:05 AM\n29-01-2026 11:50:45 AM\n29-01-2026 11:50:31 AM\n29-01-2026 11:49:50 AM\n29-01-2026 11:49:13 AM\n29-01-2026 11:48:37 AM\n29-01-2026 11:48:22 AM\n29-01-2026 11:47:59 AM\n29-01-2026 11:46:42 AM\n29-01-2026 11:45:38 AM\n29-01-2026 11:44:58 AM\n29-01-2026 11:44:30 AM\n29-01-2026 11:43:46 AM\n29-01-2026 11:42:53 AM\n29-01-2026 11:42:16 AM\n29-01-2026 11:41:57 AM\n29-01-2026 11:41:06 AM\n29-01-2026 11:39:35 AM\n29-01-2026 11:38:23 AM\n29-01-2026 11:38:02 AM\n29-01-2026 11:36:01 AM\n29-01-2026 11:35:02 AM\n29-01-2026 11:34:42 AM\n29-01-2026 11:34:17 AM\n29-01-2026 11:33:38 AM\n29-01-2026 11:33:09 AM\n29-01-2026 11:32:39 AM\n29-01-2026 11:31:49 AM\n29-01-2026 11:31:01 AM\n29-01-2026 11:30:29 AM\n29-01-2026 11:30:04 AM\n29-01-2026 11:29:36 AM\n29-01-2026 11:29:04 AM\nPage : 2\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n#1170\n#1171\n#1172\n#1173\n#1174\n#1175\n#1176\n#1177\n#1178\n#1179\n#1180\n#1181\n#1182\n#1183\n#1184\n#1185\n#1186\n#1187\n#1188\n#1189\n#1190\n#1191\n#1192\n#1193\n#1194\n#1195\n#1196\n#1197\n#1198\n#1199\n#1200\n#1201\n#1202\n#1203\n#1204\n#1205\n#1206\n#1207\n#1208\n#1209\n#1210\n#1211\n#1212\n#1213\n#1214\n#1215\n#1216\n#1217\nPage : 2\n#M049\n15-05-2026 01:00:00 PM\nSite: M138-DE46\nTotal for Site: M138-DE46\nPass\nFail\nLength (m)\nMPO MPO\n44\n5\n0\nTotal for Selected Reports\nPass\nFail\nLength (m)\nMPO MPO\n44\n5\n0\nPrinted: <TIMESTAMP>\nSignature:______________________"
+    ],
+    "page_count": 2
+  },
+  "printed": {
+    "mask_rect": [
+      53.0,
+      816.0,
+      151.0,
+      830.0
+    ],
+    "pages": [
+      1
+    ],
+    "placeholder": "Printed: <TIMESTAMP>",
+    "span_counts": [
+      0,
+      1
+    ]
+  },
+  "renderer": {
+    "alpha": false,
+    "colorspace": "RGB",
+    "dpi": 144,
+    "name": "PyMuPDF",
+    "version": "1.26.5"
+  },
+  "schema_version": 1,
+  "semantics": {
+    "fail_count": 5,
+    "footer": "Signature:______________________",
+    "input_total_length": "1568",
+    "page_boundaries": [
+      {
+        "first": {
+          "cable_label": "#M001",
+          "date_time": "15-05-2026 09:00:00 AM",
+          "length": 20.0,
+          "limit": "200GBASE-SR10",
+          "next_margin": 10.0
+        },
+        "last": {
+          "cable_label": "#M048",
+          "date_time": "15-05-2026 12:55:00 PM",
+          "length": 43.5,
+          "limit": "200GBASE-SR10",
+          "next_margin": 11.4
+        },
+        "page_index": 0,
+        "record_count": 48
+      },
+      {
+        "first": {
+          "cable_label": "#M049",
+          "date_time": "15-05-2026 01:00:00 PM",
+          "length": 44.0,
+          "limit": "200GBASE-SR10",
+          "next_margin": 11.6
+        },
+        "last": {
+          "cable_label": "#M049",
+          "date_time": "15-05-2026 01:00:00 PM",
+          "length": 44.0,
+          "limit": "200GBASE-SR10",
+          "next_margin": 11.6
+        },
+        "page_index": 1,
+        "record_count": 1
+      }
+    ],
+    "pages": [
+      {
+        "page_index": 0,
+        "rows": [
+          {
+            "cable_label": "#M001",
+            "date_time": "15-05-2026 09:00:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "09:00:00",
+              "AM"
+            ],
+            "length": "-",
+            "limit": "200GBASE-SR10",
+            "limit_tokens": [
+              "200GBASE-SR10"
+            ],
+            "margin": "-",
+            "result": "PASS",
+            "row_index": 0
+          },
+          {
+            "cable_label": "#M002",
+            "date_time": "15-05-2026 09:05:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "09:05:00",
+              "AM"
+            ],
+            "length": "-",
+            "limit": "200GBASE-SR10",
+            "limit_tokens": [
+              "200GBASE-SR10"
+            ],
+            "margin": "-",
+            "result": "FAIL",
+            "row_index": 1
+          },
+          {
+            "cable_label": "#M003",
+            "date_time": "15-05-2026 09:10:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "09:10:00",
+              "AM"
+            ],
+            "length": "-",
+            "limit": "200GBASE-SR10",
+            "limit_tokens": [
+              "200GBASE-SR10"
+            ],
+            "margin": "-",
+            "result": "PASS",
+            "row_index": 2
+          },
+          {
+            "cable_label": "#M004",
+            "date_time": "15-05-2026 09:15:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "09:15:00",
+              "AM"
+            ],
+            "length": "-",
+            "limit": "200GBASE-SR10",
+            "limit_tokens": [
+              "200GBASE-SR10"
+            ],
+            "margin": "-",
+            "result": "PASS",
+            "row_index": 3
+          },
+          {
+            "cable_label": "#M005",
+            "date_time": "15-05-2026 09:20:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "09:20:00",
+              "AM"
+            ],
+            "length": "-",
+            "limit": "200GBASE-SR10",
+            "limit_tokens": [
+              "200GBASE-SR10"
+            ],
+            "margin": "-",
+            "result": "PASS",
+            "row_index": 4
+          },
+          {
+            "cable_label": "#M006",
+            "date_time": "15-05-2026 09:25:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "09:25:00",
+              "AM"
+            ],
+            "length": "-",
+            "limit": "200GBASE-SR10",
+            "limit_tokens": [
+              "200GBASE-SR10"
+            ],
+            "margin": "-",
+            "result": "PASS",
+            "row_index": 5
+          },
+          {
+            "cable_label": "#M007",
+            "date_time": "15-05-2026 09:30:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "09:30:00",
+              "AM"
+            ],
+            "length": "-",
+            "limit": "200GBASE-SR10",
+            "limit_tokens": [
+              "200GBASE-SR10"
+            ],
+            "margin": "-",
+            "result": "PASS",
+            "row_index": 6
+          },
+          {
+            "cable_label": "#M008",
+            "date_time": "15-05-2026 09:35:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "09:35:00",
+              "AM"
+            ],
+            "length": "-",
+            "limit": "200GBASE-SR10",
+            "limit_tokens": [
+              "200GBASE-SR10"
+            ],
+            "margin": "-",
+            "result": "PASS",
+            "row_index": 7
+          },
+          {
+            "cable_label": "#M009",
+            "date_time": "15-05-2026 09:40:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "09:40:00",
+              "AM"
+            ],
+            "length": "-",
+            "limit": "200GBASE-SR10",
+            "limit_tokens": [
+              "200GBASE-SR10"
+            ],
+            "margin": "-",
+            "result": "PASS",
+            "row_index": 8
+          },
+          {
+            "cable_label": "#M010",
+            "date_time": "15-05-2026 09:45:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "09:45:00",
+              "AM"
+            ],
+            "length": "-",
+            "limit": "200GBASE-SR10",
+            "limit_tokens": [
+              "200GBASE-SR10"
+            ],
+            "margin": "-",
+            "result": "FAIL",
+            "row_index": 9
+          },
+          {
+            "cable_label": "#M011",
+            "date_time": "15-05-2026 09:50:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "09:50:00",
+              "AM"
+            ],
+            "length": "-",
+            "limit": "200GBASE-SR10",
+            "limit_tokens": [
+              "200GBASE-SR10"
+            ],
+            "margin": "-",
+            "result": "PASS",
+            "row_index": 10
+          },
+          {
+            "cable_label": "#M012",
+            "date_time": "15-05-2026 09:55:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "09:55:00",
+              "AM"
+            ],
+            "length": "-",
+            "limit": "200GBASE-SR10",
+            "limit_tokens": [
+              "200GBASE-SR10"
+            ],
+            "margin": "-",
+            "result": "PASS",
+            "row_index": 11
+          },
+          {
+            "cable_label": "#M013",
+            "date_time": "15-05-2026 10:00:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "10:00:00",
+              "AM"
+            ],
+            "length": "-",
+            "limit": "200GBASE-SR10",
+            "limit_tokens": [
+              "200GBASE-SR10"
+            ],
+            "margin": "-",
+            "result": "PASS",
+            "row_index": 12
+          },
+          {
+            "cable_label": "#M014",
+            "date_time": "15-05-2026 10:05:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "10:05:00",
+              "AM"
+            ],
+            "length": "-",
+            "limit": "200GBASE-SR10",
+            "limit_tokens": [
+              "200GBASE-SR10"
+            ],
+            "margin": "-",
+            "result": "PASS",
+            "row_index": 13
+          },
+          {
+            "cable_label": "#M015",
+            "date_time": "15-05-2026 10:10:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "10:10:00",
+              "AM"
+            ],
+            "length": "-",
+            "limit": "200GBASE-SR10",
+            "limit_tokens": [
+              "200GBASE-SR10"
+            ],
+            "margin": "-",
+            "result": "PASS",
+            "row_index": 14
+          },
+          {
+            "cable_label": "#M016",
+            "date_time": "15-05-2026 10:15:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "10:15:00",
+              "AM"
+            ],
+            "length": "-",
+            "limit": "200GBASE-SR10",
+            "limit_tokens": [
+              "200GBASE-SR10"
+            ],
+            "margin": "-",
+            "result": "PASS",
+            "row_index": 15
+          },
+          {
+            "cable_label": "#M017",
+            "date_time": "15-05-2026 10:20:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "10:20:00",
+              "AM"
+            ],
+            "length": "-",
+            "limit": "200GBASE-SR10",
+            "limit_tokens": [
+              "200GBASE-SR10"
+            ],
+            "margin": "-",
+            "result": "PASS",
+            "row_index": 16
+          },
+          {
+            "cable_label": "#M018",
+            "date_time": "15-05-2026 10:25:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "10:25:00",
+              "AM"
+            ],
+            "length": "-",
+            "limit": "200GBASE-SR10",
+            "limit_tokens": [
+              "200GBASE-SR10"
+            ],
+            "margin": "-",
+            "result": "PASS",
+            "row_index": 17
+          },
+          {
+            "cable_label": "#M019",
+            "date_time": "15-05-2026 10:30:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "10:30:00",
+              "AM"
+            ],
+            "length": "-",
+            "limit": "200GBASE-SR10",
+            "limit_tokens": [
+              "200GBASE-SR10"
+            ],
+            "margin": "-",
+            "result": "PASS",
+            "row_index": 18
+          },
+          {
+            "cable_label": "#M020",
+            "date_time": "15-05-2026 10:35:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "10:35:00",
+              "AM"
+            ],
+            "length": "-",
+            "limit": "200GBASE-SR10",
+            "limit_tokens": [
+              "200GBASE-SR10"
+            ],
+            "margin": "-",
+            "result": "FAIL",
+            "row_index": 19
+          },
+          {
+            "cable_label": "#M021",
+            "date_time": "15-05-2026 10:40:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "10:40:00",
+              "AM"
+            ],
+            "length": "-",
+            "limit": "200GBASE-SR10",
+            "limit_tokens": [
+              "200GBASE-SR10"
+            ],
+            "margin": "-",
+            "result": "PASS",
+            "row_index": 20
+          },
+          {
+            "cable_label": "#M022",
+            "date_time": "15-05-2026 10:45:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "10:45:00",
+              "AM"
+            ],
+            "length": "-",
+            "limit": "200GBASE-SR10",
+            "limit_tokens": [
+              "200GBASE-SR10"
+            ],
+            "margin": "-",
+            "result": "PASS",
+            "row_index": 21
+          },
+          {
+            "cable_label": "#M023",
+            "date_time": "15-05-2026 10:50:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "10:50:00",
+              "AM"
+            ],
+            "length": "-",
+            "limit": "200GBASE-SR10",
+            "limit_tokens": [
+              "200GBASE-SR10"
+            ],
+            "margin": "-",
+            "result": "PASS",
+            "row_index": 22
+          },
+          {
+            "cable_label": "#M024",
+            "date_time": "15-05-2026 10:55:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "10:55:00",
+              "AM"
+            ],
+            "length": "-",
+            "limit": "200GBASE-SR10",
+            "limit_tokens": [
+              "200GBASE-SR10"
+            ],
+            "margin": "-",
+            "result": "PASS",
+            "row_index": 23
+          },
+          {
+            "cable_label": "#M025",
+            "date_time": "15-05-2026 11:00:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "11:00:00",
+              "AM"
+            ],
+            "length": "-",
+            "limit": "200GBASE-SR10",
+            "limit_tokens": [
+              "200GBASE-SR10"
+            ],
+            "margin": "-",
+            "result": "PASS",
+            "row_index": 24
+          },
+          {
+            "cable_label": "#M026",
+            "date_time": "15-05-2026 11:05:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "11:05:00",
+              "AM"
+            ],
+            "length": "-",
+            "limit": "200GBASE-SR10",
+            "limit_tokens": [
+              "200GBASE-SR10"
+            ],
+            "margin": "-",
+            "result": "PASS",
+            "row_index": 25
+          },
+          {
+            "cable_label": "#M027",
+            "date_time": "15-05-2026 11:10:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "11:10:00",
+              "AM"
+            ],
+            "length": "-",
+            "limit": "200GBASE-SR10",
+            "limit_tokens": [
+              "200GBASE-SR10"
+            ],
+            "margin": "-",
+            "result": "PASS",
+            "row_index": 26
+          },
+          {
+            "cable_label": "#M028",
+            "date_time": "15-05-2026 11:15:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "11:15:00",
+              "AM"
+            ],
+            "length": "-",
+            "limit": "200GBASE-SR10",
+            "limit_tokens": [
+              "200GBASE-SR10"
+            ],
+            "margin": "-",
+            "result": "PASS",
+            "row_index": 27
+          },
+          {
+            "cable_label": "#M029",
+            "date_time": "15-05-2026 11:20:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "11:20:00",
+              "AM"
+            ],
+            "length": "-",
+            "limit": "200GBASE-SR10",
+            "limit_tokens": [
+              "200GBASE-SR10"
+            ],
+            "margin": "-",
+            "result": "PASS",
+            "row_index": 28
+          },
+          {
+            "cable_label": "#M030",
+            "date_time": "15-05-2026 11:25:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "11:25:00",
+              "AM"
+            ],
+            "length": "-",
+            "limit": "200GBASE-SR10",
+            "limit_tokens": [
+              "200GBASE-SR10"
+            ],
+            "margin": "-",
+            "result": "FAIL",
+            "row_index": 29
+          },
+          {
+            "cable_label": "#M031",
+            "date_time": "15-05-2026 11:30:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "11:30:00",
+              "AM"
+            ],
+            "length": "-",
+            "limit": "200GBASE-SR10",
+            "limit_tokens": [
+              "200GBASE-SR10"
+            ],
+            "margin": "-",
+            "result": "PASS",
+            "row_index": 30
+          },
+          {
+            "cable_label": "#M032",
+            "date_time": "15-05-2026 11:35:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "11:35:00",
+              "AM"
+            ],
+            "length": "-",
+            "limit": "200GBASE-SR10",
+            "limit_tokens": [
+              "200GBASE-SR10"
+            ],
+            "margin": "-",
+            "result": "PASS",
+            "row_index": 31
+          },
+          {
+            "cable_label": "#M033",
+            "date_time": "15-05-2026 11:40:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "11:40:00",
+              "AM"
+            ],
+            "length": "-",
+            "limit": "200GBASE-SR10",
+            "limit_tokens": [
+              "200GBASE-SR10"
+            ],
+            "margin": "-",
+            "result": "PASS",
+            "row_index": 32
+          },
+          {
+            "cable_label": "#M034",
+            "date_time": "15-05-2026 11:45:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "11:45:00",
+              "AM"
+            ],
+            "length": "-",
+            "limit": "200GBASE-SR10",
+            "limit_tokens": [
+              "200GBASE-SR10"
+            ],
+            "margin": "-",
+            "result": "PASS",
+            "row_index": 33
+          },
+          {
+            "cable_label": "#M035",
+            "date_time": "15-05-2026 11:50:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "11:50:00",
+              "AM"
+            ],
+            "length": "-",
+            "limit": "200GBASE-SR10",
+            "limit_tokens": [
+              "200GBASE-SR10"
+            ],
+            "margin": "-",
+            "result": "PASS",
+            "row_index": 34
+          },
+          {
+            "cable_label": "#M036",
+            "date_time": "15-05-2026 11:55:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "11:55:00",
+              "AM"
+            ],
+            "length": "-",
+            "limit": "200GBASE-SR10",
+            "limit_tokens": [
+              "200GBASE-SR10"
+            ],
+            "margin": "-",
+            "result": "PASS",
+            "row_index": 35
+          },
+          {
+            "cable_label": "#M037",
+            "date_time": "15-05-2026 12:00:00 PM",
+            "date_tokens": [
+              "15-05-2026",
+              "12:00:00",
+              "PM"
+            ],
+            "length": "-",
+            "limit": "200GBASE-SR10",
+            "limit_tokens": [
+              "200GBASE-SR10"
+            ],
+            "margin": "-",
+            "result": "PASS",
+            "row_index": 36
+          },
+          {
+            "cable_label": "#M038",
+            "date_time": "15-05-2026 12:05:00 PM",
+            "date_tokens": [
+              "15-05-2026",
+              "12:05:00",
+              "PM"
+            ],
+            "length": "-",
+            "limit": "200GBASE-SR10",
+            "limit_tokens": [
+              "200GBASE-SR10"
+            ],
+            "margin": "-",
+            "result": "PASS",
+            "row_index": 37
+          },
+          {
+            "cable_label": "#M039",
+            "date_time": "15-05-2026 12:10:00 PM",
+            "date_tokens": [
+              "15-05-2026",
+              "12:10:00",
+              "PM"
+            ],
+            "length": "-",
+            "limit": "200GBASE-SR10",
+            "limit_tokens": [
+              "200GBASE-SR10"
+            ],
+            "margin": "-",
+            "result": "PASS",
+            "row_index": 38
+          },
+          {
+            "cable_label": "#M040",
+            "date_time": "15-05-2026 12:15:00 PM",
+            "date_tokens": [
+              "15-05-2026",
+              "12:15:00",
+              "PM"
+            ],
+            "length": "-",
+            "limit": "200GBASE-SR10",
+            "limit_tokens": [
+              "200GBASE-SR10"
+            ],
+            "margin": "-",
+            "result": "FAIL",
+            "row_index": 39
+          },
+          {
+            "cable_label": "#M041",
+            "date_time": "15-05-2026 12:20:00 PM",
+            "date_tokens": [
+              "15-05-2026",
+              "12:20:00",
+              "PM"
+            ],
+            "length": "-",
+            "limit": "200GBASE-SR10",
+            "limit_tokens": [
+              "200GBASE-SR10"
+            ],
+            "margin": "-",
+            "result": "PASS",
+            "row_index": 40
+          },
+          {
+            "cable_label": "#M042",
+            "date_time": "15-05-2026 12:25:00 PM",
+            "date_tokens": [
+              "15-05-2026",
+              "12:25:00",
+              "PM"
+            ],
+            "length": "-",
+            "limit": "200GBASE-SR10",
+            "limit_tokens": [
+              "200GBASE-SR10"
+            ],
+            "margin": "-",
+            "result": "PASS",
+            "row_index": 41
+          },
+          {
+            "cable_label": "#M043",
+            "date_time": "15-05-2026 12:30:00 PM",
+            "date_tokens": [
+              "15-05-2026",
+              "12:30:00",
+              "PM"
+            ],
+            "length": "-",
+            "limit": "200GBASE-SR10",
+            "limit_tokens": [
+              "200GBASE-SR10"
+            ],
+            "margin": "-",
+            "result": "PASS",
+            "row_index": 42
+          },
+          {
+            "cable_label": "#M044",
+            "date_time": "15-05-2026 12:35:00 PM",
+            "date_tokens": [
+              "15-05-2026",
+              "12:35:00",
+              "PM"
+            ],
+            "length": "-",
+            "limit": "200GBASE-SR10",
+            "limit_tokens": [
+              "200GBASE-SR10"
+            ],
+            "margin": "-",
+            "result": "PASS",
+            "row_index": 43
+          },
+          {
+            "cable_label": "#M045",
+            "date_time": "15-05-2026 12:40:00 PM",
+            "date_tokens": [
+              "15-05-2026",
+              "12:40:00",
+              "PM"
+            ],
+            "length": "-",
+            "limit": "200GBASE-SR10",
+            "limit_tokens": [
+              "200GBASE-SR10"
+            ],
+            "margin": "-",
+            "result": "PASS",
+            "row_index": 44
+          },
+          {
+            "cable_label": "#M046",
+            "date_time": "15-05-2026 12:45:00 PM",
+            "date_tokens": [
+              "15-05-2026",
+              "12:45:00",
+              "PM"
+            ],
+            "length": "-",
+            "limit": "200GBASE-SR10",
+            "limit_tokens": [
+              "200GBASE-SR10"
+            ],
+            "margin": "-",
+            "result": "PASS",
+            "row_index": 45
+          },
+          {
+            "cable_label": "#M047",
+            "date_time": "15-05-2026 12:50:00 PM",
+            "date_tokens": [
+              "15-05-2026",
+              "12:50:00",
+              "PM"
+            ],
+            "length": "-",
+            "limit": "200GBASE-SR10",
+            "limit_tokens": [
+              "200GBASE-SR10"
+            ],
+            "margin": "-",
+            "result": "PASS",
+            "row_index": 46
+          },
+          {
+            "cable_label": "#M048",
+            "date_time": "15-05-2026 12:55:00 PM",
+            "date_tokens": [
+              "15-05-2026",
+              "15-05-202615-05-2026",
+              "12:55:00",
+              "PM"
+            ],
+            "length": "-",
+            "limit": "200GBASE-SR10",
+            "limit_tokens": [
+              "200GBASE-SR10"
+            ],
+            "margin": "-",
+            "result": "PASS",
+            "row_index": 47
+          }
+        ]
+      },
+      {
+        "page_index": 1,
+        "rows": [
+          {
+            "cable_label": "#M049",
+            "date_time": "15-05-2026 01:00:00 PM",
+            "date_tokens": [
+              "15-05-2026",
+              "01:00:00",
+              "PM"
+            ],
+            "length": "-",
+            "limit": "200GBASE-SR10",
+            "limit_tokens": [
+              "200GBASE-SR10"
+            ],
+            "margin": "-",
+            "result": "PASS",
+            "row_index": 0
+          }
+        ]
+      }
+    ],
+    "pass_count": 44,
+    "record_count": 49,
+    "site": "M138-DE46",
+    "summary_total_length": "0"
+  },
+  "template": {
+    "path": "assets/M138-DE46-P-A-MPO.pdf",
+    "sha256": "8b9ee738a87f5973cfaa11647ad51c7ebfd16b1b01d527ed401c76e7f77f8550"
+  }
+}

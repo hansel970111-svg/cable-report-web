@@ -1,0 +1,159 @@
+{
+  "case": {
+    "expected_pages": 1,
+    "kind": "cat5e",
+    "name": "cat5e-minimal",
+    "record_count": 2,
+    "site": "M138-DE46"
+  },
+  "critical_rois": [
+    {
+      "name": "page-1-result-column",
+      "page_index": 0,
+      "rect": [
+        271.0,
+        109.766,
+        283.0,
+        706.766
+      ]
+    }
+  ],
+  "fixture": {
+    "path": "tests/python/fixtures/pdf-cases.json",
+    "sha256": "7edfd829973ce9494d1559b4168861d66dceb351d287509208918d5eaa668a43"
+  },
+  "pages": [
+    {
+      "file": "page-001.png",
+      "height": 1684,
+      "index": 0,
+      "mode": "RGB",
+      "sha256": "abb265fc3850791ed7ce2d7ff06c54c96e959f3556d28443577bf0ddb2391a1a",
+      "width": 1190
+    }
+  ],
+  "pdf": {
+    "metadata": {
+      "author": "",
+      "creationDate": "",
+      "creator": "",
+      "encryption": null,
+      "format": "PDF 1.7",
+      "keywords": "",
+      "modDate": "",
+      "producer": "",
+      "subject": "",
+      "title": "",
+      "trapped": ""
+    },
+    "normalized_text": [
+      "Summary Report\nSite:  DE46-M138\nCable Label\nLimit\nResult Length (m) NEXT\nMargin (dB)\nFactory\nCalibration\nStatus\nDate & Time\n19\nTIA - Cat 5e Channel\n11.5\n19.1\nTIA - Cat 5e Channel\n11.5\n19.4\nTIA - Cat 5e Channel\n10.8\n19.1\nTIA - Cat 5e Channel\n11.5\n19\nTIA - Cat 5e Channel\n11.8\n19.1\nTIA - Cat 5e Channel\n11.2\n#238\n#239\n#240\n#241\n#242\n#243\n#244\n#245\n#246\n#247\n#248\n#249\n#250\n#251\n#252\n#253\n#254\n#255\n#256\n#257\n#258\n#259\n#260\n#261\n#262\n#263\n#264\n#265\n#266\n#267\n#268\n#269\n#270\n#271\n#272\n#273\n#274\n#275\n#276\n#277\n#278\n#279\n#280\n#281\n#282\n#283\n19.4\nTIA - Cat 5e Channel\n10.3\n24.3\nTIA - Cat 5e Channel\n10.3\n14.3\nTIA - Cat 5e Channel\n7.9\n14.3\nTIA - Cat 5e Channel\n10.3\n24.2\nTIA - Cat 5e Channel\n10.2\n14.3\nTIA - Cat 5e Channel\n10.4\n24.4\nTIA - Cat 5e Channel\n11.6\n24.3\nTIA - Cat 5e Channel\n11.2\n29.6\nTIA - Cat 5e Channel\n10.8\n29.6\nTIA - Cat 5e Channel\n11.6\n29.6\nTIA - Cat 5e Channel\n10.6\n24.3\nTIA - Cat 5e Channel\n10.6\n29.7\nTIA - Cat 5e Channel\n8.3\n24.2\nTIA - Cat 5e Channel\n11.6\n24.4\nTIA - Cat 5e Channel\n11.2\n23.9\nTIA - Cat 5e Channel\n12.2\n24.3\nTIA - Cat 5e Channel\n12.1\n24.4\nTIA - Cat 5e Channel\n11.6\n23.9\nTIA - Cat 5e Channel\n9.5\n24.4\nTIA - Cat 5e Channel\n12.1\n24.3\nTIA - Cat 5e Channel\n11.1\n24.3\nTIA - Cat 5e Channel\n10.8\n19.4\nTIA - Cat 5e Channel\n11.6\n19.2\nTIA - Cat 5e Channel\n9.9\n24.3\nTIA - Cat 5e Channel\n11.8\n24\nTIA - Cat 5e Channel\n11.7\n24.3\nTIA - Cat 5e Channel\n10.8\n24.3\nTIA - Cat 5e Channel\n11.4\n24.3\nTIA - Cat 5e Channel\n11.2\n24\nTIA - Cat 5e Channel\n11.6\n23.7\nTIA - Cat 5e Channel\n12.1\n24.4\nTIA - Cat 5e Channel\n11.1\n24.4\nTIA - Cat 5e Channel\n11.7\n24.4\nTIA - Cat 5e Channel\n11.3\n24.4\nTIA - Cat 5e Channel\n11.8\n24.4\nTIA - Cat 5e Channel\n10.5\n24.3\nTIA - Cat 5e Channel\n11.1\n23.7\nTIA - Cat 5e Channel\n12.6\n19\nTIA - Cat 5e Channel\n11\n19\nTIA - Cat 5e Channel\n11.1\n15-05-2026 10:16:44 AM\n15-05-2026 10:15:18 AM\n29-01-2026 10:13:47 AM\n29-01-2026 10:01:25 AM\n29-01-2026 10:00:03 AM\n29-01-2026 09:58:47 AM\n29-01-2026 09:57:22 AM\n29-01-2026 09:53:41 AM\n29-01-2026 09:50:40 AM\n29-01-2026 09:46:36 AM\n29-01-2026 09:45:20 AM\n29-01-2026 09:38:52 AM\n29-01-2026 09:37:18 AM\n29-01-2026 09:36:08 AM\n29-01-2026 09:35:07 AM\n29-01-2026 09:34:06 AM\n29-01-2026 09:31:37 AM\n29-01-2026 09:30:32 AM\n29-01-2026 09:29:12 AM\n29-01-2026 09:27:29 AM\n29-01-2026 09:23:34 AM\n29-01-2026 09:22:48 AM\n29-01-2026 09:20:50 AM\n29-01-2026 09:19:34 AM\n29-01-2026 09:18:51 AM\n29-01-2026 09:18:00 AM\n29-01-2026 09:17:02 AM\n29-01-2026 09:16:22 AM\n29-01-2026 09:14:49 AM\n29-01-2026 09:14:00 AM\n29-01-2026 09:12:52 AM\n29-01-2026 09:12:09 AM\n29-01-2026 09:10:19 AM\n29-01-2026 09:07:48 AM\n29-01-2026 09:06:51 AM\n29-01-2026 09:05:39 AM\n29-01-2026 09:04:31 AM\n29-01-2026 09:03:10 AM\n28-01-2026 05:03:26 PM\n28-01-2026 05:02:49 PM\n28-01-2026 05:02:09 PM\n28-01-2026 05:01:30 PM\n28-01-2026 05:00:54 PM\n28-01-2026 05:00:10 PM\n28-01-2026 04:59:09 PM\n28-01-2026 04:58:09 PM\nPage : 1\n20\n10.0\n20.5\n10.2\nPage : 1\n#C001\n#C002\n15-05-2026 09:00:00 AM\n15-05-2026 09:05:00 AM\nSite: M138-DE46\nTotal for Site: M138-DE46\nPass\nFail\nLength (m)\nCU Copper\n1\n1\n40.5\nTotal for Selected Reports\nPass\nFail\nLength (m)\nCU Copper\n1\n1\n40.5\nPrinted: <TIMESTAMP>\nSignature:______________________"
+    ],
+    "page_count": 1
+  },
+  "printed": {
+    "mask_rect": [
+      53.0,
+      816.0,
+      151.0,
+      830.0
+    ],
+    "pages": [
+      0
+    ],
+    "placeholder": "Printed: <TIMESTAMP>",
+    "span_counts": [
+      1
+    ]
+  },
+  "renderer": {
+    "alpha": false,
+    "colorspace": "RGB",
+    "dpi": 144,
+    "name": "PyMuPDF",
+    "version": "1.26.5"
+  },
+  "schema_version": 1,
+  "semantics": {
+    "fail_count": 1,
+    "footer": "Signature:______________________",
+    "input_total_length": "40.5",
+    "page_boundaries": [
+      {
+        "first": {
+          "cable_label": "#C001",
+          "date_time": "15-05-2026 09:00:00 AM",
+          "length": 20.0,
+          "limit": "TIA - Cat 5e Channel",
+          "next_margin": 10.0
+        },
+        "last": {
+          "cable_label": "#C002",
+          "date_time": "15-05-2026 09:05:00 AM",
+          "length": 20.5,
+          "limit": "TIA - Cat 5e Channel",
+          "next_margin": 10.2
+        },
+        "page_index": 0,
+        "record_count": 2
+      }
+    ],
+    "pages": [
+      {
+        "page_index": 0,
+        "rows": [
+          {
+            "cable_label": "#C001",
+            "date_time": "15-05-2026 09:00:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "09:00:00",
+              "AM"
+            ],
+            "length": "20",
+            "limit": "TIA - Cat 5e Channel",
+            "limit_tokens": [
+              "TIA",
+              "-",
+              "Cat",
+              "5e",
+              "Channel"
+            ],
+            "margin": "10.0",
+            "result": "PASS",
+            "row_index": 0
+          },
+          {
+            "cable_label": "#C002",
+            "date_time": "15-05-2026 09:05:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "09:05:00",
+              "AM"
+            ],
+            "length": "20.5",
+            "limit": "TIA - Cat 5e Channel",
+            "limit_tokens": [
+              "TIA",
+              "-",
+              "Cat",
+              "5e",
+              "Channel"
+            ],
+            "margin": "10.2",
+            "result": "FAIL",
+            "row_index": 1
+          }
+        ]
+      }
+    ],
+    "pass_count": 1,
+    "record_count": 2,
+    "site": "M138-DE46",
+    "summary_total_length": "40.5"
+  },
+  "template": {
+    "path": "assets/M138-DE46-OOB-Cat5e.pdf",
+    "sha256": "6f203def2f6f7851d12372d5d75e5eeeaabedb931ea41ade644ea577bb9e14e4"
+  }
+}

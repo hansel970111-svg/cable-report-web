@@ -1,0 +1,153 @@
+{
+  "case": {
+    "expected_pages": 1,
+    "kind": "lc",
+    "name": "lc-minimal",
+    "record_count": 2,
+    "site": "M138-DE46"
+  },
+  "critical_rois": [
+    {
+      "name": "page-1-result-column",
+      "page_index": 0,
+      "rect": [
+        162.109,
+        109.766,
+        174.109,
+        436.766
+      ]
+    }
+  ],
+  "fixture": {
+    "path": "tests/python/fixtures/pdf-cases.json",
+    "sha256": "7edfd829973ce9494d1559b4168861d66dceb351d287509208918d5eaa668a43"
+  },
+  "pages": [
+    {
+      "file": "page-001.png",
+      "height": 1684,
+      "index": 0,
+      "mode": "RGB",
+      "sha256": "658948ee381969beaec49a8bd95bac5b9bcb4bf0f0ac55e4d48a923e6b1bb63f",
+      "width": 1190
+    }
+  ],
+  "pdf": {
+    "metadata": {
+      "author": "",
+      "creationDate": "",
+      "creator": "",
+      "encryption": null,
+      "format": "PDF 1.7",
+      "keywords": "",
+      "modDate": "",
+      "producer": "",
+      "subject": "",
+      "title": "",
+      "trapped": ""
+    },
+    "normalized_text": [
+      "Summary Report\nCable Label\nResult Length (m) Worst\nMargin (dB)\nLimit\nFactory\nCalibration\nStatus\nDate & Time\n137\n7.71\n188.3\n7.96\n184.6\n8.07\n188.3\n7.85\n184.6\n7.8\n188.3\n7.87\n184.6\n8.01\n188.3\n7.69\n182.3\n5.11\n130.9\n7.71\n137\n7.89\n130.9\n8.14\n137\n7.65\n130.9\n7.94\n137\n8.05\n137\n7.69\n188.3\n7.51\n188.3\n7.8\n182.3\n7.87\n188.3\n7.2\n188.3\n7.78\n182.3\n8.03\n15-05-2026 03:38:34 PM\n15-05-2026 03:36:55 PM\n23-01-2026 03:35:41 PM\n23-01-2026 03:32:36 PM\n23-01-2026 03:30:47 PM\n23-01-2026 03:29:39 PM\n23-01-2026 03:28:27 PM\n23-01-2026 03:27:19 PM\n23-01-2026 03:25:53 PM\n23-01-2026 02:58:19 PM\n23-01-2026 02:56:52 PM\n23-01-2026 02:54:25 PM\n23-01-2026 02:52:39 PM\n23-01-2026 02:51:26 PM\n23-01-2026 02:50:04 PM\n23-01-2026 02:43:59 PM\n23-01-2026 02:41:12 PM\n23-01-2026 02:33:02 PM\n23-01-2026 02:30:59 PM\n23-01-2026 02:29:54 PM\n23-01-2026 02:21:47 PM\n23-01-2026 02:18:59 PM\nPass\nFail\nLength (m)\nTotal for Site: DE46-M138\n344\n0\n54295.8\nTotal for Selected Reports\nPass\nFail\nLength (m)\nFiber\n344\n0\n54295.8\nPrinted: <TIMESTAMP>\nSignature:______________________\nFiber\n#675\n#676\n#677\n#678\n#679\n#680\n#681\n#682\n#683\n#684\n#685\n#686\n#687\n#688\n#689\n#690\n#691\n#692\n#693\n#694\n#695\n#696\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nSite: M138-DE46\n#L001\nLink Validation\n20\n10\n#L002\nLink Validation\n20.5\n10.2\nPrinted: <TIMESTAMP>\n15-05-2026 09:00:00 AM\n15-05-2026 09:05:00 AM\nTotal for Site: M138-DE46\nPass\nFail\nLength (m)\nFX\nFiber\n1\n1\n40.5\nTotal for Selected Reports\nPass\nFail\nLength (m)\nFX\nFiber\n1\n1\n40.5\nPrinted: <TIMESTAMP>\nSignature:______________________"
+    ],
+    "page_count": 1
+  },
+  "printed": {
+    "mask_rect": [
+      53.0,
+      816.0,
+      151.0,
+      830.0
+    ],
+    "pages": [
+      0
+    ],
+    "placeholder": "Printed: <TIMESTAMP>",
+    "span_counts": [
+      3
+    ]
+  },
+  "renderer": {
+    "alpha": false,
+    "colorspace": "RGB",
+    "dpi": 144,
+    "name": "PyMuPDF",
+    "version": "1.26.5"
+  },
+  "schema_version": 1,
+  "semantics": {
+    "fail_count": 1,
+    "footer": "Signature:______________________",
+    "input_total_length": "40.5",
+    "page_boundaries": [
+      {
+        "first": {
+          "cable_label": "#L001",
+          "date_time": "15-05-2026 09:00:00 AM",
+          "length": 20.0,
+          "limit": "Link Validation",
+          "next_margin": 10.0
+        },
+        "last": {
+          "cable_label": "#L002",
+          "date_time": "15-05-2026 09:05:00 AM",
+          "length": 20.5,
+          "limit": "Link Validation",
+          "next_margin": 10.2
+        },
+        "page_index": 0,
+        "record_count": 2
+      }
+    ],
+    "pages": [
+      {
+        "page_index": 0,
+        "rows": [
+          {
+            "cable_label": "#L001",
+            "date_time": "15-05-2026 09:00:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "09:00:00",
+              "AM"
+            ],
+            "length": "20",
+            "limit": "Link Validation",
+            "limit_tokens": [
+              "Link",
+              "Validation"
+            ],
+            "margin": "10",
+            "result": "PASS",
+            "row_index": 0
+          },
+          {
+            "cable_label": "#L002",
+            "date_time": "15-05-2026 09:05:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "09:05:00",
+              "AM"
+            ],
+            "length": "20.5",
+            "limit": "Link Validation",
+            "limit_tokens": [
+              "Link",
+              "Validation"
+            ],
+            "margin": "10.2",
+            "result": "FAIL",
+            "row_index": 1
+          }
+        ]
+      }
+    ],
+    "pass_count": 1,
+    "record_count": 2,
+    "site": "M138-DE46",
+    "summary_total_length": "40.5"
+  },
+  "template": {
+    "path": "assets/M138-DE46-D-P-cross-LC.pdf",
+    "sha256": "23433799fe8506ac197f5c39db21ad450a43f4710d9c02ad2910883ca40b9a84"
+  }
+}

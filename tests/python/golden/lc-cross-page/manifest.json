@@ -1,0 +1,1042 @@
+{
+  "case": {
+    "expected_pages": 2,
+    "kind": "lc",
+    "name": "lc-cross-page",
+    "record_count": 49,
+    "site": "M138-DE46"
+  },
+  "critical_rois": [
+    {
+      "name": "page-1-result-column",
+      "page_index": 0,
+      "rect": [
+        162.109,
+        109.766,
+        174.109,
+        796.766
+      ]
+    },
+    {
+      "name": "page-2-result-column",
+      "page_index": 1,
+      "rect": [
+        162.109,
+        109.766,
+        174.109,
+        436.766
+      ]
+    }
+  ],
+  "fixture": {
+    "path": "tests/python/fixtures/pdf-cases.json",
+    "sha256": "7edfd829973ce9494d1559b4168861d66dceb351d287509208918d5eaa668a43"
+  },
+  "pages": [
+    {
+      "file": "page-001.png",
+      "height": 1684,
+      "index": 0,
+      "mode": "RGB",
+      "sha256": "988efbf74c853f120be42f35f60c6ad1825baa6aef65ccb77c80807c424cd6f8",
+      "width": 1190
+    },
+    {
+      "file": "page-002.png",
+      "height": 1684,
+      "index": 1,
+      "mode": "RGB",
+      "sha256": "4d509e4682582af0689966f38b8c0d91b499a375b8a7ab1190bec2da1f2ff2d7",
+      "width": 1190
+    }
+  ],
+  "pdf": {
+    "metadata": {
+      "author": "",
+      "creationDate": "",
+      "creator": "",
+      "encryption": null,
+      "format": "PDF 1.7",
+      "keywords": "",
+      "modDate": "",
+      "producer": "",
+      "subject": "",
+      "title": "",
+      "trapped": ""
+    },
+    "normalized_text": [
+      "Summary Report\nSite:  DE46-M138\nCable Label\nLimit\nResult Length (m) Worst\nMargin (dB)\nFactory\nCalibration\nStatus\nDate & Time\n133.2\n7.65\n127.1\n8.07\n130.9\n7.96\n127.1\n8.14\n130.9\n7.48\n130.9\n7.93\n188.3\n7.8\n182.3\n7.53\n182.3\n8\n188.3\n7.57\n184.6\n7.89\n130.9\n7.8\n130.9\n7.82\n130.9\n7.78\n182.3\n7.53\n179.3\n7.89\n182.3\n7.46\n179.3\n7.87\n178.5\n7.84\n178.5\n7.55\n130.9\n7.23\n136.2\n7.71\n130.9\n7.43\n137\n8.16\n130.9\n7.89\n137\n8.23\n130.9\n7.98\n137\n8.03\n182.3\n7.48\n188.3\n7.89\n182.3\n7.89\n188.3\n7.57\n182.3\n7.58\n136.2\n7.43\n130.9\n7.87\n136.2\n7.71\n130.2\n8.12\n136.2\n7.48\n130.9\n7.75\n137\n7.03\n188.3\n7.88\n182.3\n8.18\n188.3\n7.87\n182.3\n8.03\n188.3\n7.55\n182.3\n#354\n#355\n#356\n#357\n#358\n#359\n#360\n#361\n#362\n#363\n#364\n#365\n#366\n#367\n#368\n#369\n#370\n#371\n#372\n#373\n#374\n#375\n#376\n#377\n#378\n#379\n#380\n#381\n#382\n#383\n#384\n#385\n#386\n#387\n#388\n#389\n#390\n#391\n#392\n#393\n#394\n#395\n#396\n#397\n#398\n#399\n7.97\n15-05-2026 05:39:19 PM\n15-05-2026 05:38:28 PM\n15-05-2026 05:37:26 PM\n15-05-2026 05:36:25 PM\n15-05-2026 05:35:29 PM\n15-05-2026 05:33:18 PM\n15-05-2026 05:31:59 PM\n15-05-2026 05:31:11 PM\n15-05-2026 05:29:04 PM\n15-05-2026 05:25:44 PM\n15-05-2026 05:24:54 PM\n15-05-2026 05:20:08 PM\n15-05-2026 05:17:52 PM\n15-05-2026 05:15:38 PM\n15-05-2026 05:14:21 PM\n15-05-2026 05:13:30 PM\n15-05-2026 05:12:42 PM\n15-05-2026 05:11:53 PM\n15-05-2026 05:09:40 PM\n15-05-2026 05:05:34 PM\n15-05-2026 05:04:19 PM\n15-05-2026 05:03:20 PM\n15-05-2026 05:02:19 PM\n15-05-2026 05:00:56 PM\n15-05-2026 05:00:00 PM\n15-05-2026 04:59:01 PM\n15-05-2026 04:57:00 PM\n15-05-2026 04:56:04 PM\n15-05-2026 04:47:12 PM\n15-05-2026 04:45:44 PM\n15-05-2026 04:44:56 PM\n15-05-2026 04:44:01 PM\n15-05-2026 04:43:05 PM\n15-05-2026 04:38:47 PM\n15-05-2026 04:37:50 PM\n15-05-2026 04:37:00 PM\n15-05-2026 04:36:05 PM\n15-05-2026 04:35:07 PM\n15-05-2026 04:34:09 PM\n15-05-2026 04:33:12 PM\n15-05-2026 04:31:48 PM\n15-05-2026 04:30:52 PM\n15-05-2026 04:29:57 PM\n15-05-2026 04:29:04 PM\n15-05-2026 04:28:01 PM\n15-05-2026 04:26:57 PM\nPage : 1\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nSite: M138-DE46\nPage : 1\n#L001\nLink Validation\n20\n10\n#L002\nLink Validation\n20.5\n10.2\n#L003\nLink Validation\n21\n10.4\n#L004\nLink Validation\n21.5\n10.6\n#L005\nLink Validation\n22\n10.8\n#L006\nLink Validation\n22.5\n11\n#L007\nLink Validation\n23\n11.2\n#L008\nLink Validation\n23.5\n11.4\n#L009\nLink Validation\n24\n11.6\n#L010\nLink Validation\n24.5\n11.8\n#L011\nLink Validation\n25\n10\n#L012\nLink Validation\n25.5\n10.2\n#L013\nLink Validation\n26\n10.4\n#L014\nLink Validation\n26.5\n10.6\n#L015\nLink Validation\n27\n10.8\n#L016\nLink Validation\n27.5\n11\n#L017\nLink Validation\n28\n11.2\n#L018\nLink Validation\n28.5\n11.4\n#L019\nLink Validation\n29\n11.6\n#L020\nLink Validation\n29.5\n11.8\n#L021\nLink Validation\n30\n10\n#L022\nLink Validation\n30.5\n10.2\n#L023\nLink Validation\n31\n10.4\n#L024\nLink Validation\n31.5\n10.6\n#L025\nLink Validation\n32\n10.8\n#L026\nLink Validation\n32.5\n11\n#L027\nLink Validation\n33\n11.2\n#L028\nLink Validation\n33.5\n11.4\n#L029\nLink Validation\n34\n11.6\n#L030\nLink Validation\n34.5\n11.8\n#L031\nLink Validation\n35\n10\n#L032\nLink Validation\n35.5\n10.2\n#L033\nLink Validation\n36\n10.4\n#L034\nLink Validation\n36.5\n10.6\n#L035\nLink Validation\n37\n10.8\n#L036\nLink Validation\n37.5\n11\n#L037\nLink Validation\n38\n11.2\n#L038\nLink Validation\n38.5\n11.4\n#L039\nLink Validation\n39\n11.6\n#L040\nLink Validation\n39.5\n11.8\n#L041\nLink Validation\n40\n10\n#L042\nLink Validation\n40.5\n10.2\n#L043\nLink Validation\n41\n10.4\n#L044\nLink Validation\n41.5\n10.6\n#L045\nLink Validation\n42\n10.8\n#L046\nLink Validation\n42.5\n11\n15-05-2026 09:00:00 AM\n15-05-2026 09:05:00 AM\n15-05-2026 09:10:00 AM\n15-05-2026 09:15:00 AM\n15-05-2026 09:20:00 AM\n15-05-2026 09:25:00 AM\n15-05-2026 09:30:00 AM\n15-05-2026 09:35:00 AM\n15-05-2026 09:40:00 AM\n15-05-2026 09:45:00 AM\n15-05-2026 09:50:00 AM\n15-05-2026 09:55:00 AM\n15-05-2026 10:00:00 AM\n15-05-2026 10:05:00 AM\n15-05-2026 10:10:00 AM\n15-05-2026 10:15:00 AM\n15-05-2026 10:20:00 AM\n15-05-2026 10:25:00 AM\n15-05-2026 10:30:00 AM\n15-05-2026 10:35:00 AM\n15-05-2026 10:40:00 AM\n15-05-2026 10:45:00 AM\n15-05-2026 10:50:00 AM\n15-05-2026 10:55:00 AM\n15-05-2026 11:00:00 AM\n15-05-2026 11:05:00 AM\n15-05-2026 11:10:00 AM\n15-05-2026 11:15:00 AM\n15-05-2026 11:20:00 AM\n15-05-2026 11:25:00 AM\n15-05-2026 11:30:00 AM\n15-05-2026 11:35:00 AM\n15-05-2026 11:40:00 AM\n15-05-2026 11:45:00 AM\n15-05-2026 11:50:00 AM\n15-05-2026 11:55:00 AM\n15-05-2026 12:00:00 PM\n15-05-2026 12:05:00 PM\n15-05-2026 12:10:00 PM\n15-05-2026 12:15:00 PM\n15-05-2026 12:20:00 PM\n15-05-2026 12:25:00 PM\n15-05-2026 12:30:00 PM\n15-05-2026 12:35:00 PM\n15-05-2026 12:40:00 PM\n15-05-2026 12:45:00 PM",
+      "Summary Report\nCable Label\nResult Length (m) Worst\nMargin (dB)\nLimit\nFactory\nCalibration\nStatus\nDate & Time\n137\n7.71\n188.3\n7.96\n184.6\n8.07\n188.3\n7.85\n184.6\n7.8\n188.3\n7.87\n184.6\n8.01\n188.3\n7.69\n182.3\n5.11\n130.9\n7.71\n137\n7.89\n130.9\n8.14\n137\n7.65\n130.9\n7.94\n137\n8.05\n137\n7.69\n188.3\n7.51\n188.3\n7.8\n182.3\n7.87\n188.3\n7.2\n188.3\n7.78\n182.3\n8.03\n15-05-2026 03:38:34 PM\n15-05-2026 03:36:55 PM\n15-05-2026 03:35:41 PM\n23-01-2026 03:32:36 PM\n23-01-2026 03:30:47 PM\n23-01-2026 03:29:39 PM\n23-01-2026 03:28:27 PM\n23-01-2026 03:27:19 PM\n23-01-2026 03:25:53 PM\n23-01-2026 02:58:19 PM\n23-01-2026 02:56:52 PM\n23-01-2026 02:54:25 PM\n23-01-2026 02:52:39 PM\n23-01-2026 02:51:26 PM\n23-01-2026 02:50:04 PM\n23-01-2026 02:43:59 PM\n23-01-2026 02:41:12 PM\n23-01-2026 02:33:02 PM\n23-01-2026 02:30:59 PM\n23-01-2026 02:29:54 PM\n23-01-2026 02:21:47 PM\n23-01-2026 02:18:59 PM\nPass\nFail\nLength (m)\nTotal for Site: DE46-M138\n344\n0\n54295.8\nTotal for Selected Reports\nPass\nFail\nLength (m)\nFiber\n344\n0\n54295.8\nPrinted: <TIMESTAMP>\nSignature:______________________\nFiber\n#675\n#676\n#677\n#678\n#679\n#680\n#681\n#682\n#683\n#684\n#685\n#686\n#687\n#688\n#689\n#690\n#691\n#692\n#693\n#694\n#695\n#696\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nLink Validation\nSite: M138-DE46\n#L047\nLink Validation\n43\n11.2\n#L048\nLink Validation\n43.5\n11.4\n#L049\nLink Validation\n44\n11.6\nPrinted: <TIMESTAMP>\n15-05-2026 12:50:00 PM\n15-05-2026 12:55:00 PM\n15-05-2026 01:00:00 PM\nTotal for Site: M138-DE46\nPass\nFail\nLength (m)\nFX\nFiber\n44\n5\n1568\nTotal for Selected Reports\nPass\nFail\nLength (m)\nFX\nFiber\n44\n5\n1568\nPrinted: <TIMESTAMP>\nSignature:______________________"
+    ],
+    "page_count": 2
+  },
+  "printed": {
+    "mask_rect": [
+      53.0,
+      816.0,
+      151.0,
+      830.0
+    ],
+    "pages": [
+      1
+    ],
+    "placeholder": "Printed: <TIMESTAMP>",
+    "span_counts": [
+      0,
+      3
+    ]
+  },
+  "renderer": {
+    "alpha": false,
+    "colorspace": "RGB",
+    "dpi": 144,
+    "name": "PyMuPDF",
+    "version": "1.26.5"
+  },
+  "schema_version": 1,
+  "semantics": {
+    "fail_count": 5,
+    "footer": "Signature:______________________",
+    "input_total_length": "1568",
+    "page_boundaries": [
+      {
+        "first": {
+          "cable_label": "#L001",
+          "date_time": "15-05-2026 09:00:00 AM",
+          "length": 20.0,
+          "limit": "Link Validation",
+          "next_margin": 10.0
+        },
+        "last": {
+          "cable_label": "#L046",
+          "date_time": "15-05-2026 12:45:00 PM",
+          "length": 42.5,
+          "limit": "Link Validation",
+          "next_margin": 11.0
+        },
+        "page_index": 0,
+        "record_count": 46
+      },
+      {
+        "first": {
+          "cable_label": "#L047",
+          "date_time": "15-05-2026 12:50:00 PM",
+          "length": 43.0,
+          "limit": "Link Validation",
+          "next_margin": 11.2
+        },
+        "last": {
+          "cable_label": "#L049",
+          "date_time": "15-05-2026 01:00:00 PM",
+          "length": 44.0,
+          "limit": "Link Validation",
+          "next_margin": 11.6
+        },
+        "page_index": 1,
+        "record_count": 3
+      }
+    ],
+    "pages": [
+      {
+        "page_index": 0,
+        "rows": [
+          {
+            "cable_label": "#L001",
+            "date_time": "15-05-2026 09:00:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "09:00:00",
+              "AM"
+            ],
+            "length": "20",
+            "limit": "Link Validation",
+            "limit_tokens": [
+              "Link",
+              "Validation"
+            ],
+            "margin": "10",
+            "result": "PASS",
+            "row_index": 0
+          },
+          {
+            "cable_label": "#L002",
+            "date_time": "15-05-2026 09:05:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "09:05:00",
+              "AM"
+            ],
+            "length": "20.5",
+            "limit": "Link Validation",
+            "limit_tokens": [
+              "Link",
+              "Validation"
+            ],
+            "margin": "10.2",
+            "result": "FAIL",
+            "row_index": 1
+          },
+          {
+            "cable_label": "#L003",
+            "date_time": "15-05-2026 09:10:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "09:10:00",
+              "AM"
+            ],
+            "length": "21",
+            "limit": "Link Validation",
+            "limit_tokens": [
+              "Link",
+              "Validation"
+            ],
+            "margin": "10.4",
+            "result": "PASS",
+            "row_index": 2
+          },
+          {
+            "cable_label": "#L004",
+            "date_time": "15-05-2026 09:15:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "09:15:00",
+              "AM"
+            ],
+            "length": "21.5",
+            "limit": "Link Validation",
+            "limit_tokens": [
+              "Link",
+              "Validation"
+            ],
+            "margin": "10.6",
+            "result": "PASS",
+            "row_index": 3
+          },
+          {
+            "cable_label": "#L005",
+            "date_time": "15-05-2026 09:20:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "09:20:00",
+              "AM"
+            ],
+            "length": "22",
+            "limit": "Link Validation",
+            "limit_tokens": [
+              "Link",
+              "Validation"
+            ],
+            "margin": "10.8",
+            "result": "PASS",
+            "row_index": 4
+          },
+          {
+            "cable_label": "#L006",
+            "date_time": "15-05-2026 09:25:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "09:25:00",
+              "AM"
+            ],
+            "length": "22.5",
+            "limit": "Link Validation",
+            "limit_tokens": [
+              "Link",
+              "Validation"
+            ],
+            "margin": "11",
+            "result": "PASS",
+            "row_index": 5
+          },
+          {
+            "cable_label": "#L007",
+            "date_time": "15-05-2026 09:30:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "09:30:00",
+              "AM"
+            ],
+            "length": "23",
+            "limit": "Link Validation",
+            "limit_tokens": [
+              "Link",
+              "Validation"
+            ],
+            "margin": "11.2",
+            "result": "PASS",
+            "row_index": 6
+          },
+          {
+            "cable_label": "#L008",
+            "date_time": "15-05-2026 09:35:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "09:35:00",
+              "AM"
+            ],
+            "length": "23.5",
+            "limit": "Link Validation",
+            "limit_tokens": [
+              "Link",
+              "Validation"
+            ],
+            "margin": "11.4",
+            "result": "PASS",
+            "row_index": 7
+          },
+          {
+            "cable_label": "#L009",
+            "date_time": "15-05-2026 09:40:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "09:40:00",
+              "AM"
+            ],
+            "length": "24",
+            "limit": "Link Validation",
+            "limit_tokens": [
+              "Link",
+              "Validation"
+            ],
+            "margin": "11.6",
+            "result": "PASS",
+            "row_index": 8
+          },
+          {
+            "cable_label": "#L010",
+            "date_time": "15-05-2026 09:45:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "09:45:00",
+              "AM"
+            ],
+            "length": "24.5",
+            "limit": "Link Validation",
+            "limit_tokens": [
+              "Link",
+              "Validation"
+            ],
+            "margin": "11.8",
+            "result": "FAIL",
+            "row_index": 9
+          },
+          {
+            "cable_label": "#L011",
+            "date_time": "15-05-2026 09:50:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "09:50:00",
+              "AM"
+            ],
+            "length": "25",
+            "limit": "Link Validation",
+            "limit_tokens": [
+              "Link",
+              "Validation"
+            ],
+            "margin": "10",
+            "result": "PASS",
+            "row_index": 10
+          },
+          {
+            "cable_label": "#L012",
+            "date_time": "15-05-2026 09:55:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "09:55:00",
+              "AM"
+            ],
+            "length": "25.5",
+            "limit": "Link Validation",
+            "limit_tokens": [
+              "Link",
+              "Validation"
+            ],
+            "margin": "10.2",
+            "result": "PASS",
+            "row_index": 11
+          },
+          {
+            "cable_label": "#L013",
+            "date_time": "15-05-2026 10:00:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "10:00:00",
+              "AM"
+            ],
+            "length": "26",
+            "limit": "Link Validation",
+            "limit_tokens": [
+              "Link",
+              "Validation"
+            ],
+            "margin": "10.4",
+            "result": "PASS",
+            "row_index": 12
+          },
+          {
+            "cable_label": "#L014",
+            "date_time": "15-05-2026 10:05:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "10:05:00",
+              "AM"
+            ],
+            "length": "26.5",
+            "limit": "Link Validation",
+            "limit_tokens": [
+              "Link",
+              "Validation"
+            ],
+            "margin": "10.6",
+            "result": "PASS",
+            "row_index": 13
+          },
+          {
+            "cable_label": "#L015",
+            "date_time": "15-05-2026 10:10:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "10:10:00",
+              "AM"
+            ],
+            "length": "27",
+            "limit": "Link Validation",
+            "limit_tokens": [
+              "Link",
+              "Validation"
+            ],
+            "margin": "10.8",
+            "result": "PASS",
+            "row_index": 14
+          },
+          {
+            "cable_label": "#L016",
+            "date_time": "15-05-2026 10:15:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "10:15:00",
+              "AM"
+            ],
+            "length": "27.5",
+            "limit": "Link Validation",
+            "limit_tokens": [
+              "Link",
+              "Validation"
+            ],
+            "margin": "11",
+            "result": "PASS",
+            "row_index": 15
+          },
+          {
+            "cable_label": "#L017",
+            "date_time": "15-05-2026 10:20:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "10:20:00",
+              "AM"
+            ],
+            "length": "28",
+            "limit": "Link Validation",
+            "limit_tokens": [
+              "Link",
+              "Validation"
+            ],
+            "margin": "11.2",
+            "result": "PASS",
+            "row_index": 16
+          },
+          {
+            "cable_label": "#L018",
+            "date_time": "15-05-2026 10:25:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "10:25:00",
+              "AM"
+            ],
+            "length": "28.5",
+            "limit": "Link Validation",
+            "limit_tokens": [
+              "Link",
+              "Validation"
+            ],
+            "margin": "11.4",
+            "result": "PASS",
+            "row_index": 17
+          },
+          {
+            "cable_label": "#L019",
+            "date_time": "15-05-2026 10:30:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "10:30:00",
+              "AM"
+            ],
+            "length": "29",
+            "limit": "Link Validation",
+            "limit_tokens": [
+              "Link",
+              "Validation"
+            ],
+            "margin": "11.6",
+            "result": "PASS",
+            "row_index": 18
+          },
+          {
+            "cable_label": "#L020",
+            "date_time": "15-05-2026 10:35:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "10:35:00",
+              "AM"
+            ],
+            "length": "29.5",
+            "limit": "Link Validation",
+            "limit_tokens": [
+              "Link",
+              "Validation"
+            ],
+            "margin": "11.8",
+            "result": "FAIL",
+            "row_index": 19
+          },
+          {
+            "cable_label": "#L021",
+            "date_time": "15-05-2026 10:40:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "10:40:00",
+              "AM"
+            ],
+            "length": "30",
+            "limit": "Link Validation",
+            "limit_tokens": [
+              "Link",
+              "Validation"
+            ],
+            "margin": "10",
+            "result": "PASS",
+            "row_index": 20
+          },
+          {
+            "cable_label": "#L022",
+            "date_time": "15-05-2026 10:45:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "10:45:00",
+              "AM"
+            ],
+            "length": "30.5",
+            "limit": "Link Validation",
+            "limit_tokens": [
+              "Link",
+              "Validation"
+            ],
+            "margin": "10.2",
+            "result": "PASS",
+            "row_index": 21
+          },
+          {
+            "cable_label": "#L023",
+            "date_time": "15-05-2026 10:50:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "10:50:00",
+              "AM"
+            ],
+            "length": "31",
+            "limit": "Link Validation",
+            "limit_tokens": [
+              "Link",
+              "Validation"
+            ],
+            "margin": "10.4",
+            "result": "PASS",
+            "row_index": 22
+          },
+          {
+            "cable_label": "#L024",
+            "date_time": "15-05-2026 10:55:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "10:55:00",
+              "AM"
+            ],
+            "length": "31.5",
+            "limit": "Link Validation",
+            "limit_tokens": [
+              "Link",
+              "Validation"
+            ],
+            "margin": "10.6",
+            "result": "PASS",
+            "row_index": 23
+          },
+          {
+            "cable_label": "#L025",
+            "date_time": "15-05-2026 11:00:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "11:00:00",
+              "AM"
+            ],
+            "length": "32",
+            "limit": "Link Validation",
+            "limit_tokens": [
+              "Link",
+              "Validation"
+            ],
+            "margin": "10.8",
+            "result": "PASS",
+            "row_index": 24
+          },
+          {
+            "cable_label": "#L026",
+            "date_time": "15-05-2026 11:05:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "11:05:00",
+              "AM"
+            ],
+            "length": "32.5",
+            "limit": "Link Validation",
+            "limit_tokens": [
+              "Link",
+              "Validation"
+            ],
+            "margin": "11",
+            "result": "PASS",
+            "row_index": 25
+          },
+          {
+            "cable_label": "#L027",
+            "date_time": "15-05-2026 11:10:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "11:10:00",
+              "AM"
+            ],
+            "length": "33",
+            "limit": "Link Validation",
+            "limit_tokens": [
+              "Link",
+              "Validation"
+            ],
+            "margin": "11.2",
+            "result": "PASS",
+            "row_index": 26
+          },
+          {
+            "cable_label": "#L028",
+            "date_time": "15-05-2026 11:15:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "11:15:00",
+              "AM"
+            ],
+            "length": "33.5",
+            "limit": "Link Validation",
+            "limit_tokens": [
+              "Link",
+              "Validation"
+            ],
+            "margin": "11.4",
+            "result": "PASS",
+            "row_index": 27
+          },
+          {
+            "cable_label": "#L029",
+            "date_time": "15-05-2026 11:20:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "11:20:00",
+              "AM"
+            ],
+            "length": "34",
+            "limit": "Link Validation",
+            "limit_tokens": [
+              "Link",
+              "Validation"
+            ],
+            "margin": "11.6",
+            "result": "PASS",
+            "row_index": 28
+          },
+          {
+            "cable_label": "#L030",
+            "date_time": "15-05-2026 11:25:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "11:25:00",
+              "AM"
+            ],
+            "length": "34.5",
+            "limit": "Link Validation",
+            "limit_tokens": [
+              "Link",
+              "Validation"
+            ],
+            "margin": "11.8",
+            "result": "FAIL",
+            "row_index": 29
+          },
+          {
+            "cable_label": "#L031",
+            "date_time": "15-05-2026 11:30:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "11:30:00",
+              "AM"
+            ],
+            "length": "35",
+            "limit": "Link Validation",
+            "limit_tokens": [
+              "Link",
+              "Validation"
+            ],
+            "margin": "10",
+            "result": "PASS",
+            "row_index": 30
+          },
+          {
+            "cable_label": "#L032",
+            "date_time": "15-05-2026 11:35:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "11:35:00",
+              "AM"
+            ],
+            "length": "35.5",
+            "limit": "Link Validation",
+            "limit_tokens": [
+              "Link",
+              "Validation"
+            ],
+            "margin": "10.2",
+            "result": "PASS",
+            "row_index": 31
+          },
+          {
+            "cable_label": "#L033",
+            "date_time": "15-05-2026 11:40:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "11:40:00",
+              "AM"
+            ],
+            "length": "36",
+            "limit": "Link Validation",
+            "limit_tokens": [
+              "Link",
+              "Validation"
+            ],
+            "margin": "10.4",
+            "result": "PASS",
+            "row_index": 32
+          },
+          {
+            "cable_label": "#L034",
+            "date_time": "15-05-2026 11:45:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "11:45:00",
+              "AM"
+            ],
+            "length": "36.5",
+            "limit": "Link Validation",
+            "limit_tokens": [
+              "Link",
+              "Validation"
+            ],
+            "margin": "10.6",
+            "result": "PASS",
+            "row_index": 33
+          },
+          {
+            "cable_label": "#L035",
+            "date_time": "15-05-2026 11:50:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "11:50:00",
+              "AM"
+            ],
+            "length": "37",
+            "limit": "Link Validation",
+            "limit_tokens": [
+              "Link",
+              "Validation"
+            ],
+            "margin": "10.8",
+            "result": "PASS",
+            "row_index": 34
+          },
+          {
+            "cable_label": "#L036",
+            "date_time": "15-05-2026 11:55:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "11:55:00",
+              "AM"
+            ],
+            "length": "37.5",
+            "limit": "Link Validation",
+            "limit_tokens": [
+              "Link",
+              "Validation"
+            ],
+            "margin": "11",
+            "result": "PASS",
+            "row_index": 35
+          },
+          {
+            "cable_label": "#L037",
+            "date_time": "15-05-2026 12:00:00 PM",
+            "date_tokens": [
+              "15-05-2026",
+              "12:00:00",
+              "PM"
+            ],
+            "length": "38",
+            "limit": "Link Validation",
+            "limit_tokens": [
+              "Link",
+              "Validation"
+            ],
+            "margin": "11.2",
+            "result": "PASS",
+            "row_index": 36
+          },
+          {
+            "cable_label": "#L038",
+            "date_time": "15-05-2026 12:05:00 PM",
+            "date_tokens": [
+              "15-05-2026",
+              "12:05:00",
+              "PM"
+            ],
+            "length": "38.5",
+            "limit": "Link Validation",
+            "limit_tokens": [
+              "Link",
+              "Validation"
+            ],
+            "margin": "11.4",
+            "result": "PASS",
+            "row_index": 37
+          },
+          {
+            "cable_label": "#L039",
+            "date_time": "15-05-2026 12:10:00 PM",
+            "date_tokens": [
+              "15-05-2026",
+              "12:10:00",
+              "PM"
+            ],
+            "length": "39",
+            "limit": "Link Validation",
+            "limit_tokens": [
+              "Link",
+              "Validation"
+            ],
+            "margin": "11.6",
+            "result": "PASS",
+            "row_index": 38
+          },
+          {
+            "cable_label": "#L040",
+            "date_time": "15-05-2026 12:15:00 PM",
+            "date_tokens": [
+              "15-05-2026",
+              "12:15:00",
+              "PM"
+            ],
+            "length": "39.5",
+            "limit": "Link Validation",
+            "limit_tokens": [
+              "Link",
+              "Validation"
+            ],
+            "margin": "11.8",
+            "result": "FAIL",
+            "row_index": 39
+          },
+          {
+            "cable_label": "#L041",
+            "date_time": "15-05-2026 12:20:00 PM",
+            "date_tokens": [
+              "15-05-2026",
+              "12:20:00",
+              "PM"
+            ],
+            "length": "40",
+            "limit": "Link Validation",
+            "limit_tokens": [
+              "Link",
+              "Validation"
+            ],
+            "margin": "10",
+            "result": "PASS",
+            "row_index": 40
+          },
+          {
+            "cable_label": "#L042",
+            "date_time": "15-05-2026 12:25:00 PM",
+            "date_tokens": [
+              "15-05-2026",
+              "12:25:00",
+              "PM"
+            ],
+            "length": "40.5",
+            "limit": "Link Validation",
+            "limit_tokens": [
+              "Link",
+              "Validation"
+            ],
+            "margin": "10.2",
+            "result": "PASS",
+            "row_index": 41
+          },
+          {
+            "cable_label": "#L043",
+            "date_time": "15-05-2026 12:30:00 PM",
+            "date_tokens": [
+              "15-05-2026",
+              "12:30:00",
+              "PM"
+            ],
+            "length": "41",
+            "limit": "Link Validation",
+            "limit_tokens": [
+              "Link",
+              "Validation"
+            ],
+            "margin": "10.4",
+            "result": "PASS",
+            "row_index": 42
+          },
+          {
+            "cable_label": "#L044",
+            "date_time": "15-05-2026 12:35:00 PM",
+            "date_tokens": [
+              "15-05-2026",
+              "12:35:00",
+              "PM"
+            ],
+            "length": "41.5",
+            "limit": "Link Validation",
+            "limit_tokens": [
+              "Link",
+              "Validation"
+            ],
+            "margin": "10.6",
+            "result": "PASS",
+            "row_index": 43
+          },
+          {
+            "cable_label": "#L045",
+            "date_time": "15-05-2026 12:40:00 PM",
+            "date_tokens": [
+              "15-05-2026",
+              "12:40:00",
+              "PM"
+            ],
+            "length": "42",
+            "limit": "Link Validation",
+            "limit_tokens": [
+              "Link",
+              "Validation"
+            ],
+            "margin": "10.8",
+            "result": "PASS",
+            "row_index": 44
+          },
+          {
+            "cable_label": "#L046",
+            "date_time": "15-05-2026 12:45:00 PM",
+            "date_tokens": [
+              "15-05-2026",
+              "12:45:00",
+              "PM"
+            ],
+            "length": "42.5",
+            "limit": "Link Validation",
+            "limit_tokens": [
+              "Link",
+              "Validation"
+            ],
+            "margin": "11",
+            "result": "PASS",
+            "row_index": 45
+          }
+        ]
+      },
+      {
+        "page_index": 1,
+        "rows": [
+          {
+            "cable_label": "#L047",
+            "date_time": "15-05-2026 12:50:00 PM",
+            "date_tokens": [
+              "15-05-2026",
+              "12:50:00",
+              "PM"
+            ],
+            "length": "43",
+            "limit": "Link Validation",
+            "limit_tokens": [
+              "Link",
+              "Validation"
+            ],
+            "margin": "11.2",
+            "result": "PASS",
+            "row_index": 0
+          },
+          {
+            "cable_label": "#L048",
+            "date_time": "15-05-2026 12:55:00 PM",
+            "date_tokens": [
+              "15-05-2026",
+              "12:55:00",
+              "PM"
+            ],
+            "length": "43.5",
+            "limit": "Link Validation",
+            "limit_tokens": [
+              "Link",
+              "Validation"
+            ],
+            "margin": "11.4",
+            "result": "PASS",
+            "row_index": 1
+          },
+          {
+            "cable_label": "#L049",
+            "date_time": "15-05-2026 01:00:00 PM",
+            "date_tokens": [
+              "15-05-2026",
+              "01:00:00",
+              "PM"
+            ],
+            "length": "44",
+            "limit": "Link Validation",
+            "limit_tokens": [
+              "Link",
+              "Validation"
+            ],
+            "margin": "11.6",
+            "result": "PASS",
+            "row_index": 2
+          }
+        ]
+      }
+    ],
+    "pass_count": 44,
+    "record_count": 49,
+    "site": "M138-DE46",
+    "summary_total_length": "1568"
+  },
+  "template": {
+    "path": "assets/M138-DE46-D-P-cross-LC.pdf",
+    "sha256": "23433799fe8506ac197f5c39db21ad450a43f4710d9c02ad2910883ca40b9a84"
+  }
+}

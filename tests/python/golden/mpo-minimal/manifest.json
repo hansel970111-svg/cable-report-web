@@ -1,0 +1,151 @@
+{
+  "case": {
+    "expected_pages": 1,
+    "kind": "mpo",
+    "name": "mpo-minimal",
+    "record_count": 2,
+    "site": "M138-DE46"
+  },
+  "critical_rois": [
+    {
+      "name": "page-1-result-column",
+      "page_index": 0,
+      "rect": [
+        170.777,
+        88.0,
+        182.777,
+        715.0
+      ]
+    }
+  ],
+  "fixture": {
+    "path": "tests/python/fixtures/pdf-cases.json",
+    "sha256": "7edfd829973ce9494d1559b4168861d66dceb351d287509208918d5eaa668a43"
+  },
+  "pages": [
+    {
+      "file": "page-001.png",
+      "height": 1684,
+      "index": 0,
+      "mode": "RGB",
+      "sha256": "dd8629299268a9345b374cb6d05c100c6f21e10b92387f3413f08d26b7b42ba6",
+      "width": 1190
+    }
+  ],
+  "pdf": {
+    "metadata": {
+      "author": "",
+      "creationDate": "",
+      "creator": "",
+      "encryption": null,
+      "format": "PDF 1.7",
+      "keywords": "",
+      "modDate": "",
+      "producer": "",
+      "subject": "",
+      "title": "",
+      "trapped": ""
+    },
+    "normalized_text": [
+      "Summary Report\nSite:  DE46-M138\nCable Label\nLimit\nResult Length (m) Margin (dB) Date & Time\n-\n-\n15-05-2026 01:43:17 PM\n-\n-\n-\n-\n-\n-\n-\n#1122\n#1123\n#1124\n#1125\n#1126\n#1127\n#1128\n#1129\n#1130\n#1131\n#1132\n#1133\n#1134\n#1135\n#1136\n#1137\n#1138\n#1139\n#1140\n#1141\n#1142\n#1143\n#1144\n#1145\n#1146\n#1147\n#1148\n#1149\n#1150\n#1151\n#1152\n#1153\n#1154\n#1155\n#1156\n#1157\n#1158\n#1159\n#1160\n#1161\n#1162\n#1163\n#1164\n#1165\n#1166\n#1167\n#1168\n#1169\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n-\n15-05-2026 01:42:47 PM\n29-01-2026 01:42:16 PM\n29-01-2026 01:41:35 PM\n29-01-2026 01:40:52 PM\n29-01-2026 01:40:27 PM\n29-01-2026 01:40:05 PM\n29-01-2026 01:39:31 PM\n29-01-2026 01:38:40 PM\n29-01-2026 01:38:07 PM\n29-01-2026 01:37:34 PM\n29-01-2026 01:36:46 PM\n29-01-2026 01:36:04 PM\n29-01-2026 01:35:28 PM\n29-01-2026 01:34:51 PM\n29-01-2026 01:34:23 PM\n29-01-2026 01:34:01 PM\n29-01-2026 01:33:33 PM\n29-01-2026 01:32:48 PM\n29-01-2026 01:32:22 PM\n29-01-2026 01:32:03 PM\n29-01-2026 01:31:38 PM\n29-01-2026 01:31:10 PM\n29-01-2026 01:30:51 PM\n29-01-2026 01:30:29 PM\n29-01-2026 01:29:57 PM\n29-01-2026 01:29:18 PM\n29-01-2026 01:28:50 PM\n29-01-2026 01:28:25 PM\n29-01-2026 01:27:25 PM\n29-01-2026 01:25:32 PM\n29-01-2026 01:25:01 PM\n29-01-2026 01:23:47 PM\n29-01-2026 01:23:23 PM\n29-01-2026 01:23:05 PM\n29-01-2026 01:22:46 PM\n29-01-2026 01:22:27 PM\n29-01-2026 01:22:04 PM\n29-01-2026 01:21:30 PM\n29-01-2026 01:20:39 PM\n29-01-2026 01:18:40 PM\n29-01-2026 01:18:15 PM\n29-01-2026 01:17:49 PM\n29-01-2026 01:17:10 PM\n29-01-2026 01:16:25 PM\n29-01-2026 01:16:06 PM\n29-01-2026 01:15:38 PM\n29-01-2026 01:15:11 PM\nPage : 1\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\n200GBASE-SR10\nPage : 1\n#M001\n#M002\n15-05-2026 09:00:00 AM\n15-05-2026 09:05:00 AM\nSite: M138-DE46\nTotal for Site: M138-DE46\nPass\nFail\nLength (m)\nMPO MPO\n1\n1\n0\nTotal for Selected Reports\nPass\nFail\nLength (m)\nMPO MPO\n1\n1\n0\nPrinted: <TIMESTAMP>\nSignature:______________________"
+    ],
+    "page_count": 1
+  },
+  "printed": {
+    "mask_rect": [
+      53.0,
+      816.0,
+      151.0,
+      830.0
+    ],
+    "pages": [
+      0
+    ],
+    "placeholder": "Printed: <TIMESTAMP>",
+    "span_counts": [
+      1
+    ]
+  },
+  "renderer": {
+    "alpha": false,
+    "colorspace": "RGB",
+    "dpi": 144,
+    "name": "PyMuPDF",
+    "version": "1.26.5"
+  },
+  "schema_version": 1,
+  "semantics": {
+    "fail_count": 1,
+    "footer": "Signature:______________________",
+    "input_total_length": "40.5",
+    "page_boundaries": [
+      {
+        "first": {
+          "cable_label": "#M001",
+          "date_time": "15-05-2026 09:00:00 AM",
+          "length": 20.0,
+          "limit": "200GBASE-SR10",
+          "next_margin": 10.0
+        },
+        "last": {
+          "cable_label": "#M002",
+          "date_time": "15-05-2026 09:05:00 AM",
+          "length": 20.5,
+          "limit": "200GBASE-SR10",
+          "next_margin": 10.2
+        },
+        "page_index": 0,
+        "record_count": 2
+      }
+    ],
+    "pages": [
+      {
+        "page_index": 0,
+        "rows": [
+          {
+            "cable_label": "#M001",
+            "date_time": "15-05-2026 09:00:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "09:00:00",
+              "AM"
+            ],
+            "length": "-",
+            "limit": "200GBASE-SR10",
+            "limit_tokens": [
+              "200GBASE-SR10"
+            ],
+            "margin": "-",
+            "result": "PASS",
+            "row_index": 0
+          },
+          {
+            "cable_label": "#M002",
+            "date_time": "15-05-2026 09:05:00 AM",
+            "date_tokens": [
+              "15-05-2026",
+              "09:05:00",
+              "AM"
+            ],
+            "length": "-",
+            "limit": "200GBASE-SR10",
+            "limit_tokens": [
+              "200GBASE-SR10"
+            ],
+            "margin": "-",
+            "result": "FAIL",
+            "row_index": 1
+          }
+        ]
+      }
+    ],
+    "pass_count": 1,
+    "record_count": 2,
+    "site": "M138-DE46",
+    "summary_total_length": "0"
+  },
+  "template": {
+    "path": "assets/M138-DE46-P-A-MPO.pdf",
+    "sha256": "8b9ee738a87f5973cfaa11647ad51c7ebfd16b1b01d527ed401c76e7f77f8550"
+  }
+}
