@@ -1,0 +1,7 @@
+{
+  "domRows": 32,
+  "inputP95Ms": 17.7,
+  "importDurationMs": 68.9,
+  "batchSaveMaxLongTaskMs": 0,
+  "peakUsedJsHeapBytes": 10000000
+}
