@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { useState } from 'react';
+import { renderToString } from 'react-dom/server';
 import {
   act,
   fireEvent,
@@ -248,16 +249,29 @@ describe('ReportEditor keyboard and environment behavior', () => {
     expect(screen.getByText('#1')).toBeInTheDocument();
   });
 
-  it('renders one development banner only when browser mode is explicit', () => {
+  it('keeps server-rendered markup free of the client-only browser banner', () => {
     document.documentElement.dataset.devBrowserMode = 'true';
-    const { rerender } = render(<ReportEditor services={makeServices()} />);
 
-    expect(screen.getByRole('status', { name: '运行模式' }))
-      .toHaveTextContent('浏览器开发模式');
+    const markup = renderToString(<ReportEditor services={makeServices()} />);
 
-    delete document.documentElement.dataset.devBrowserMode;
-    rerender(<ReportEditor services={makeServices()} />);
+    expect(markup).not.toContain('浏览器开发模式');
+  });
+
+  it('tracks browser mode dataset changes after mount without a parent rerender', async () => {
+    render(<ReportEditor services={makeServices()} />);
+
     expect(screen.queryByText('浏览器开发模式')).not.toBeInTheDocument();
+
+    document.documentElement.dataset.devBrowserMode = 'true';
+    await waitFor(() => {
+      expect(screen.getByRole('status', { name: '运行模式' }))
+        .toHaveTextContent('浏览器开发模式');
+    });
+
+    document.documentElement.dataset.devBrowserMode = 'false';
+    await waitFor(() => {
+      expect(screen.queryByText('浏览器开发模式')).not.toBeInTheDocument();
+    });
   });
 
   it('accepts minute 00 in the date-time picker', () => {

@@ -5,6 +5,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  useSyncExternalStore,
   type KeyboardEvent,
 } from 'react';
 
@@ -20,6 +21,29 @@ import { VirtualRecordTable } from './virtual-record-table';
 import { WorkflowAlert } from './workflow-alert';
 
 const NO_RECORDS: ReportDraft['records'] = [];
+const BROWSER_MODE_ATTRIBUTE = 'data-dev-browser-mode';
+
+function browserModeSnapshot(): boolean {
+  return typeof document !== 'undefined'
+    && document.documentElement.dataset.devBrowserMode === 'true';
+}
+
+function serverBrowserModeSnapshot(): boolean {
+  return false;
+}
+
+function subscribeToBrowserMode(listener: () => void): () => void {
+  if (typeof document === 'undefined' || typeof MutationObserver === 'undefined') {
+    return () => undefined;
+  }
+
+  const observer = new MutationObserver(listener);
+  observer.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: [BROWSER_MODE_ATTRIBUTE],
+  });
+  return () => observer.disconnect();
+}
 
 function visibleDraft(
   state: WorkflowState,
@@ -52,8 +76,11 @@ export function ReportEditor({ services }: ReportEditorProps) {
   const operationInProgress = workflow.state.status === 'importing'
     || workflow.state.status === 'generating'
     || workflow.state.status === 'saving';
-  const browserDevelopmentMode = typeof document !== 'undefined'
-    && document.documentElement.dataset.devBrowserMode === 'true';
+  const browserDevelopmentMode = useSyncExternalStore(
+    subscribeToBrowserMode,
+    browserModeSnapshot,
+    serverBrowserModeSnapshot,
+  );
 
   useEffect(() => {
     if (!editing) draftStore.reset(records);
