@@ -115,9 +115,9 @@ export function DateTimePicker({ value, onChange, className, disabled }: DateTim
     const numericValue = minute.replace(/\D/g, '');
     let newMinute = parseInt(numericValue);
     
-    // 验证范围1-59
-    if (isNaN(newMinute) || newMinute < 1) {
-      newMinute = 1;
+    // 验证范围0-59
+    if (isNaN(newMinute) || newMinute < 0) {
+      newMinute = 0;
     } else if (newMinute > 59) {
       newMinute = 59;
     }
@@ -151,6 +151,7 @@ export function DateTimePicker({ value, onChange, className, disabled }: DateTim
               !selectedDate && "text-muted-foreground"
             )}
             disabled={disabled}
+            aria-label="日期"
           >
             <CalendarIcon className="mr-2 h-4 w-4" />
             {formatDisplayDate}
@@ -181,7 +182,7 @@ export function DateTimePicker({ value, onChange, className, disabled }: DateTim
           onValueChange={handleHourChange}
           disabled={disabled}
         >
-          <SelectTrigger className="w-[70px]">
+          <SelectTrigger className="w-[70px]" aria-label="小时">
             <SelectValue placeholder="时" />
           </SelectTrigger>
           <SelectContent>
@@ -203,9 +204,10 @@ export function DateTimePicker({ value, onChange, className, disabled }: DateTim
           onChange={(e) => handleMinuteChange(e.target.value)}
           disabled={disabled}
           className="w-[70px] h-9 text-center"
-          min={1}
+          min={0}
           max={59}
           placeholder="分"
+          aria-label="分钟"
         />
       </div>
 
@@ -215,7 +217,7 @@ export function DateTimePicker({ value, onChange, className, disabled }: DateTim
         onValueChange={handleAmPmChange}
         disabled={disabled}
       >
-        <SelectTrigger className="w-[80px]">
+        <SelectTrigger className="w-[80px]" aria-label="上午或下午">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
