@@ -10,8 +10,8 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-function request(headers: HeadersInit = {}) {
-  return new NextRequest(`${origin}/api/load-template`, {
+function request(headers: HeadersInit = {}, pathname = '/api/load-template') {
+  return new NextRequest(`${origin}${pathname}`, {
     method: 'POST',
     headers,
   });
@@ -27,6 +27,33 @@ test('proxy protects every API path with the desktop boundary', async () => {
   await expect(response.json()).resolves.toMatchObject({
     error: { code: 'DESKTOP_TOKEN_REQUIRED', retryable: false },
   });
+  expect(response.headers.get('Deprecation')).toBeNull();
+});
+
+test.each(['/api/upload-excel', '/api/upload-excel/'])(
+  'marks denied legacy endpoint responses as deprecated for %s',
+  async pathname => {
+    vi.stubEnv('CABLE_DESKTOP_ORIGIN', origin);
+    vi.stubEnv('CABLE_DESKTOP_TOKEN', token);
+
+    const response = proxy(request({ Origin: origin }, pathname));
+
+    expect(response.status).toBe(401);
+    expect(response.headers.get('Deprecation')).toBe('true');
+  },
+);
+
+test('marks the authorized legacy continuation as deprecated', () => {
+  vi.stubEnv('CABLE_DESKTOP_ORIGIN', origin);
+  vi.stubEnv('CABLE_DESKTOP_TOKEN', token);
+
+  const response = proxy(request({
+    Origin: origin,
+    'X-Cable-Desktop-Token': token,
+  }, '/api/upload-excel'));
+
+  expect(response.headers.get('x-middleware-next')).toBe('1');
+  expect(response.headers.get('Deprecation')).toBe('true');
 });
 
 test('proxy permits an exact desktop request to continue', () => {

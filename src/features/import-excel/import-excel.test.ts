@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 import { NextRequest } from 'next/server';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as XLSX from 'xlsx';
 
 import type { CableImportRow, CableType } from '@/domain/report/model';
@@ -17,6 +17,8 @@ import {
 
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 const XLS_MIME = 'application/vnd.ms-excel';
+const ROUTE_ORIGIN = 'http://localhost';
+const ROUTE_TOKEN = 'A'.repeat(43);
 const fixturesDirectory = fileURLToPath(
   new URL('../../../tests/fixtures/excel/', import.meta.url),
 );
@@ -91,7 +93,13 @@ function uploadRequest(
   formData.append('file', new Blob([arrayBuffer], { type: mimeType }), fileName);
   formData.append('cableType', cableType);
   return new NextRequest('http://localhost/api/upload-excel', {
-    method: 'POST', body: formData,
+    method: 'POST',
+    headers: {
+      'Content-Length': '1024',
+      Origin: ROUTE_ORIGIN,
+      'X-Cable-Desktop-Token': ROUTE_TOKEN,
+    },
+    body: formData,
   });
 }
 
@@ -482,6 +490,15 @@ describe('expansion and record limits', () => {
 });
 
 describe('legacy upload route adapter', () => {
+  beforeEach(() => {
+    vi.stubEnv('CABLE_DESKTOP_ORIGIN', ROUTE_ORIGIN);
+    vi.stubEnv('CABLE_DESKTOP_TOKEN', ROUTE_TOKEN);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it.each([
     ['cat5e-oob.xlsx', 'Cat 5e', XLSX_MIME, 'OOB'],
     ['vertical.xlsx', 'Cat 5e (Vertical Cabling)', XLSX_MIME, 'Vertical Cabling'],
@@ -501,6 +518,7 @@ describe('legacy upload route adapter', () => {
     ));
 
     expect(response.status).toBe(200);
+    expect(response.headers.get('Deprecation')).toBe('true');
     expect(await response.json()).toMatchObject({ dataSource });
   });
 
@@ -567,7 +585,14 @@ describe('legacy upload route adapter', () => {
     const body = await response.json();
 
     expect(response.status).toBe(400);
-    expect(body).toEqual({ error: 'No matching rows were found for Cat 5e.' });
+    expect(body).toEqual({
+      error: {
+        code: 'NO_MATCHING_ROWS',
+        message: '未找到与所选线缆类型匹配的记录。',
+        retryable: false,
+      },
+    });
+    expect(response.headers.get('Deprecation')).toBe('true');
   });
 
   it('returns a safe 400 error for an unsupported cable type', async () => {
@@ -578,7 +603,14 @@ describe('legacy upload route adapter', () => {
     ));
 
     expect(response.status).toBe(400);
-    expect(await response.json()).toEqual({ error: 'Unsupported cable type' });
+    expect(await response.json()).toEqual({
+      error: {
+        code: 'UNSUPPORTED_CABLE_TYPE',
+        message: '不支持的线缆类型。',
+        retryable: false,
+        field: 'cableType',
+      },
+    });
   });
 
   it('returns 413 for a workbook over the public byte limit', async () => {
@@ -589,24 +621,59 @@ describe('legacy upload route adapter', () => {
 
     expect(response.status).toBe(413);
     expect(await response.json()).toEqual({
-      error: `Excel file exceeds the ${IMPORT_LIMITS.maxBytes}-byte limit.`,
+      error: {
+        code: 'EXCEL_FILE_TOO_LARGE',
+        message: 'Excel 文件不能超过 25 MiB。',
+        retryable: false,
+        field: 'file',
+      },
     });
+    expect(response.headers.get('Deprecation')).toBe('true');
   });
 
-  it('returns a sanitized 500 envelope when request form parsing fails', async () => {
+  it('returns a stable 400 envelope when request form parsing fails', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
     try {
       const response = await POST(new NextRequest('http://localhost/api/upload-excel', {
         method: 'POST',
-        headers: { 'content-type': 'multipart/form-data; boundary=broken' },
+        headers: {
+          'content-length': '128',
+          'content-type': 'multipart/form-data; boundary=broken',
+          Origin: ROUTE_ORIGIN,
+          'X-Cable-Desktop-Token': ROUTE_TOKEN,
+        },
         body: 'not-a-valid-multipart-body',
       }));
 
-      expect(response.status).toBe(500);
-      expect(await response.json()).toEqual({ error: 'Excel文件解析失败' });
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({
+        error: {
+          code: 'INVALID_MULTIPART_FORM',
+          message: '上传表单格式无效。',
+          retryable: false,
+        },
+      });
+      expect(response.headers.get('Deprecation')).toBe('true');
     } finally {
       consoleError.mockRestore();
     }
+  });
+
+  it('keeps authentication errors canonical and marks them deprecated', async () => {
+    const request = uploadRequest(
+      readFixtureBytes('cat5e-oob.xlsx'),
+      'cat5e-oob.xlsx',
+      'Cat 5e',
+    );
+    request.headers.delete('X-Cable-Desktop-Token');
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(401);
+    expect(response.headers.get('Deprecation')).toBe('true');
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: 'DESKTOP_TOKEN_REQUIRED', retryable: false },
+    });
   });
 });

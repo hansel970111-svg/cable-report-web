@@ -1,8 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
-
-import type { ImportRule } from '@/domain/report/model';
-import { CableTypeSchema } from '@/domain/report/schema';
-import { importExcel, ImportExcelError } from '@/features/import-excel/import-excel';
+import type { CableType, ImportRule } from '@/domain/report/model';
+import {
+  createImportExcelPresenterHandler,
+  type ImportExcelPresenter,
+} from '@/app/api/import-excel/handler';
+import { importExcel } from '@/features/import-excel/import-excel';
+import { apiError } from '@/server/api-error';
+import { requireDesktopApi } from '@/server/desktop-auth';
 
 const LEGACY_DATA_SOURCE: Readonly<Record<ImportRule, string>> = {
   'cat5e-oob': 'OOB',
@@ -11,59 +14,51 @@ const LEGACY_DATA_SOURCE: Readonly<Record<ImportRule, string>> = {
   mpo: 'MPO',
 };
 
-export async function POST(request: NextRequest) {
-  try {
-    const formData = await request.formData();
-    const file = formData.get('file');
-    if (!(file instanceof File)) {
-      return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
-    }
+const LEGACY_CABLE_TYPE: Readonly<Record<ImportRule, CableType>> = {
+  'cat5e-oob': 'Cat 5e',
+  'vertical-cabling': 'Cat 5e (Vertical Cabling)',
+  lc: 'LC',
+  mpo: 'MPO',
+};
 
-    const parsedCableType = CableTypeSchema.safeParse(formData.get('cableType'));
-    if (!parsedCableType.success) {
-      return NextResponse.json({ error: 'Unsupported cable type' }, { status: 400 });
-    }
+const LEGACY_PRESENTER: ImportExcelPresenter = {
+  success: result => Response.json({
+    success: true,
+    filteredRows: result.rows.map(row => ({
+      cableNo: row.cableNumber,
+      cableType: row.cableTypeText,
+      length: row.length,
+      dateTime: row.dateTime,
+      sourceLabel: row.sourceLabel,
+      bandwidth: row.bandwidth,
+      rowIndex: row.source.rowNumber,
+      sheetName: row.source.sheetName,
+      ...(row.source.rule === 'vertical-cabling'
+        ? { qtyIndex: row.source.expansionIndex + 1 }
+        : {}),
+    })),
+    totalCount: result.rows.length,
+    sheetName: result.metadata.sheetNames.join(', '),
+    detectedColumns: result.metadata.detectedColumns,
+    dataSource: LEGACY_DATA_SOURCE[result.metadata.rule],
+    cableType: LEGACY_CABLE_TYPE[result.metadata.rule],
+  }),
+  failure: failure => apiError(
+    failure.status,
+    failure.code,
+    failure.message,
+    failure.retryable,
+    failure.field,
+  ),
+};
 
-    const cableType = parsedCableType.data;
-    const result = importExcel({
-      fileName: file.name,
-      mimeType: file.type,
-      bytes: new Uint8Array(await file.arrayBuffer()),
-    }, cableType);
+const legacyHandler = createImportExcelPresenterHandler({
+  importExcel,
+  authenticate: requireDesktopApi,
+}, LEGACY_PRESENTER);
 
-    return NextResponse.json({
-      success: true,
-      filteredRows: result.rows.map(row => ({
-        cableNo: row.cableNumber,
-        cableType: row.cableTypeText,
-        length: row.length,
-        dateTime: row.dateTime,
-        sourceLabel: row.sourceLabel,
-        bandwidth: row.bandwidth,
-        rowIndex: row.source.rowNumber,
-        sheetName: row.source.sheetName,
-        ...(row.source.rule === 'vertical-cabling'
-          ? { qtyIndex: row.source.expansionIndex + 1 }
-          : {}),
-      })),
-      totalCount: result.rows.length,
-      sheetName: result.metadata.sheetNames.join(', '),
-      detectedColumns: result.metadata.detectedColumns,
-      dataSource: LEGACY_DATA_SOURCE[result.metadata.rule],
-      cableType,
-    });
-  } catch (error) {
-    if (error instanceof ImportExcelError) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: error.code === 'EXCEL_FILE_TOO_LARGE' ? 413 : 400 },
-      );
-    }
-
-    console.error('Excel import failed:', error);
-    return NextResponse.json(
-      { error: 'Excel文件解析失败' },
-      { status: 500 },
-    );
-  }
+export async function POST(request: Request): Promise<Response> {
+  const response = await legacyHandler(request);
+  response.headers.set('Deprecation', 'true');
+  return response;
 }
