@@ -17,6 +17,11 @@ const {
   classifyNavigation,
   createDesktopSessionToken,
 } = require('./security.cjs');
+const {
+  registerSavePdfHandler,
+  savePdfAtomically,
+  writeAndSyncTemporary,
+} = require('./save-pdf.cjs');
 
 if (!process.env.NEXT_TELEMETRY_DISABLED) {
   process.env.NEXT_TELEMETRY_DISABLED = '1';
@@ -25,6 +30,7 @@ if (!process.env.NEXT_TELEMETRY_DISABLED) {
 let mainWindow = null;
 let nextServer = null;
 let checkingForUpdates = false;
+let unregisterSavePdfHandler = null;
 
 const desktopSessionToken = createDesktopSessionToken();
 process.env.CABLE_DESKTOP_TOKEN = desktopSessionToken;
@@ -376,6 +382,24 @@ function registerDesktopSessionBridge() {
   });
 }
 
+function registerNativeSaveBridge() {
+  unregisterSavePdfHandler?.();
+  unregisterSavePdfHandler = registerSavePdfHandler({
+    ipcMain,
+    getMainWindow: () => mainWindow,
+    savePdf: (window, request) => savePdfAtomically(
+      {
+        showSaveDialog: options => dialog.showSaveDialog(window, options),
+        writeAndSyncTemporary,
+        rename: fs.promises.rename,
+        remove: temporaryPath => fs.promises.rm(temporaryPath, { force: true }),
+        randomUUID: require('node:crypto').randomUUID,
+      },
+      request,
+    ),
+  });
+}
+
 function createMainWindow(url) {
   mainWindow = new BrowserWindow({
     width: 1280,
@@ -432,6 +456,7 @@ app.whenReady().then(async () => {
   try {
     configureSessionSecurity();
     registerDesktopSessionBridge();
+    registerNativeSaveBridge();
     setupApplicationMenu();
     const url = await startNextServer();
     createMainWindow(url);
@@ -456,6 +481,8 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
+  unregisterSavePdfHandler?.();
+  unregisterSavePdfHandler = null;
   if (nextServer) {
     nextServer.close();
     nextServer = null;
