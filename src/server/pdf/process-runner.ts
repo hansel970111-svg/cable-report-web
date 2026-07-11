@@ -179,23 +179,42 @@ async function terminateWindowsTree(
     throw new Error('terminate failed');
   }
 
-  const succeeded = await new Promise<boolean>(resolve => {
-    let done = false;
-    const finish = (success: boolean) => {
-      if (done) return;
-      done = true;
-      taskkill.removeListener('error', onError);
-      taskkill.removeListener('close', onClose);
-      resolve(success);
-    };
-    const onError = () => finish(false);
-    const onClose = (code: number | null) => finish(code === 0);
-    taskkill.once('error', onError);
-    taskkill.once('close', onClose);
-  });
+  type TaskkillOutcome = 'failed' | 'original-closed' | 'succeeded' | 'timed-out';
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let finish!: (outcome: TaskkillOutcome) => void;
+  const onError = () => finish('failed');
+  const onClose = (code: number | null) => {
+    finish(code === 0 ? 'succeeded' : 'failed');
+  };
 
-  if (succeeded || originalClosed()) return;
-  if (await waitForClose(originalClose, 50)) return;
+  let outcome: TaskkillOutcome;
+  try {
+    outcome = await new Promise<TaskkillOutcome>(resolve => {
+      let done = false;
+      finish = next => {
+        if (done) return;
+        done = true;
+        resolve(next);
+      };
+
+      timer = setTimeout(() => finish('timed-out'), TERMINATION_GRACE_MS);
+      originalClose.then(() => finish('original-closed'));
+      taskkill.once('error', onError);
+      taskkill.once('close', onClose);
+    });
+  } finally {
+    if (timer) clearTimeout(timer);
+    taskkill.removeListener('error', onError);
+    taskkill.removeListener('close', onClose);
+    taskkill.unref();
+  }
+
+  if (outcome === 'succeeded' || outcome === 'original-closed' || originalClosed()) {
+    return;
+  }
+  if (await waitForClose(originalClose, 50)) {
+    return;
+  }
   throw new Error('terminate failed');
 }
 
@@ -427,7 +446,7 @@ export function createProcessTreeRunner(
           kind: 'terminate',
           message: MESSAGES.terminate,
         };
-        if (!processClosed) {
+        if (!processClosed && dependencies.platform !== 'win32') {
           try {
             child.kill('SIGKILL');
           } catch {

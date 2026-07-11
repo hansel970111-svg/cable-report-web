@@ -617,3 +617,218 @@ test('Windows taskkill nonzero race preserves abort when the original closes con
     message: 'PDF 工作进程已取消',
   });
 });
+
+test('Windows taskkill wait stops when the original process closes without a taskkill event', async () => {
+  vi.useFakeTimers();
+  const directory = await createTemporaryDirectory();
+  const controller = new AbortController();
+  const stdout = new PassThrough();
+  const stderr = new PassThrough();
+  const mainChild = Object.assign(new EventEmitter(), {
+    pid: 4321,
+    stdout,
+    stderr,
+    kill: vi.fn(() => true),
+    unref: vi.fn(),
+  }) as unknown as ChildProcess;
+  const taskkill = Object.assign(new EventEmitter(), {
+    pid: 9876,
+    stdout: null,
+    stderr: null,
+    kill: vi.fn(() => true),
+    unref: vi.fn(),
+  }) as unknown as ChildProcess;
+  const spawnProcess = vi.fn<ProcessRunnerDependencies['spawnProcess']>(command =>
+    command === 'taskkill' ? taskkill : mainChild,
+  );
+  const runner = createProcessTreeRunner({
+    openLog: async () => fakeLogHandle(),
+    platform: 'win32',
+    spawnProcess,
+  });
+  const running = runner(
+    requestFor(directory, controller, 'ignored', {
+      command: 'worker.exe',
+      args: [],
+    }),
+  );
+
+  try {
+    await vi.waitFor(() => expect(spawnProcess).toHaveBeenCalledOnce());
+    controller.abort();
+    await vi.waitFor(() => expect(spawnProcess).toHaveBeenCalledTimes(2));
+
+    stdout.end();
+    stderr.end();
+    mainChild.emit('exit', 0, null);
+    mainChild.emit('close', 0, null);
+
+    const pending = Symbol('pending');
+    const outcome = Promise.race([
+      running.catch(error => error as unknown),
+      new Promise<typeof pending>(resolve => {
+        setTimeout(() => resolve(pending), 100);
+      }),
+    ]);
+    await vi.advanceTimersByTimeAsync(100);
+
+    await expect(outcome).resolves.toMatchObject({
+      code: 'PROCESS_ABORTED',
+      message: 'PDF 工作进程已取消',
+    });
+    expect(taskkill.listenerCount('error')).toBe(0);
+    expect(taskkill.listenerCount('close')).toBe(0);
+    expect(taskkill.unref).toHaveBeenCalledOnce();
+    expect(vi.getTimerCount()).toBe(0);
+  } finally {
+    if (taskkill.listenerCount('error') > 0) {
+      taskkill.emit('error', new Error('test cleanup'));
+    }
+    await vi.runOnlyPendingTimersAsync();
+    await running.catch(() => undefined);
+    vi.useRealTimers();
+  }
+});
+
+test('Windows taskkill timeout preserves an original close at the timeout boundary', async () => {
+  vi.useFakeTimers();
+  const directory = await createTemporaryDirectory();
+  const controller = new AbortController();
+  const stdout = new PassThrough();
+  const stderr = new PassThrough();
+  const mainChild = Object.assign(new EventEmitter(), {
+    pid: 4321,
+    stdout,
+    stderr,
+    kill: vi.fn(() => true),
+    unref: vi.fn(),
+  }) as unknown as ChildProcess;
+  const taskkill = Object.assign(new EventEmitter(), {
+    pid: 9876,
+    stdout: null,
+    stderr: null,
+    kill: vi.fn(() => true),
+    unref: vi.fn(),
+  }) as unknown as ChildProcess;
+  const spawnProcess = vi.fn<ProcessRunnerDependencies['spawnProcess']>(command => {
+    if (command !== 'taskkill') return mainChild;
+    setTimeout(() => {
+      stdout.end();
+      stderr.end();
+      mainChild.emit('exit', 0, null);
+      mainChild.emit('close', 0, null);
+    }, 2_001);
+    return taskkill;
+  });
+  const runner = createProcessTreeRunner({
+    openLog: async () => fakeLogHandle(),
+    platform: 'win32',
+    spawnProcess,
+  });
+  const running = runner(
+    requestFor(directory, controller, 'ignored', {
+      command: 'worker.exe',
+      args: [],
+    }),
+  );
+  const outcome = running.catch(error => error as unknown);
+
+  try {
+    await vi.waitFor(() => expect(spawnProcess).toHaveBeenCalledOnce());
+    controller.abort();
+    await vi.waitFor(() => expect(spawnProcess).toHaveBeenCalledTimes(2));
+
+    await vi.advanceTimersByTimeAsync(2_001);
+
+    await expect(outcome).resolves.toMatchObject({
+      code: 'PROCESS_ABORTED',
+      message: 'PDF 工作进程已取消',
+    });
+    expect(taskkill.listenerCount('error')).toBe(0);
+    expect(taskkill.listenerCount('close')).toBe(0);
+    expect(taskkill.unref).toHaveBeenCalledOnce();
+    expect(vi.getTimerCount()).toBe(0);
+  } finally {
+    if (taskkill.listenerCount('error') > 0) {
+      taskkill.emit('error', new Error('test cleanup'));
+    }
+    stdout.end();
+    stderr.end();
+    mainChild.emit('exit', null, 'SIGKILL');
+    mainChild.emit('close', null, 'SIGKILL');
+    await vi.runOnlyPendingTimersAsync();
+    await running.catch(() => undefined);
+    vi.useRealTimers();
+  }
+});
+
+test('Windows taskkill wait times out and cleans up when neither process closes', async () => {
+  vi.useFakeTimers();
+  const directory = await createTemporaryDirectory();
+  const controller = new AbortController();
+  const stdout = new PassThrough();
+  const stderr = new PassThrough();
+  const mainChild = Object.assign(new EventEmitter(), {
+    pid: 4321,
+    stdout,
+    stderr,
+    kill: vi.fn(() => false),
+    unref: vi.fn(),
+  }) as unknown as ChildProcess;
+  const taskkill = Object.assign(new EventEmitter(), {
+    pid: 9876,
+    stdout: null,
+    stderr: null,
+    kill: vi.fn(() => true),
+    unref: vi.fn(),
+  }) as unknown as ChildProcess;
+  const spawnProcess = vi.fn<ProcessRunnerDependencies['spawnProcess']>(command =>
+    command === 'taskkill' ? taskkill : mainChild,
+  );
+  const runner = createProcessTreeRunner({
+    openLog: async () => fakeLogHandle(),
+    platform: 'win32',
+    spawnProcess,
+  });
+  const running = runner(
+    requestFor(directory, controller, 'ignored', {
+      command: 'worker.exe',
+      args: [],
+    }),
+  );
+  const pending = Symbol('pending');
+  let outcome: ProcessRunError | typeof pending = pending;
+  void running.catch(error => {
+    outcome = error as ProcessRunError;
+  });
+
+  try {
+    await vi.waitFor(() => expect(spawnProcess).toHaveBeenCalledOnce());
+    controller.abort();
+    await vi.waitFor(() => expect(spawnProcess).toHaveBeenCalledTimes(2));
+
+    await vi.advanceTimersByTimeAsync(5_050);
+
+    expect(outcome).toMatchObject({
+      code: 'PROCESS_ABORTED',
+      message: 'PDF 工作进程终止失败',
+    });
+    expect(taskkill.listenerCount('error')).toBe(0);
+    expect(taskkill.listenerCount('close')).toBe(0);
+    expect(taskkill.unref).toHaveBeenCalledOnce();
+    expect(mainChild.kill).not.toHaveBeenCalled();
+    expect(mainChild.unref).toHaveBeenCalledOnce();
+    expect(vi.getTimerCount()).toBe(0);
+  } finally {
+    if (taskkill.listenerCount('error') > 0) {
+      taskkill.emit('error', new Error('test cleanup'));
+    }
+    stdout.end();
+    stderr.end();
+    mainChild.emit('exit', null, 'SIGKILL');
+    mainChild.emit('close', null, 'SIGKILL');
+    await vi.runOnlyPendingTimersAsync();
+    await running.catch(() => undefined);
+    vi.useRealTimers();
+  }
+});
