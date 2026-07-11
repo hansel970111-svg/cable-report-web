@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import './globals.css';
 
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   applicationName: 'Cable Report Generator',
   title: {
@@ -36,8 +38,12 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const devBrowserMode = process.env.CABLE_DEV_BROWSER_MODE === '1';
   return (
-    <html lang="zh-CN">
+    <html
+      lang="zh-CN"
+      data-dev-browser-mode={devBrowserMode ? 'true' : undefined}
+    >
       <body className={`antialiased`}>
         {children}
       </body>

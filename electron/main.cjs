@@ -1,9 +1,22 @@
-const { app, BrowserWindow, dialog, Menu, shell } = require('electron');
+const {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  Menu,
+  session,
+  shell,
+} = require('electron');
 const { createServer } = require('node:http');
 const fs = require('node:fs');
 const https = require('node:https');
 const net = require('node:net');
 const path = require('node:path');
+
+const {
+  classifyNavigation,
+  createDesktopSessionToken,
+} = require('./security.cjs');
 
 if (!process.env.NEXT_TELEMETRY_DISABLED) {
   process.env.NEXT_TELEMETRY_DISABLED = '1';
@@ -13,9 +26,26 @@ let mainWindow = null;
 let nextServer = null;
 let checkingForUpdates = false;
 
+const desktopSessionToken = createDesktopSessionToken();
+process.env.CABLE_DESKTOP_TOKEN = desktopSessionToken;
+delete process.env.CABLE_DEV_BROWSER_MODE;
+
 const UPDATE_REPO = 'hansel970111-svg/cable-report-web';
 const RELEASES_URL = `https://github.com/${UPDATE_REPO}/releases/latest`;
 const LATEST_RELEASE_API = `https://api.github.com/repos/${UPDATE_REPO}/releases/latest`;
+
+function openApprovedExternal(targetUrl) {
+  const decision = classifyNavigation(
+    targetUrl,
+    process.env.CABLE_DESKTOP_ORIGIN || '',
+  );
+  if (decision.kind !== 'external') return false;
+
+  void shell.openExternal(decision.url).catch(error => {
+    console.error('无法打开外部链接:', error);
+  });
+  return true;
+}
 
 function getAppRoot() {
   if (app.isPackaged) {
@@ -198,7 +228,7 @@ async function checkForUpdates({ manual = false } = {}) {
     });
 
     if (result.response === 0) {
-      shell.openExternal(getPreferredAsset(release));
+      openApprovedExternal(getPreferredAsset(release));
     }
   } catch (error) {
     if (manual) {
@@ -213,7 +243,7 @@ async function checkForUpdates({ manual = false } = {}) {
       });
 
       if (result.response === 0) {
-        shell.openExternal(RELEASES_URL);
+        openApprovedExternal(RELEASES_URL);
       }
     }
   } finally {
@@ -250,7 +280,7 @@ function setupApplicationMenu() {
         },
         {
           label: '打开下载页',
-          click: () => shell.openExternal(RELEASES_URL),
+          click: () => openApprovedExternal(RELEASES_URL),
         },
       ],
     },
@@ -263,6 +293,7 @@ async function startNextServer() {
   const appRoot = getAppRoot();
   const port = await getFreePort(Number(process.env.PORT || 5000));
   const hostname = '127.0.0.1';
+  const origin = `http://${hostname}:${port}`;
   const dev = !app.isPackaged && process.env.ELECTRON_NEXT_DEV !== 'false';
 
   process.chdir(appRoot);
@@ -272,13 +303,16 @@ async function startNextServer() {
   process.env.PORT = String(port);
   process.env.HOSTNAME = hostname;
   process.env.HOST = hostname;
+  process.env.CABLE_DESKTOP_ORIGIN = origin;
+  process.env.CABLE_DESKTOP_TOKEN = desktopSessionToken;
+  delete process.env.CABLE_DEV_BROWSER_MODE;
 
   if (!dev) {
     const standaloneServerPath = path.join(appRoot, 'next-build', 'standalone', 'server.js');
     if (fs.existsSync(standaloneServerPath)) {
       require(standaloneServerPath);
       await waitForPort(port);
-      return `http://${hostname}:${port}`;
+      return origin;
     }
 
     const buildIdPath = path.join(appRoot, 'next-build', 'BUILD_ID');
@@ -311,7 +345,35 @@ async function startNextServer() {
     nextServer.listen(port, hostname, resolve);
   });
 
-  return `http://${hostname}:${port}`;
+  return origin;
+}
+
+function configureSessionSecurity() {
+  session.defaultSession.setPermissionCheckHandler(() => false);
+  session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => {
+    callback(false);
+  });
+}
+
+function registerDesktopSessionBridge() {
+  ipcMain.removeHandler('cable-report:get-session-token');
+  ipcMain.handle('cable-report:get-session-token', event => {
+    const expectedOrigin = process.env.CABLE_DESKTOP_ORIGIN || '';
+    const senderFrame = event.senderFrame;
+    const senderDecision = classifyNavigation(senderFrame?.url || '', expectedOrigin);
+    const authorized =
+      mainWindow &&
+      !mainWindow.isDestroyed() &&
+      event.sender === mainWindow.webContents &&
+      senderFrame === mainWindow.webContents.mainFrame &&
+      senderDecision.kind === 'internal';
+
+    if (!authorized) {
+      throw new Error('Unauthorized desktop session token request');
+    }
+
+    return desktopSessionToken;
+  });
 }
 
 function createMainWindow(url) {
@@ -322,9 +384,15 @@ function createMainWindow(url) {
     minHeight: 720,
     show: false,
     webPreferences: {
+      preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      webSecurity: true,
+      allowRunningInsecureContent: false,
+      webviewTag: false,
+      navigateOnDragDrop: false,
+      spellcheck: false,
     },
   });
 
@@ -333,8 +401,28 @@ function createMainWindow(url) {
   });
 
   mainWindow.webContents.setWindowOpenHandler(({ url: targetUrl }) => {
-    shell.openExternal(targetUrl);
+    const decision = classifyNavigation(targetUrl, url);
+    if (decision.kind === 'external') {
+      openApprovedExternal(decision.url);
+    }
     return { action: 'deny' };
+  });
+
+  const handleNavigation = (event, targetUrl) => {
+    const decision = classifyNavigation(targetUrl, url);
+    if (decision.kind === 'internal') return;
+
+    event.preventDefault();
+    if (decision.kind === 'external') {
+      openApprovedExternal(decision.url);
+    }
+  };
+
+  mainWindow.webContents.on('will-navigate', handleNavigation);
+  mainWindow.webContents.on('will-redirect', handleNavigation);
+
+  mainWindow.on('closed', () => {
+    mainWindow = null;
   });
 
   mainWindow.loadURL(url);
@@ -342,6 +430,8 @@ function createMainWindow(url) {
 
 app.whenReady().then(async () => {
   try {
+    configureSessionSecurity();
+    registerDesktopSessionBridge();
     setupApplicationMenu();
     const url = await startNextServer();
     createMainWindow(url);

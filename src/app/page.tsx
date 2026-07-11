@@ -20,6 +20,12 @@ import type { CableImportRow, CableType as ReportCableType } from '@/domain/repo
 import { mathRandomSource } from '@/domain/report/random-source';
 import { defaultRecordIdFactory, mapImportedRows } from '@/domain/report/record-mapper';
 import {
+  ApiResponseError,
+  desktopFetch,
+  readApiError,
+  requireApiSuccess,
+} from '@/lib/desktop-api';
+import {
   ensureUiRecordIds,
   toUiCableRecords,
   type UiCableRecord as CableRecord,
@@ -62,39 +68,13 @@ async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit, tim
   const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    return await fetch(input, {
+    return await desktopFetch(input, {
       ...init,
       signal: controller.signal,
     });
   } finally {
     window.clearTimeout(timeoutId);
   }
-}
-
-async function readApiError(response: Response): Promise<string> {
-  const contentType = response.headers.get('content-type') || '';
-
-  if (contentType.includes('application/json')) {
-    try {
-      const body = await response.json();
-      if (typeof body?.error === 'string' && body.error.trim()) {
-        return body.error;
-      }
-    } catch {
-      // Fall through to text handling below.
-    }
-  }
-
-  const text = await response.text();
-  const isHtmlError = /^\s*<!doctype html/i.test(text) || /<html[\s>]/i.test(text);
-  if (isHtmlError) {
-    if (response.status === 502 || /<title>\s*502\s*<\/title>/i.test(text)) {
-      return '服务器生成 PDF 超时或临时不可用，请稍后重试。';
-    }
-    return `服务器返回了异常页面（HTTP ${response.status}）。`;
-  }
-
-  return text.trim() || `请求失败（HTTP ${response.status}）`;
 }
 
 export default function Home() {
@@ -470,6 +450,7 @@ export default function Home() {
                       }, 60000);
 
                       console.log('模板API响应状态:', templateResponse.status);
+                      await requireApiSuccess(templateResponse);
                       const templateResult = await templateResponse.json();
                       console.log('模板API响应:', templateResult);
 
@@ -508,6 +489,7 @@ export default function Home() {
                             method: 'POST',
                             body: formData,
                           }, 180000);
+                          await requireApiSuccess(excelResponse);
 
                           // 读取响应文本
                           const responseText = await excelResponse.text();
@@ -651,7 +633,9 @@ export default function Home() {
                           console.error('Excel upload error:', error);
                           const message = error instanceof DOMException && error.name === 'AbortError'
                             ? 'Excel上传或解析超时，请确认文件是否正确，然后重新导入'
-                            : 'Excel上传失败';
+                            : error instanceof ApiResponseError
+                              ? error.message
+                              : 'Excel上传失败';
                           alert(message);
                         } finally {
                           setUploadingExcel(false);
@@ -663,7 +647,9 @@ export default function Home() {
                       console.error('Load template error:', error);
                       const message = error instanceof DOMException && error.name === 'AbortError'
                         ? '模板加载超时，请刷新页面后重试'
-                        : '加载模板失败';
+                        : error instanceof ApiResponseError
+                          ? error.message
+                          : '加载模板失败';
                       alert(message);
                     } finally {
                       setLoadingTemplate(false);

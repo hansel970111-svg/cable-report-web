@@ -1,22 +1,22 @@
 import { spawn } from 'node:child_process';
 import process from 'node:process';
 
-const workspace = process.env.COZE_WORKSPACE_PATH || process.cwd();
-const port = process.env.PORT || process.env.DEPLOY_RUN_PORT || '10000';
-const host = process.env.HOST || '0.0.0.0';
+import { createStartConfiguration } from './browser-mode.mjs';
 
-console.log(`Starting production server on http://${host}:${port}`);
+const workspace = process.env.COZE_WORKSPACE_PATH || process.cwd();
+const { browserDevMode, childEnv, host, port } = createStartConfiguration({
+  args: process.argv.slice(2),
+  env: process.env,
+  workspace,
+});
+
+console.log(
+  `Starting production server on http://${host}:${port}${browserDevMode ? ' (browser development mode)' : ''}`,
+);
 
 const child = spawn(process.execPath, ['dist/server.js'], {
   cwd: workspace,
-  env: {
-    ...process.env,
-    COZE_WORKSPACE_PATH: workspace,
-    COZE_PROJECT_ENV: process.env.COZE_PROJECT_ENV || 'PROD',
-    HOST: host,
-    PORT: port,
-    DEPLOY_RUN_PORT: port,
-  },
+  env: childEnv,
   stdio: 'inherit',
   shell: false,
   windowsHide: false,

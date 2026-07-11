@@ -31,4 +31,5 @@ echo "Clearing port ${PORT} before start."
 kill_port_if_listening
 echo "Starting HTTP service on port ${PORT} for dev..."
 
-PORT=$PORT corepack pnpm tsx watch src/server.ts
+CABLE_DEV_BROWSER_MODE=1 HOST=127.0.0.1 HOSTNAME=127.0.0.1 PORT=$PORT \
+  corepack pnpm tsx watch src/server.ts
