@@ -2,10 +2,11 @@
 """PDF Editor Module."""
 import sys
 import re
-import json
 import fitz  # PyMuPDF
 import os
 from datetime import datetime
+
+from pdf_engine.cli import run_editor_cli
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, '..'))
@@ -312,7 +313,7 @@ def site_text_to_cid(text):
             else:
                 # file or JSON 
                 # 
-                print(f"[WARN] Site '{char}' has beenCID, ", file=sys.stderr)
+                print("[WARN] Site contains an unsupported character", file=sys.stderr)
                 result.append('0003')
     
     return ''.join(result)
@@ -397,9 +398,9 @@ def replace_site_in_page_stream(page, site):
         cid_count = len(hex_str) // 4
         if cid_count == 9:
             is_cat5e = True
-            print(f"[DEBUG]  Cat5e  (tj1 CID : {cid_count})")
+            print(f"[DEBUG]  Cat5e  (tj1 CID : {cid_count})", file=sys.stderr)
         else:
-            print(f"[DEBUG]  MPO  (tj1 CID : {cid_count})")
+            print(f"[DEBUG]  MPO  (tj1 CID : {cid_count})", file=sys.stderr)
     
     # C2_0 ( CALIBRI_CID_MAP )
     # : C2_0 : 4, 6
@@ -818,7 +819,7 @@ def replace_site_in_page_stream(page, site):
         tj1_start = match.start()
         tj1_end = match.start() + len(original_tj)
         is_data_page_site = True
-        print(f"[DEBUG]  Site : {original_tj}")
+        print("[DEBUG] Site placeholder detected", file=sys.stderr)
     else:
         return False
 
@@ -862,7 +863,7 @@ def replace_site_in_page_stream(page, site):
             data_page_cid_padded = ''.join(cid_list[:original_cid_count])
             
             new_tj = f"<{data_page_cid_padded}>Tj"
-            print(f"[DEBUG]  Site : {original_tj} -> {new_tj}")
+            print("[DEBUG] Site placeholder updated", file=sys.stderr)
             stream_text = stream_text[:tj1_start] + new_tj + stream_text[tj1_end:]
             
             #  Site 
@@ -891,7 +892,7 @@ def replace_site_in_page_stream(page, site):
                 other_cid_padded = ''.join(cid_list[:other_cid_count])
                 other_new_tj = f"<{other_cid_padded}>Tj"
                 
-                print(f"[DEBUG]  Site : {other_original} -> {other_new_tj}")
+                print("[DEBUG] Additional Site placeholder updated", file=sys.stderr)
                 stream_text = stream_text[:other_start] + other_new_tj + stream_text[other_end:]
                 offset = other_start + len(other_new_tj)
             
@@ -937,9 +938,7 @@ def replace_site_in_page_stream(page, site):
         #  CID
         # tj2  C2_2 ()
         tj2_hex = ''.join(get_cid(c, CALIBRI_C2_2_CID_MAP) for c in tj2_text_parts)
-        print(f"[DEBUG] tj1_chars: {tj1_chars}")
-        print(f"[DEBUG] tj2_text_parts: {tj2_text_parts}")
-        print(f"[DEBUG] tj2_hex: {tj2_hex}")
+        print("[DEBUG] Site CID segments prepared", file=sys.stderr)
         # tj3 :  C2_0,  C2_2
         def get_tj3_cid(char):
             if char == '-':
@@ -952,10 +951,6 @@ def replace_site_in_page_stream(page, site):
         # tj4  C2_2 ()
         # tj4_hex  tj4_chars 
         tj4_hex = ''.join(get_cid(c, CALIBRI_C2_2_CID_MAP) for c in tj4_chars) if tj4_chars else ''
-        print(f"[DEBUG] tj3_chars: {tj3_chars}")
-        print(f"[DEBUG] tj4_chars: {tj4_chars}")
-        print(f"[DEBUG] tj4_hex: {tj4_hex}")
-        print(f"[DEBUG] tj3_hex: {tj3_hex}")
         
         # :  tj1  tj2, tj3, tj4
         # tj1 :  -> tj2 ->  -> tj3 ->  -> tj4
@@ -1027,8 +1022,7 @@ def replace_site_in_page_stream(page, site):
                     tj4_hex_new = tj4_hex + "0003" * space_count
             else:
                 tj4_hex_new = tj4_hex[:original_tj4_len]
-            print(f"[DEBUG] original_tj4_hex: {original_tj4_hex}, len: {original_tj4_len}")
-            print(f"[DEBUG] tj4_hex_new: {tj4_hex_new}")
+            print(f"[DEBUG] Site CID block resized to {original_tj4_len}", file=sys.stderr)
             # 
             tj4_start = cumulative_offset + tj4_block.start()
             tj4_end = cumulative_offset + tj4_block.end()
@@ -1331,8 +1325,8 @@ def replace_dates_times_with_text_drawing(page, records, start_idx):
                     fontsize=6,
                     color=(0, 0, 0)
                 )
-            except Exception as e:
-                print(f"[DEBUG] : {e}", file=sys.stderr)
+            except Exception:
+                print("[DEBUG] Date fallback drawing failed", file=sys.stderr)
         
         # 
         if i < len(time_positions):
@@ -1347,8 +1341,8 @@ def replace_dates_times_with_text_drawing(page, records, start_idx):
                     fontsize=5,
                     color=(0, 0, 0)
                 )
-            except Exception as e:
-                print(f"[DEBUG] : {e}", file=sys.stderr)
+            except Exception:
+                print("[DEBUG] Time fallback drawing failed", file=sys.stderr)
     
     return len(records)
 
@@ -1463,7 +1457,7 @@ def replace_times_in_page_stream(page, records, start_idx, std_tj_record_offset=
                         'pdf_row': 1,
                         'type': 'simple_date_tj'
                     })
-                    print(f"[DEBUG] First date Tj: replaced '{old_date_hex}' -> '{new_date_cid.upper()}'", file=sys.stderr)
+                    print("[DEBUG] First date placeholder updated", file=sys.stderr)
     
     # : TJPDF: 
     # - 0(simpleTj[0])-> PDF1()
@@ -1539,7 +1533,7 @@ def replace_times_in_page_stream(page, records, start_idx, std_tj_record_offset=
                 'pdf_row': i + 1,
                 'type': 'simple_date_tj_rowN'
             })
-            print(f"[DEBUG] Row {i+1} date Tj: replaced '{old_date_hex}' -> '{new_date_cid.upper()}'", file=sys.stderr)
+            print(f"[DEBUG] Row {i + 1} date placeholder updated", file=sys.stderr)
     
     for i, match in enumerate(matches1):
         # MPO/Cat5e keep row 1 in a simple Tj and stdTJ[0] starts at row 2.
@@ -1581,7 +1575,7 @@ def replace_times_in_page_stream(page, records, start_idx, std_tj_record_offset=
             'rec_idx': rec_idx,
             'pdf_row': i + 2
         })
-        print(f"[DEBUG] stdTJ[{i}]: PDF{i + 1 + std_tj_record_offset} -> record[{rec_idx}], time='{time_str}'", file=sys.stderr)
+        print(f"[DEBUG] stdTJ[{i}] time placeholder updated", file=sys.stderr)
     
     #  simpleTj[0] (PDF1, record[0])
     # :  Tj  TJ 
@@ -1622,7 +1616,7 @@ def replace_times_in_page_stream(page, records, start_idx, std_tj_record_offset=
                         'rec_idx': rec_idx,
                         'pdf_row': 1
                     })
-                    print(f"[DEBUG] simpleTj[0] -> TJ: PDF1 -> record[{rec_idx}], time='{time_str}'", file=sys.stderr)
+                    print("[DEBUG] First-row time placeholder updated", file=sys.stderr)
     
     #  simpleTj[1] (PDF48, record[47])
     # :  Tj  TJ 
@@ -1669,7 +1663,7 @@ def replace_times_in_page_stream(page, records, start_idx, std_tj_record_offset=
                         'rec_idx': rec_idx,
                         'pdf_row': 48
                     })
-                    print(f"[DEBUG] simpleTj[1] -> TJ: PDF48 -> record[{rec_idx}], time='{time_str}'", file=sys.stderr)
+                    print("[DEBUG] Final-row time placeholder updated", file=sys.stderr)
     
     # 
     all_replacements.sort(key=lambda x: x['pos'], reverse=True)
@@ -1895,8 +1889,8 @@ def _fix_missing_glyphs_in_font(doc):
             else:
                 print(f"[DEBUG] FontDescriptor not changed", file=sys.stderr)
         
-        except Exception as e:
-            print(f"[DEBUG] Error updating font: {e}", file=sys.stderr)
+        except Exception:
+            print("[DEBUG] Font update failed", file=sys.stderr)
             return False
     
     print("[DEBUG] Font glyph fix completed successfully", file=sys.stderr)
@@ -1936,8 +1930,8 @@ def _fix_lc_template_date(template_doc):
 
         if replaced:
             print(f"[DEBUG] Fixed {replaced} corrupted LC date placeholder(s)", file=sys.stderr)
-    except Exception as e:
-        print(f"[DEBUG] Failed to fix LC date placeholder: {e}", file=sys.stderr)
+    except Exception:
+        print("[DEBUG] LC date placeholder repair failed", file=sys.stderr)
         pass
 
 
@@ -2197,8 +2191,8 @@ def _draw_dates_at_positions(page, records, date_positions, start_idx=0, all_rec
                 fontsize=fontsize
             )
             drawn += 1
-        except Exception as e:
-            print(f"[ERROR] Failed to insert date text: {e}", file=sys.stderr)
+        except Exception:
+            print("[ERROR] Date text insertion failed", file=sys.stderr)
     
     return drawn
 
@@ -2487,15 +2481,15 @@ def replace_dates_in_tj_format(page, records, start_idx):
             
             stream_bytes[start_pos:end_pos] = new_bytes
             processed += 1
-            print(f"[DEBUG] Replaced date at TJ {i}: {date_part} -> {cid_hex}", file=sys.stderr)
+            print(f"[DEBUG] Date placeholder {i} updated", file=sys.stderr)
         
         if processed > 0:
             try:
                 page.parent.update_stream(content_xref, bytes(stream_bytes))
                 total_processed += processed
                 print(f"[DEBUG] Updated {processed} Tj date patterns on page {page_num}", file=sys.stderr)
-            except Exception as e:
-                print(f"[DEBUG] Error updating stream: {e}", file=sys.stderr)
+            except Exception:
+                print("[DEBUG] Date stream update failed", file=sys.stderr)
     
     return total_processed
 
@@ -2736,7 +2730,7 @@ def replace_cable_labels_in_page_stream(page, records, start_idx):
         #  matches 
         
         processed += 1
-        print(f"[DEBUG]  Cable Label {processed}: PDF{i + 1} record[{rec_idx}] = '{cable_label}' -> CID='{label_cid}'", file=sys.stderr)
+        print(f"[DEBUG] Cable Label row {processed} updated", file=sys.stderr)
     
     # 
     if processed > 0:
@@ -2843,7 +2837,7 @@ def replace_limits_in_page_stream(page, records, start_idx, is_mpo_template=True
             replacement = old_match_text[:tj_start] + new_tj
             stream_bytes[match.start():match.end()] = replacement
 
-            print(f"[DEBUG]  Limit {processed + 1}: record[{processed}] = '{limit}'", file=sys.stderr)
+            print(f"[DEBUG] Limit row {processed + 1} updated", file=sys.stderr)
             processed += 1
             stream_processed += 1
 
@@ -2893,8 +2887,8 @@ def _save_pdf_compact(doc, output_path):
     """Save a generated report with lossless PDF cleanup/compression."""
     try:
         doc.subset_fonts()
-    except Exception as exc:
-        print(f"[WARN] Font subsetting skipped: {exc}", file=sys.stderr)
+    except Exception:
+        print("[WARN] Font subsetting skipped", file=sys.stderr)
 
     try:
         doc.save(
@@ -3436,7 +3430,7 @@ def fill_page(page, records, start_idx, page_num, is_last_data_page=False):
         print(f"[DEBUG fill_page:{page_num}] CID: xref={xref_before}, xref_length={xref_len}, valid={xref_before < xref_len if xref_before else False}, stream_len={stream_len_before}", file=sys.stderr)
         
         page_records = records[start_idx:start_idx + processed]
-        print(f"[DEBUG fill_page:{page_num}] page_records={len(page_records)}, ={page_records[0] if page_records else 'None'}", file=sys.stderr)
+        print(f"[DEBUG fill_page:{page_num}] page_records={len(page_records)}", file=sys.stderr)
         
         #  Cable Label CID ( clean_contents )
         replace_result = replace_cable_labels_in_page_stream(page, page_records, 0)
@@ -3478,7 +3472,7 @@ def fill_page(page, records, start_idx, page_num, is_last_data_page=False):
         date_positions = _get_date_positions_before_redaction(page)
         if hasattr(_get_date_positions_before_redaction, '_debug'):
             _get_date_positions_before_redaction._debug = True
-        print(f"[DEBUG fill_page:{page_num}] date_positions count: {len(date_positions)}")
+        print(f"[DEBUG fill_page:{page_num}] date_positions count: {len(date_positions)}", file=sys.stderr)
     
     # Apply redaction for non-date rects only
     # Skip date rects since dates are replaced directly in content stream
@@ -4415,10 +4409,9 @@ def edit_non_lc_pdf(input_path, output_path, records, site=None, template_kind='
             'pages_used': data_pages_needed + 1,
             'output_path': output_path
         }
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return {'error': str(e)}
+    except Exception:
+        print("[ERROR] PDF rendering failed", file=sys.stderr)
+        return {'error': 'PDF rendering failed'}
 
 
 def _fill_lc_summary_page(page, page_records, all_records, site, page_num):
@@ -4550,10 +4543,9 @@ def edit_lc_pdf(input_path, output_path, records, site=None):
             'pages_used': data_pages_needed + 1,
             'output_path': output_path
         }
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return {'error': str(e)}
+    except Exception:
+        print("[ERROR] PDF rendering failed", file=sys.stderr)
+        return {'error': 'PDF rendering failed'}
 
 
 def edit_pdf(input_path, output_path, records, site=None):
@@ -4749,8 +4741,6 @@ def edit_pdf(input_path, output_path, records, site=None):
             page_records = records[page_records_start:page_records_start + ROWS_PER_PAGE]
             if page_records:
                 print(f"[DEBUG edit_pdf] {page_num}: page_records={len(page_records)}, record_idx={record_idx}", file=sys.stderr)
-                print(f"[DEBUG edit_pdf] {page_num}: records[0]={records[0] if records else 'None'}", file=sys.stderr)
-                print(f"[DEBUG edit_pdf] {page_num}: page_records[0]={page_records[0]}", file=sys.stderr)
 
             #  fill_page 
             # :  page_records_start
@@ -4938,7 +4928,7 @@ def edit_pdf(input_path, output_path, records, site=None):
                             doc.update_stream(xref, new_stream_text.encode('latin-1'))
                             replaced_count += 1
                 
-                print(f"[INFO] LC Summary page: replaced {replaced_count} date(s) with {first_record_date}", file=sys.stderr)
+                print(f"[INFO] LC Summary page: replaced {replaced_count} date value(s)", file=sys.stderr)
         
         # Apply redactions for Pass and Length fields
         for rect in summary_redacts:
@@ -4991,7 +4981,7 @@ def edit_pdf(input_path, output_path, records, site=None):
                             color=(0, 0, 0)
                         )
                         printed_updated = True
-                        print(f"[INFO] Printed: {printed_text}", file=sys.stderr)
+                        print("[INFO] Printed timestamp updated", file=sys.stderr)
                         break
                 if printed_updated:
                     break
@@ -5003,7 +4993,7 @@ def edit_pdf(input_path, output_path, records, site=None):
         # :  clean_contents(),  ToUnicode 
         # summary_page.clean_contents()
 
-        print(f"[INFO] : Pass={pass_count}, Length={total_length_str}", file=sys.stderr)
+        print("[INFO] Summary values updated", file=sys.stderr)
         print(f"[INFO] : Page : {page_num + 1}", file=sys.stderr)
 
         # ()
@@ -5018,7 +5008,7 @@ def edit_pdf(input_path, output_path, records, site=None):
         # summary_page_idx 
         correct_page_num = summary_page_idx + 1  # 1-based 
         
-        print(f"[INFO] : Pass={pass_count}, Length={total_length_str}", file=sys.stderr)
+        print("[INFO] Summary values verified", file=sys.stderr)
         print(f"[INFO] : Page : {correct_page_num}", file=sys.stderr)
         
         #  PDF - 
@@ -5035,10 +5025,9 @@ def edit_pdf(input_path, output_path, records, site=None):
             'output_path': output_path
         }
         
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return {'error': str(e)}
+    except Exception:
+        print("[ERROR] PDF rendering failed", file=sys.stderr)
+        return {'error': 'PDF rendering failed'}
 
 
 def modify_pdf_precise(input_path: str, output_path: str, modifications: dict) -> dict:
@@ -5047,49 +5036,23 @@ def modify_pdf_precise(input_path: str, output_path: str, modifications: dict) -
     site = modifications.get('site', None)
     
     print(f"[PYTHON]  {len(records)} ", file=sys.stderr)
-    if records:
-        print(f"[PYTHON] : {records[0]}", file=sys.stderr)
-        print(f"[PYTHON] : {records[-1]}", file=sys.stderr)
-    
+
     if not records:
         return {'error': 'No records provided'}
     
     return edit_pdf(input_path, output_path, records, site)
 
 
-def main():
-    """Main function for CLI usage."""
-    if len(sys.argv) < 4:
-        print(json.dumps({'error': 'Usage: python pdf_editor.py <input_pdf> <output_pdf> <json_or_file>'}))
-        sys.exit(1)
-    
-    input_path = sys.argv[1]
-    output_path = sys.argv[2]
-    json_arg = sys.argv[3]
-    
-    try:
-        # JSON
-        if json_arg.startswith('{') or json_arg.startswith('['):
-            # JSON
-            modifications = json.loads(json_arg)
-        else:
-            # file or JSON 
-            try:
-                with open(json_arg, 'r', encoding='utf-8') as f:
-                    modifications = json.load(f)
-            except (FileNotFoundError, IOError):
-                # file or JSON JSON
-                modifications = json.loads(json_arg)
-        
-        result = modify_pdf_precise(input_path, output_path, modifications)
-        print(json.dumps(result))
-    except json.JSONDecodeError as e:
-        print(json.dumps({'error': 'Invalid JSON: ' + str(e)}))
-        sys.exit(1)
-    except Exception as e:
-        print(json.dumps({'error': 'Error: ' + str(e)}))
-        sys.exit(1)
+def main(argv=None):
+    """Run the compatibility editor entry point through the shared protocol."""
+    editor_args = sys.argv[1:] if argv is None else argv
+    return run_editor_cli(
+        editor_args,
+        modify_pdf_precise,
+        stdout=sys.stdout,
+        stderr=sys.stderr,
+    )
 
 
 if __name__ == '__main__':
-    main()
+    raise SystemExit(main())
