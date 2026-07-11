@@ -44,8 +44,11 @@ test('approved dependency baseline is exact', async () => {
     'tar@7.5.15': '7.5.19',
     tmp: '0.2.7',
     'form-data': '4.0.6',
-    undici: '6.27.0',
+    '@electron/get@5.0.0>undici': '7.28.0',
+    'jsdom@29.1.1>undici': '7.28.0',
+    'node-gyp@12.3.0>undici': '6.27.0',
   });
+  expect(packageJson.pnpm?.overrides).not.toHaveProperty('undici');
   expect(packageJson.packageManager).toBe('pnpm@9.15.9');
   expect(packageJson.engines.node).toBe('>=24.0.0 <25');
   expect(packageJson.engines.pnpm).toBe('9.15.9');
@@ -70,6 +73,49 @@ test('approved dependency baseline is exact', async () => {
   expect(createHash('sha256').update(tarball).digest('hex')).toBe(
     '8dc73fc3b00203e72d176e85b50938627c7b086e607c682e8d3c22c02bb99fe8',
   );
+});
+
+function snapshotDependency(
+  lockfile: string,
+  packageKey: string,
+  dependency: string,
+): string | undefined {
+  const lines = lockfile.split(/\r?\n/);
+  const quotedKey = `  '${packageKey}':`;
+  const plainKey = `  ${packageKey}:`;
+  let inSnapshots = false;
+  let inPackage = false;
+
+  for (const line of lines) {
+    if (line === 'snapshots:') {
+      inSnapshots = true;
+      continue;
+    }
+    if (!inSnapshots) continue;
+    if (/^[^\s]/.test(line)) break;
+
+    if (/^  \S/.test(line)) {
+      inPackage = line === quotedKey || line === plainKey;
+      continue;
+    }
+    if (!inPackage) continue;
+
+    const match = line.match(new RegExp(`^      ${dependency}: (.+)$`));
+    if (match) return match[1];
+  }
+
+  return undefined;
+}
+
+test('undici lock topology follows supported consumer ranges', async () => {
+  const lockfile = await readFile('pnpm-lock.yaml', 'utf8');
+
+  expect(snapshotDependency(lockfile, 'jsdom@29.1.1(@noble/hashes@2.2.0)', 'undici'))
+    .toBe('7.28.0');
+  expect(snapshotDependency(lockfile, '@electron/get@5.0.0', 'undici'))
+    .toBe('7.28.0');
+  expect(snapshotDependency(lockfile, 'node-gyp@12.3.0', 'undici'))
+    .toBe('6.27.0');
 });
 
 test('package store and compiler policy is strict', async () => {

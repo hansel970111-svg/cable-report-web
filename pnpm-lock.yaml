@@ -13,6 +13,8 @@ overrides:
   fast-uri: 3.1.2
   flatted: 3.4.2
   form-data: 4.0.6
+  '@electron/get@5.0.0>undici': 7.28.0
+  jsdom@29.1.1>undici: 7.28.0
   js-yaml@4.1.1: 4.3.0
   lodash: 4.18.1
   minimatch@3.1.2: 3.1.4
@@ -22,7 +24,7 @@ overrides:
   postcss: 8.5.16
   tar@7.5.15: 7.5.19
   tmp: 0.2.7
-  undici: 6.27.0
+  node-gyp@12.3.0>undici: 6.27.0
 
 importers:
 
@@ -4816,6 +4818,10 @@ packages:
     resolution: {integrity: sha512-YmfV3YnEDzXRC5lZ2jWtWWHKGUm1zIt8AhesR1tens+HTNv+YZlN/dp6G727LOvMJ8xjP9Be7Y2Sdr96LDm+pg==}
     engines: {node: '>=18.17'}
 
+  undici@7.28.0:
+    resolution: {integrity: sha512-cRZYrTDwWznlnRiPjggAGxZXanty6M8RV1ff8Wm4LWXBp7/IG8v5DnOm74DtUBp9OONpK75YlPnIjQqX0dBDtA==}
+    engines: {node: '>=20.18.1'}
+
   universalify@0.1.2:
     resolution: {integrity: sha512-rBJeI5CXAlmy1pV+617WB9J63U6XcazHHF2f2dbJix4XzpUF0RS3Zbj0FGIOCAva5P/d/GBOYaACQ1w+0azUkg==}
     engines: {node: '>= 4.0.0'}
@@ -5292,7 +5298,7 @@ snapshots:
       semver: 7.7.4
       sumchecker: 3.0.1
     optionalDependencies:
-      undici: 6.27.0
+      undici: 7.28.0
     transitivePeerDependencies:
       - supports-color
 
@@ -8624,7 +8630,7 @@ snapshots:
       saxes: 6.0.0
       symbol-tree: 3.2.4
       tough-cookie: 6.0.2
-      undici: 6.27.0
+      undici: 7.28.0
       w3c-xmlserializer: 5.0.0
       webidl-conversions: 8.0.1
       whatwg-mimetype: 5.0.0
@@ -9922,6 +9928,8 @@ snapshots:
   undici-types@7.18.2: {}
 
   undici@6.27.0: {}
+
+  undici@7.28.0: {}
 
   universalify@0.1.2: {}
 
