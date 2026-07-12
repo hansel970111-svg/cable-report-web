@@ -31,6 +31,7 @@ let mainWindow = null;
 let nextServer = null;
 let checkingForUpdates = false;
 let unregisterSavePdfHandler = null;
+let versioningModulePromise = null;
 
 const desktopSessionToken = createDesktopSessionToken();
 process.env.CABLE_DESKTOP_TOKEN = desktopSessionToken;
@@ -109,25 +110,19 @@ function waitForPort(port, timeoutMs = 30000) {
 }
 
 function normalizeVersion(version) {
-  const text = String(version || '')
+  return String(version || '')
     .trim()
-    .replace(/^v/i, '')
-    .split(/[+-]/)[0];
-  const match = text.match(/\d+(?:\.\d+)*/);
-  return match ? match[0] : '';
+    .replace(/^v/i, '');
 }
 
-function compareVersions(left, right) {
-  const leftParts = normalizeVersion(left).split('.').map(value => Number.parseInt(value, 10) || 0);
-  const rightParts = normalizeVersion(right).split('.').map(value => Number.parseInt(value, 10) || 0);
-  const length = Math.max(leftParts.length, rightParts.length);
-
-  for (let i = 0; i < length; i++) {
-    const delta = (leftParts[i] || 0) - (rightParts[i] || 0);
-    if (delta !== 0) return delta;
+function loadVersioningModule() {
+  if (!versioningModulePromise) {
+    versioningModulePromise = import('../scripts/versioning.mjs').catch(error => {
+      versioningModulePromise = null;
+      throw error;
+    });
   }
-
-  return 0;
+  return versioningModulePromise;
 }
 
 function getJson(url) {
@@ -202,6 +197,7 @@ async function checkForUpdates({ manual = false } = {}) {
   checkingForUpdates = true;
 
   try {
+    const { compareAppVersions } = await loadVersioningModule();
     const release = await getJson(LATEST_RELEASE_API);
     const currentVersion = app.getVersion();
     const latestTag = release.tag_name || release.name || '';
@@ -211,7 +207,7 @@ async function checkForUpdates({ manual = false } = {}) {
       throw new Error('最新版没有有效版本号');
     }
 
-    if (compareVersions(latestVersion, currentVersion) <= 0) {
+    if (compareAppVersions(latestVersion, currentVersion) <= 0) {
       if (manual) {
         await showMessageBox({
           type: 'info',
