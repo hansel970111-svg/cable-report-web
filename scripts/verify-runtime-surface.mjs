@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import { builtinModules } from 'node:module';
 import path from 'node:path';
@@ -6,26 +7,46 @@ import process from 'node:process';
 import ts from 'typescript';
 
 const workspace = process.cwd();
-const sourceRoot = path.join(workspace, 'src');
 const packageJson = JSON.parse(fs.readFileSync(path.join(workspace, 'package.json'), 'utf8'));
 const productionDependencies = new Set(Object.keys(packageJson.dependencies ?? {}));
+const developmentDependencies = new Set(Object.keys(packageJson.devDependencies ?? {}));
 const declaredDependencies = new Set([
   ...productionDependencies,
-  ...Object.keys(packageJson.devDependencies ?? {}),
+  ...developmentDependencies,
 ]);
 const nodeBuiltins = new Set(builtinModules.flatMap(name => [name, `node:${name}`]));
 const indirectRuntimeDependencies = new Set(['next', 'react', 'react-dom', 'xlsx', 'zod']);
+const platformProvidedImports = new Set(['electron']);
+const exactVersion = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
 const scriptExtensions = new Set(['.js', '.jsx', '.ts', '.tsx', '.mjs', '.cjs']);
 const styleExtensions = new Set(['.css', '.scss', '.sass']);
 
-function sourceFiles(directory) {
-  return fs.readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
-    const fullPath = path.join(directory, entry.name);
-    if (entry.isDirectory()) return sourceFiles(fullPath);
-    if (!entry.isFile() || entry.name.includes('.test.') || entry.name.includes('.spec.')) return [];
-    const extension = path.extname(entry.name);
-    return scriptExtensions.has(extension) || styleExtensions.has(extension) ? [fullPath] : [];
-  });
+function indexedSourceFiles() {
+  const result = spawnSync(
+    'git',
+    ['ls-files', '--cached', '-z', '--', 'src', 'electron', 'scripts'],
+    {
+      cwd: workspace,
+      encoding: 'buffer',
+      shell: false,
+      windowsHide: true,
+    },
+  );
+  if (result.error || result.status !== 0 || !Buffer.isBuffer(result.stdout)) {
+    console.error('Runtime source enumeration failed: Git index unavailable.');
+    process.exit(1);
+  }
+
+  return result.stdout
+    .toString('utf8')
+    .split('\0')
+    .filter(Boolean)
+    .filter(relativePath => (
+      !relativePath.includes('.test.') &&
+      !relativePath.includes('.spec.') &&
+      (scriptExtensions.has(path.extname(relativePath)) ||
+        styleExtensions.has(path.extname(relativePath)))
+    ));
 }
 
 function packageName(specifier) {
@@ -88,8 +109,14 @@ function styleImports(source) {
     .map(match => match[1]);
 }
 
-const importedPackages = new Set();
-for (const filePath of sourceFiles(sourceRoot)) {
+const productionImportedPackages = new Set();
+const toolImportedPackages = new Set();
+const verifiedPlatformProvidedImports = new Set();
+const invalidPlatformProvidedImports = new Set();
+const undeclaredProductionImports = new Set();
+const undeclaredToolImports = new Set();
+for (const relativePath of indexedSourceFiles()) {
+  const filePath = path.join(workspace, relativePath);
   const source = fs.readFileSync(filePath, 'utf8');
   const extension = path.extname(filePath);
   const specifiers = scriptExtensions.has(extension)
@@ -97,20 +124,74 @@ for (const filePath of sourceFiles(sourceRoot)) {
     : styleImports(source);
   for (const specifier of specifiers) {
     const importedPackage = packageName(specifier);
-    if (importedPackage) importedPackages.add(importedPackage);
+    if (!importedPackage) continue;
+
+    const isProductionScript = scriptExtensions.has(extension) && (
+      relativePath.startsWith('src/') || relativePath.startsWith('electron/')
+    );
+    if (isProductionScript) {
+      if (platformProvidedImports.has(importedPackage)) {
+        verifiedPlatformProvidedImports.add(importedPackage);
+        const version = packageJson.devDependencies?.[importedPackage];
+        if (
+          productionDependencies.has(importedPackage) ||
+          typeof version !== 'string' ||
+          !exactVersion.test(version)
+        ) {
+          invalidPlatformProvidedImports.add(importedPackage);
+        }
+      } else {
+        productionImportedPackages.add(importedPackage);
+        if (!productionDependencies.has(importedPackage)) {
+          undeclaredProductionImports.add(importedPackage);
+        }
+      }
+    } else {
+      toolImportedPackages.add(importedPackage);
+      if (!declaredDependencies.has(importedPackage)) {
+        undeclaredToolImports.add(importedPackage);
+      }
+      if (styleExtensions.has(extension) && productionDependencies.has(importedPackage)) {
+        productionImportedPackages.add(importedPackage);
+      }
+    }
   }
 }
 
-const undeclared = [...importedPackages]
-  .filter(name => !declaredDependencies.has(name))
-  .sort();
 const unused = [...productionDependencies]
-  .filter(name => !importedPackages.has(name) && !indirectRuntimeDependencies.has(name))
+  .filter(name => (
+    !productionImportedPackages.has(name) &&
+    !indirectRuntimeDependencies.has(name)
+  ))
   .sort();
+const approvedIndirectDependencies = new Set(
+  [...indirectRuntimeDependencies].filter(name => (
+    productionDependencies.has(name) && !productionImportedPackages.has(name)
+  )),
+);
+const coveredProductionDependencies = new Set([
+  ...productionImportedPackages,
+  ...approvedIndirectDependencies,
+]);
 
-if (undeclared.length || unused.length) {
-  if (undeclared.length) {
-    console.error(`Undeclared production imports: ${undeclared.join(', ')}`);
+if (
+  invalidPlatformProvidedImports.size ||
+  undeclaredProductionImports.size ||
+  undeclaredToolImports.size ||
+  unused.length
+) {
+  for (const importedPackage of [...invalidPlatformProvidedImports].sort()) {
+    console.error(
+      `Invalid platform-provided import: ${importedPackage} must be an exact devDependency.`,
+    );
+  }
+  if (undeclaredProductionImports.size) {
+    console.error(
+      `Undeclared production imports: ${[...undeclaredProductionImports].sort().join(', ')}`,
+    );
+  }
+  if (undeclaredToolImports.size) {
+    console.error(`Undeclared tool imports: ${[...undeclaredToolImports].sort().join(', ')}`);
   }
   if (unused.length) {
     console.error(`Unused production dependencies: ${unused.join(', ')}`);
@@ -119,6 +200,15 @@ if (undeclared.length || unused.length) {
 }
 
 console.log(
-  `Runtime surface verified: ${importedPackages.size} imported packages, ` +
-  `${productionDependencies.size} declared production dependencies.`,
+  `Runtime surface verified: ${coveredProductionDependencies.size} covered production ` +
+  `dependencies, ${productionDependencies.size} declared production dependencies ` +
+  `(${productionImportedPackages.size} imported, ` +
+  `${approvedIndirectDependencies.size} approved indirect).`,
 );
+console.log(`Tool/build surface verified: ${toolImportedPackages.size} imported packages.`);
+if (verifiedPlatformProvidedImports.size) {
+  console.log(
+    `Platform-provided imports verified: ` +
+    `${[...verifiedPlatformProvidedImports].sort().join(', ')}.`,
+  );
+}

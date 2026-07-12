@@ -3,7 +3,6 @@
  * 支持 macOS, Windows, Linux
  */
 
-import os from 'os';
 import path from 'path';
 import fs from 'fs';
 import { spawnSync } from 'child_process';
@@ -58,15 +57,6 @@ export function getAppPathCandidates(...segments: string[]): string[] {
 export function resolveAppPath(...segments: string[]): string {
   const candidates = getAppPathCandidates(...segments);
   return candidates.find(candidate => fs.existsSync(candidate)) || candidates[0];
-}
-
-/**
- * 获取跨平台临时目录
- * macOS/Linux: /tmp 或 /var/folders/...
- * Windows: C:\Users\...\AppData\Local\Temp
- */
-export function getTempDir(): string {
-  return os.tmpdir();
 }
 
 /**

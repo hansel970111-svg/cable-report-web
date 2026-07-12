@@ -1,4 +1,4 @@
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
@@ -28,5 +28,10 @@ describe('production API surface', () => {
       'src/app/api/generate-report/route.ts',
       'src/app/api/import-excel/route.ts',
     ]);
+  });
+
+  it('does not retain the unused platform temp-directory helper', () => {
+    const source = readFileSync(join(process.cwd(), 'src/lib/platform.ts'), 'utf8');
+    expect(source).not.toMatch(/\bgetTempDir\b/);
   });
 });
