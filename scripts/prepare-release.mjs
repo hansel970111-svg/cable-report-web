@@ -52,15 +52,14 @@ function command(runner, commandName, args, cwd) {
   }
 }
 
-async function writePackageAtomically(packagePath, packageJson, fileSystem) {
+async function writeTextAtomically(packagePath, text, fileSystem) {
   const directory = dirname(packagePath);
   const temporaryPath = join(
     directory,
     `.${basename(packagePath)}.release-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.tmp`,
   );
-  const nextText = `${JSON.stringify(packageJson, null, 2)}\n`;
   try {
-    await fileSystem.writeFile(temporaryPath, nextText, 'utf8');
+    await fileSystem.writeFile(temporaryPath, text, 'utf8');
     await fileSystem.rename(temporaryPath, packagePath);
   } catch (error) {
     try {
@@ -70,7 +69,33 @@ async function writePackageAtomically(packagePath, packageJson, fileSystem) {
     }
     throw error;
   }
-  return nextText;
+}
+
+function fetchAndAssertMainCurrent(git) {
+  try {
+    git(['fetch', 'origin', 'main', '--tags', '--prune']);
+  } catch (error) {
+    throw new ReleaseValidationError(
+      'TAG_FETCH_FAILED',
+      `Could not fetch origin/main and release tags: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+
+  const counts = git(['rev-list', '--left-right', '--count', 'main...origin/main']).stdout
+    .split(/\s+/)
+    .map(Number);
+  const remoteAhead = counts[1];
+  if (counts.length !== 2 || counts.some(value => !Number.isInteger(value)) || remoteAhead > 0) {
+    releaseError('MAIN_NOT_CURRENT', 'Local main is behind or diverged from origin/main.');
+  }
+}
+
+function sameTags(left, right) {
+  return left.length === right.length && left.every((tag, index) => tag === right[index]);
+}
+
+function errorMessage(error) {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function instructionsFor(version) {
@@ -103,22 +128,7 @@ export async function prepareRelease(options = {}) {
   if (git(['status', '--porcelain=v1', '--untracked-files=all']).stdout !== '') {
     releaseError('DIRTY_WORKTREE', 'The worktree or index has uncommitted changes.');
   }
-  try {
-    git(['fetch', 'origin', 'main', '--tags', '--prune']);
-  } catch (error) {
-    throw new ReleaseValidationError(
-      'TAG_FETCH_FAILED',
-      `Could not fetch origin/main and release tags: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
-
-  const counts = git(['rev-list', '--left-right', '--count', 'main...origin/main']).stdout
-    .split(/\s+/)
-    .map(Number);
-  const remoteAhead = counts[1];
-  if (counts.length !== 2 || counts.some(value => !Number.isInteger(value)) || remoteAhead > 0) {
-    releaseError('MAIN_NOT_CURRENT', 'Local main is behind or diverged from origin/main.');
-  }
+  fetchAndAssertMainCurrent(git);
 
   const packagePath = join(cwd, 'package.json');
   const originalText = await fileSystem.readFile(packagePath, 'utf8');
@@ -128,6 +138,13 @@ export async function prepareRelease(options = {}) {
   const currentTag = `v${currentVersion}`;
   const currentIsPublished = publishedTags.includes(currentTag);
 
+  if (refreshUnreleased && !parseCalVer(currentVersion)) {
+    throw new ReleaseValidationError(
+      'INVALID_CURRENT_VERSION',
+      `Cannot refresh historical package version ${currentVersion}; refresh requires an untagged CalVer.`,
+      'Prepare a CalVer normally from the historical release; only an untagged CalVer can be refreshed.',
+    );
+  }
   if (refreshUnreleased && currentIsPublished) {
     releaseError('VERSION_COLLISION', `${currentTag} is published and cannot be refreshed.`);
   }
@@ -171,7 +188,11 @@ export async function prepareRelease(options = {}) {
     throw error;
   }
 
+  fetchAndAssertMainCurrent(git);
   const tagsImmediatelyBeforeWrite = listPublishedTags(git);
+  if (!sameTags(tagsImmediatelyBeforeWrite, publishedTags)) {
+    releaseError('VERSION_COLLISION', 'Release tag history changed during preparation.');
+  }
   if (tagsImmediatelyBeforeWrite.includes(`v${version}`)) {
     releaseError('VERSION_COLLISION', `Release tag v${version} appeared during preparation.`);
   }
@@ -189,14 +210,32 @@ export async function prepareRelease(options = {}) {
     packageJsonText: nextText,
   });
 
+  await writeTextAtomically(packagePath, nextText, fileSystem);
   if (runPostChecks) {
-    command(checkRunner, 'corepack', [
-      'pnpm', 'vitest', 'run', 'tests/release/versioning.test.ts',
-    ], cwd);
-    command(checkRunner, process.execPath, ['scripts/verify-dependency-policy.mjs'], cwd);
+    try {
+      command(
+        checkRunner,
+        process.execPath,
+        ['scripts/validate-release-version.mjs', '--prepared'],
+        cwd,
+      );
+      command(checkRunner, 'corepack', [
+        'pnpm', 'vitest', 'run', 'tests/release/versioning.test.ts',
+      ], cwd);
+      command(checkRunner, process.execPath, ['scripts/verify-dependency-policy.mjs'], cwd);
+    } catch (postcheckError) {
+      try {
+        await writeTextAtomically(packagePath, originalText, fileSystem);
+      } catch (rollbackError) {
+        const combined = new AggregateError(
+          [postcheckError, rollbackError],
+          `Release postcheck failed: ${errorMessage(postcheckError)}\nRollback failed: ${errorMessage(rollbackError)}`,
+        );
+        throw combined;
+      }
+      throw postcheckError;
+    }
   }
-
-  await writePackageAtomically(packagePath, nextPackage, fileSystem);
   const instructions = instructionsFor(version);
   return { version, instructions };
 }

@@ -132,27 +132,60 @@ function berlinDateParts(date) {
   return values;
 }
 
-function validateArtifacts(version, artifacts = {}) {
-  if (!artifacts || typeof artifacts !== 'object') return;
-  const directVersions = [
-    artifacts.uiVersion,
-    artifacts.electronVersion,
-    artifacts.macShortVersion,
-    artifacts.windowsVersion,
-  ].filter(value => value !== undefined);
-  if (directVersions.some(value => value !== version)) {
+const REQUIRED_ARTIFACT_FIELDS = Object.freeze([
+  'uiVersion',
+  'electronVersion',
+  'macShortVersion',
+  'macBundleVersion',
+  'windowsVersion',
+  'artifactNames',
+]);
+
+function failArtifact(message) {
+  releaseError('VERSION_NOT_IN_ARTIFACT', message);
+}
+
+function hasVersionToken(filename, version) {
+  const escaped = version.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(?:^|[^0-9A-Za-z])${escaped}(?=$|[^0-9A-Za-z])`).test(filename);
+}
+
+function validateArtifacts(version, artifacts, required) {
+  if (artifacts === undefined && !required) return false;
+  if (!artifacts || typeof artifacts !== 'object' || Array.isArray(artifacts)) {
+    failArtifact('Complete consumer and artifact evidence is required.');
+  }
+  const missing = REQUIRED_ARTIFACT_FIELDS.filter(field => !(field in artifacts));
+  if (missing.length > 0) {
+    failArtifact(`Artifact evidence is incomplete; missing: ${missing.join(', ')}.`);
+  }
+  const directFields = [
+    'uiVersion',
+    'electronVersion',
+    'macShortVersion',
+    'windowsVersion',
+  ];
+  if (directFields.some(field => typeof artifacts[field] !== 'string' || artifacts[field] === '')) {
+    failArtifact('Consumer version evidence must contain non-empty strings.');
+  }
+  if (directFields.some(field => artifacts[field] !== version)) {
     releaseError('VERSION_NOT_IN_ARTIFACT', 'An artifact metadata version differs from package.json.');
   }
-  if (artifacts.macBundleVersion !== undefined
-      && artifacts.macBundleVersion !== toMacBundleVersion(version)) {
+  const expectedMacBundleVersion = version === '0.1.1' ? version : toMacBundleVersion(version);
+  if (typeof artifacts.macBundleVersion !== 'string'
+      || artifacts.macBundleVersion === ''
+      || artifacts.macBundleVersion !== expectedMacBundleVersion) {
     releaseError('VERSION_NOT_IN_ARTIFACT', 'The macOS CFBundleVersion does not match the approved mapping.');
   }
-  if (artifacts.artifactNames !== undefined) {
-    if (!Array.isArray(artifacts.artifactNames)
-        || artifacts.artifactNames.some(name => typeof name !== 'string' || !name.includes(version))) {
-      releaseError('VERSION_NOT_IN_ARTIFACT', 'An artifact filename does not contain the package version.');
-    }
+  if (!Array.isArray(artifacts.artifactNames)
+      || artifacts.artifactNames.length === 0
+      || artifacts.artifactNames.some(name => typeof name !== 'string' || name === '')) {
+    failArtifact('Artifact filename evidence must be a non-empty list of non-empty strings.');
   }
+  if (artifacts.artifactNames.some(name => !hasVersionToken(name, version))) {
+    failArtifact('An artifact filename does not contain an exact package-version token.');
+  }
+  return true;
 }
 
 export async function validateReleaseVersion(options = {}) {
@@ -177,8 +210,14 @@ export async function validateReleaseVersion(options = {}) {
     if (highest && compareAppVersions(version, highest) <= 0) {
       releaseError('CURRENT_VERSION_NOT_LATEST', `Prepared version ${version} is not above ${highest}.`);
     }
-    validateArtifacts(version, artifacts);
-    return { mode: 'prepared', version, highestPublishedVersion: highest };
+    const artifactsValidated = validateArtifacts(version, artifacts, false);
+    return {
+      mode: 'prepared',
+      version,
+      highestPublishedVersion: highest,
+      artifactsValidated,
+      consumerValidationPending: !artifactsValidated,
+    };
   }
 
   const headTagsOutput = git(['tag', '--points-at', 'HEAD', '--list', 'v*']).stdout;
@@ -210,8 +249,14 @@ export async function validateReleaseVersion(options = {}) {
     }
   }
 
-  validateArtifacts(version, artifacts);
-  return { mode: 'tag', version, tag: expectedTag, highestPublishedVersion: highest };
+  validateArtifacts(version, artifacts, true);
+  return {
+    mode: 'tag',
+    version,
+    tag: expectedTag,
+    highestPublishedVersion: highest,
+    artifactsValidated: true,
+  };
 }
 
 function formatFailure(error) {
@@ -228,6 +273,12 @@ async function main() {
     throw new Error(`Unknown argument: ${unknown[0]}`);
   }
   const result = await validateReleaseVersion({ prepared: args.includes('--prepared') });
+  if (result.mode === 'prepared' && !result.artifactsValidated) {
+    process.stdout.write(
+      `Validated prepared version prerequisites ${result.version}; consumer validation pending.\n`,
+    );
+    return;
+  }
   process.stdout.write(`Validated ${result.mode} release version ${result.version}.\n`);
 }
 

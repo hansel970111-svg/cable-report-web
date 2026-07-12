@@ -1,6 +1,7 @@
 import { execFileSync, spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import {
-  mkdtemp, readFile, rm, unlink, writeFile,
+  mkdtemp, readFile, readdir, rename, rm, unlink, writeFile,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -67,6 +68,39 @@ async function remoteCommit(origin: string, root: string, name: string) {
   git(peer, ['push', 'origin', 'main']);
 }
 
+async function pendingRemoteRelease(origin: string, root: string, version: string) {
+  const peer = join(root, `peer-${version}`);
+  git(root, ['clone', origin, peer]);
+  git(peer, ['config', 'user.name', 'Racing Publisher']);
+  git(peer, ['config', 'user.email', 'race@example.test']);
+  await writePackage(peer, version);
+  git(peer, ['add', 'package.json']);
+  git(peer, ['commit', '-m', `race release ${version}`]);
+  git(peer, ['tag', '-a', `v${version}`, '-m', `Release v${version}`], {
+    GIT_COMMITTER_DATE: '2026-07-10T12:00:00+02:00',
+  });
+  return {
+    publish: () => git(peer, ['push', 'origin', 'main', `v${version}`]),
+  };
+}
+
+async function pendingRemoteTag(origin: string, root: string, version: string) {
+  const peer = join(root, `tag-peer-${version}`);
+  git(root, ['clone', origin, peer]);
+  git(peer, ['config', 'user.name', 'Racing Tagger']);
+  git(peer, ['config', 'user.email', 'tag-race@example.test']);
+  git(peer, ['tag', '-a', `v${version}`, '-m', `Release v${version}`], {
+    GIT_COMMITTER_DATE: '2026-07-10T12:00:00+02:00',
+  });
+  return {
+    publish: () => git(peer, ['push', 'origin', `v${version}`]),
+  };
+}
+
+async function temporaryReleaseFiles(work: string) {
+  return (await readdir(work)).filter(name => name.includes('.package.json.release-'));
+}
+
 async function prepare(work: string, options: Record<string, unknown> = {}) {
   const { prepareRelease } = await import('../../scripts/prepare-release.mjs');
   return prepareRelease({ cwd: work, now: NOW, runPostChecks: false, ...options });
@@ -110,6 +144,66 @@ describe('prepare-release command with a real bare origin', () => {
     git(work, ['remote', 'set-url', 'origin', join(work, 'missing-origin.git')]);
 
     await expect(prepare(work)).rejects.toMatchObject({ code: 'TAG_FETCH_FAILED' });
+    expect(await packageText(work)).toBe(before);
+  });
+
+  it('refetches before writing and rejects a real remote release race without changing package bytes', async () => {
+    const { origin, root, work } = await fixture();
+    const race = await pendingRemoteRelease(origin, root, '2026.710.1');
+    const before = await packageText(work);
+    let fetches = 0;
+    const runner = (command: string, args: string[], options: Record<string, unknown>) => {
+      const result = spawnSync(command, args, options);
+      if (command === 'git' && args[0] === 'fetch') {
+        fetches += 1;
+        if (fetches === 1) race.publish();
+      }
+      return result;
+    };
+
+    await expect(prepare(work, { runner })).rejects.toMatchObject({ code: 'MAIN_NOT_CURRENT' });
+    expect(fetches).toBe(2);
+    expect(await packageText(work)).toBe(before);
+  });
+
+  it('rejects a remote-only tag race even when origin/main does not move', async () => {
+    const { origin, root, work } = await fixture();
+    const race = await pendingRemoteTag(origin, root, '2026.710.1');
+    const before = await packageText(work);
+    let fetches = 0;
+    const runner = (command: string, args: string[], options: Record<string, unknown>) => {
+      const result = spawnSync(command, args, options);
+      if (command === 'git' && args[0] === 'fetch') {
+        fetches += 1;
+        if (fetches === 1) race.publish();
+      }
+      return result;
+    };
+
+    await expect(prepare(work, { runner })).rejects.toMatchObject({
+      code: 'VERSION_COLLISION',
+    });
+    expect(fetches).toBe(2);
+    expect(await packageText(work)).toBe(before);
+  });
+
+  it('maps a second fetch failure to TAG_FETCH_FAILED and preserves package bytes', async () => {
+    const { work } = await fixture();
+    const before = await packageText(work);
+    let fetches = 0;
+    const runner = (command: string, args: string[], options: Record<string, unknown>) => {
+      const result = spawnSync(command, args, options);
+      if (command === 'git' && args[0] === 'fetch') {
+        fetches += 1;
+        if (fetches === 1) {
+          git(work, ['remote', 'set-url', 'origin', join(work, 'vanished-origin.git')]);
+        }
+      }
+      return result;
+    };
+
+    await expect(prepare(work, { runner })).rejects.toMatchObject({ code: 'TAG_FETCH_FAILED' });
+    expect(fetches).toBe(2);
     expect(await packageText(work)).toBe(before);
   });
 
@@ -200,6 +294,17 @@ describe('prepare-release command with a real bare origin', () => {
       .rejects.toMatchObject({ code: 'VERSION_COLLISION' });
   });
 
+  it('rejects refreshing historical 0.1.1 because refresh requires an untagged CalVer', async () => {
+    const { work } = await fixture();
+    const before = await packageText(work);
+
+    await expect(prepare(work, { refreshUnreleased: true })).rejects.toMatchObject({
+      code: 'INVALID_CURRENT_VERSION',
+      recovery: expect.stringContaining('CalVer'),
+    });
+    expect(await packageText(work)).toBe(before);
+  });
+
   it('detects a tag collision introduced after version calculation', async () => {
     const { work } = await fixture();
     let tagLists = 0;
@@ -226,6 +331,67 @@ describe('prepare-release command with a real bare origin', () => {
 
     await expect(prepare(work, { fileSystem })).rejects.toThrow('rename blocked');
     expect(await packageText(work)).toBe(before);
+    expect(await temporaryReleaseFiles(work)).toEqual([]);
+  });
+
+  it('runs all postchecks against the candidate on disk and keeps it after success', async () => {
+    const { work } = await fixture();
+    const calls: Array<{ command: string; args: string[]; version: string }> = [];
+    const checkRunner = (command: string, args: string[]) => {
+      calls.push({
+        command,
+        args,
+        version: JSON.parse(readFileSync(join(work, 'package.json'), 'utf8')).version,
+      });
+      return { status: 0, stdout: '', stderr: '' };
+    };
+
+    await expect(prepare(work, { runPostChecks: true, checkRunner }))
+      .resolves.toMatchObject({ version: '2026.710.1' });
+    expect(calls.map(call => [call.command, ...call.args])).toEqual([
+      [process.execPath, 'scripts/validate-release-version.mjs', '--prepared'],
+      ['corepack', 'pnpm', 'vitest', 'run', 'tests/release/versioning.test.ts'],
+      [process.execPath, 'scripts/verify-dependency-policy.mjs'],
+    ]);
+    expect(calls.every(call => call.version === '2026.710.1')).toBe(true);
+    expect(JSON.parse(await packageText(work)).version).toBe('2026.710.1');
+  });
+
+  it('atomically restores original bytes and cleans temporary files when a postcheck fails', async () => {
+    const { work } = await fixture();
+    const before = await packageText(work);
+    const seenVersions: string[] = [];
+    const checkRunner = () => {
+      seenVersions.push(JSON.parse(readFileSync(join(work, 'package.json'), 'utf8')).version);
+      return { status: 1, stdout: '', stderr: 'postcheck exploded' };
+    };
+
+    await expect(prepare(work, { runPostChecks: true, checkRunner }))
+      .rejects.toThrow('postcheck exploded');
+    expect(seenVersions).toEqual(['2026.710.1']);
+    expect(await packageText(work)).toBe(before);
+    expect(await temporaryReleaseFiles(work)).toEqual([]);
+  });
+
+  it('fails closed with both errors when postcheck rollback itself fails', async () => {
+    const { work } = await fixture();
+    let renames = 0;
+    const fileSystem = {
+      readFile,
+      writeFile,
+      unlink,
+      rename: async (source: string, destination: string) => {
+        renames += 1;
+        if (renames === 2) throw new Error('rollback blocked');
+        await rename(source, destination);
+      },
+    };
+    const checkRunner = () => ({ status: 1, stdout: '', stderr: 'postcheck exploded' });
+
+    await expect(prepare(work, { runPostChecks: true, checkRunner, fileSystem }))
+      .rejects.toThrow(/postcheck exploded[\s\S]*rollback blocked/);
+    expect(renames).toBe(2);
+    expect(await temporaryReleaseFiles(work)).toEqual([]);
   });
 
   it('invokes Git shell-free with argument arrays', async () => {

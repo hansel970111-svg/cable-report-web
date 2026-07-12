@@ -1,10 +1,11 @@
 import { execFileSync } from 'node:child_process';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 const roots: string[] = [];
+const validatorScript = resolve('scripts/validate-release-version.mjs');
 
 function git(cwd: string, args: string[], env?: Record<string, string | undefined>) {
   return execFileSync('git', args, {
@@ -51,6 +52,25 @@ function annotatedTag(work: string, version: string, date = '2026-07-10T12:00:00
   });
 }
 
+function artifactEvidence(version: string) {
+  let macBundleVersion = version;
+  const match = /^(\d{4})\.(\d+?)\.(\d+)$/.exec(version);
+  if (match) {
+    const monthDay = Number(match[2]);
+    const month = Math.floor(monthDay / 100);
+    const day = monthDay % 100;
+    macBundleVersion = `${(Number(match[1]) % 100) * 100 + month}.${day}.${match[3]}`;
+  }
+  return {
+    uiVersion: version,
+    electronVersion: version,
+    macShortVersion: version,
+    macBundleVersion,
+    windowsVersion: version,
+    artifactNames: [`Cable-Report-${version}.dmg`, `Cable-Report-${version}.exe`],
+  };
+}
+
 async function validate(work: string, options: Record<string, unknown> = {}) {
   const { validateReleaseVersion } = await import('../../scripts/validate-release-version.mjs');
   return validateReleaseVersion({ cwd: work, ...options });
@@ -73,7 +93,17 @@ describe('validate-release command with real Git tags', () => {
     await commitVersion(work, '2026.710.2');
 
     await expect(validate(work, { prepared: true }))
-      .resolves.toMatchObject({ mode: 'prepared', version: '2026.710.2' });
+      .resolves.toMatchObject({
+        mode: 'prepared',
+        version: '2026.710.2',
+        artifactsValidated: false,
+      });
+
+    const stdout = execFileSync(process.execPath, [validatorScript, '--prepared'], {
+      cwd: work,
+      encoding: 'utf8',
+    });
+    expect(stdout).toContain('Validated prepared version prerequisites 2026.710.2; consumer validation pending.');
   });
 
   it('rejects invalid prepared candidates, non-increasing candidates, and collisions', async () => {
@@ -101,10 +131,11 @@ describe('validate-release command with real Git tags', () => {
     await commitVersion(work, '2026.710.1');
     annotatedTag(work, '2026.710.1', '2026-07-10T23:30:00+02:00');
 
-    await expect(validate(work)).resolves.toMatchObject({
+    await expect(validate(work, { artifacts: artifactEvidence('2026.710.1') })).resolves.toMatchObject({
       mode: 'tag',
       tag: 'v2026.710.1',
       version: '2026.710.1',
+      artifactsValidated: true,
     });
   });
 
@@ -152,9 +183,37 @@ describe('validate-release command with real Git tags', () => {
     })).rejects.toMatchObject({ code: 'VERSION_NOT_IN_ARTIFACT' });
   });
 
+  it('fails closed when formal tag validation lacks complete non-empty artifact evidence', async () => {
+    const { work } = await fixture();
+    await commitVersion(work, '2026.710.1');
+    annotatedTag(work, '2026.710.1');
+
+    await expect(validate(work)).rejects.toMatchObject({ code: 'VERSION_NOT_IN_ARTIFACT' });
+    await expect(validate(work, { artifacts: {} }))
+      .rejects.toMatchObject({ code: 'VERSION_NOT_IN_ARTIFACT' });
+    await expect(validate(work, { artifacts: { uiVersion: '2026.710.1' } }))
+      .rejects.toMatchObject({ code: 'VERSION_NOT_IN_ARTIFACT' });
+  });
+
+  it('rejects artifact filename substring collisions but accepts complete exact evidence', async () => {
+    const { work } = await fixture();
+    await commitVersion(work, '2026.710.1');
+    annotatedTag(work, '2026.710.1');
+    const collision = {
+      ...artifactEvidence('2026.710.1'),
+      artifactNames: ['Cable-Report-2026.710.10.dmg'],
+    };
+
+    await expect(validate(work, { artifacts: collision }))
+      .rejects.toMatchObject({ code: 'VERSION_NOT_IN_ARTIFACT' });
+    await expect(validate(work, { artifacts: artifactEvidence('2026.710.1') }))
+      .resolves.toMatchObject({ artifactsValidated: true });
+  });
+
   it('keeps historical 0.1.1 valid only as a tagged migration baseline', async () => {
     const { work } = await fixture();
-    await expect(validate(work)).resolves.toMatchObject({ version: '0.1.1', tag: 'v0.1.1' });
+    await expect(validate(work, { artifacts: artifactEvidence('0.1.1') }))
+      .resolves.toMatchObject({ version: '0.1.1', tag: 'v0.1.1', artifactsValidated: true });
     await expect(validate(work, { prepared: true }))
       .rejects.toMatchObject({ code: 'INVALID_CURRENT_VERSION' });
   });
