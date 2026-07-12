@@ -174,14 +174,15 @@ def _resolved_imports(tree, module_name):
             imported_from = node.module or ""
 
         imported_from = imported_from.lower()
-        if imported_from:
-            imported_modules.add(imported_from)
         if imported_from == "pdf_engine":
-            imported_modules.update(
+            imported_names = {
                 f"pdf_engine.{alias.name.lower()}"
                 for alias in node.names
                 if alias.name != "*"
-            )
+            }
+            imported_modules.update(imported_names or {"pdf_engine"})
+        elif imported_from:
+            imported_modules.add(imported_from)
 
     return imported_modules
 
@@ -191,7 +192,7 @@ def _pdf_engine_imports(tree, module_name):
         imported
         for imported in _resolved_imports(tree, module_name)
         if imported == "pdf_engine" or imported.startswith("pdf_engine.")
-    } - {"pdf_engine"}
+    }
 
 
 def _assert_allowed_pdf_engine_imports(tree, module_name):
@@ -281,8 +282,8 @@ def test_signature_guard_rejects_default_mutation():
         )
 
 
-def test_signature_guard_rejects_annotation_mutation():
-    def cable_label_to_cid(text: str) -> str:
+def test_signature_guard_rejects_parameter_annotation_mutation():
+    def cable_label_to_cid(text: str):
         return text
 
     assert tuple(inspect.signature(cable_label_to_cid).parameters) == ("text",)
@@ -291,6 +292,17 @@ def test_signature_guard_rejects_annotation_mutation():
             cable_label_to_cid,
             EXPECTED_SIGNATURES["pdf_engine.cid"]["cable_label_to_cid"],
         )
+
+
+def test_signature_guard_rejects_return_annotation_mutation():
+    def cable_label_to_cid(text) -> str:
+        return text
+
+    actual = inspect.signature(cable_label_to_cid)
+    expected = EXPECTED_SIGNATURES["pdf_engine.cid"]["cable_label_to_cid"]
+    assert tuple(actual.parameters.values()) == tuple(expected.parameters.values())
+    with pytest.raises(AssertionError):
+        _assert_signature_contract(cable_label_to_cid, expected)
 
 
 @pytest.mark.parametrize(
@@ -319,3 +331,28 @@ def test_import_guard_rejects_relative_import_beyond_pdf_engine_package():
 
     with pytest.raises(AssertionError):
         _assert_allowed_pdf_engine_imports(tree, "pdf_engine.resources")
+
+
+@pytest.mark.parametrize("source", ["import pdf_engine", "from pdf_engine import *"])
+def test_import_guard_rejects_root_or_unknown_pdf_engine_dependency(source):
+    tree = ast.parse(source)
+
+    assert _pdf_engine_imports(tree, "pdf_engine.resources") == {"pdf_engine"}
+    with pytest.raises(AssertionError):
+        _assert_allowed_pdf_engine_imports(tree, "pdf_engine.resources")
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "from pdf_engine.layout import insert_text_with_font",
+        "from .layout import insert_text_with_font",
+    ],
+)
+def test_import_guard_keeps_legal_absolute_and_relative_inward_edges(source):
+    tree = ast.parse(source)
+
+    assert _pdf_engine_imports(tree, "pdf_engine.summary") == {
+        "pdf_engine.layout"
+    }
+    _assert_allowed_pdf_engine_imports(tree, "pdf_engine.summary")
