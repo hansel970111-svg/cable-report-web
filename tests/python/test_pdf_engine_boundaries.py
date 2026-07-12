@@ -35,6 +35,7 @@ EXPECTED = {
         "draw_non_lc_summary_boxes",
         "draw_final_footer",
     ],
+    "pdf_engine.editors.lc": ["edit_lc_pdf"],
 }
 
 EMPTY = inspect.Signature.empty
@@ -116,6 +117,15 @@ EXPECTED_SIGNATURES = {
             _parameter("footer_template_page"),
         ),
     },
+    "pdf_engine.editors.lc": {
+        "edit_lc_pdf": _signature(
+            _parameter("input_path", annotation="Path"),
+            _parameter("output_path", annotation="Path"),
+            _parameter("records", annotation="Sequence[CableRecordPayload]"),
+            _parameter("site", annotation="str | None"),
+            return_annotation="PdfEditResult",
+        ),
+    },
 }
 
 ALLOWED_PDF_ENGINE_IMPORTS = {
@@ -126,6 +136,12 @@ ALLOWED_PDF_ENGINE_IMPORTS = {
         "pdf_engine.cid",
         "pdf_engine.layout",
         "pdf_engine.resources",
+    },
+    "pdf_engine.editors.lc": {
+        "pdf_engine.cid",
+        "pdf_engine.layout",
+        "pdf_engine.summary",
+        "pdf_engine.types",
     },
 }
 
@@ -312,6 +328,7 @@ def test_signature_guard_rejects_return_annotation_mutation():
         ("pdf_engine.cid", "from . import layout", "pdf_engine.layout"),
         ("pdf_engine.layout", "from . import summary", "pdf_engine.summary"),
         ("pdf_engine.summary", "from . import editors", "pdf_engine.editors"),
+        ("pdf_engine.editors.lc", "from .. import dispatch", "pdf_engine.dispatch"),
     ],
 )
 def test_import_guard_resolves_and_rejects_relative_outward_edges(

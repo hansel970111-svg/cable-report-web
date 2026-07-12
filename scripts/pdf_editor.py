@@ -7,6 +7,7 @@ import os
 from datetime import datetime
 
 from pdf_engine.cli import run_editor_cli
+from pdf_engine.editors.lc import edit_lc_pdf
 from pdf_engine.resources import (
     CALIBRI_BOLD_FONT,
     CALIBRI_REGULAR_FONT,
@@ -40,7 +41,6 @@ from pdf_engine.cid import (
     _draw_dates_at_positions,
     _fit_cid_to_hex_length,
     _fix_f2_cmap_for_dates,
-    _fix_lc_template_date,
     _fix_missing_glyphs_in_font,
     _get_date_positions_after_redaction,
     _get_date_positions_before_redaction,
@@ -86,32 +86,19 @@ from pdf_engine.layout import (
     _RESULT_ICON_ROW_PITCH,
     _TEXTWRITER_FONT_CACHE,
     _apply_redacts_and_inserts,
-    _cover_rect,
     _draw_clear_rect,
     _draw_clear_rects,
     _draw_fail_result_icon,
     _draw_failed_result_icons,
     _draw_site_header,
-    _expanded_rect,
     _field_baseline,
     _field_size,
-    _format_lc_datetime,
-    _format_lc_label,
-    _format_pdf_value,
-    _get_lc_rows,
     _get_textwriter_font,
     _insert_text_items,
-    _iter_page_spans,
     _page_font_key,
-    _queue_lc_site_update,
-    _queue_page_number_update,
     _queue_site_header_update,
-    _redraw_lc_data_outline,
     _redraw_outline,
-    _replace_template_datetimes,
     _result_icon_rect,
-    _rewrite_lc_datetimes,
-    _row_clear_rect,
     _split_pdf_datetime,
     _text_width_for_insert,
     clear_row_images,
@@ -436,57 +423,7 @@ def fill_page(page, records, start_idx, page_num, is_last_data_page=False):
 
 
 
-def _fill_lc_data_page(page, page_records, site, page_num):
-    rows = _get_lc_rows(page)
-    redacts = []
-    inserts = []
-
-    _queue_lc_site_update(page, site, redacts, inserts)
-    _queue_page_number_update(page, page_num, redacts, inserts)
-
-    for row_idx, row in enumerate(rows):
-        if row_idx >= len(page_records):
-            redacts.append(_row_clear_rect(row))
-            continue
-
-        record = page_records[row_idx]
-        values = {
-            "cable_label": _format_lc_label(record),
-            "limit": str(record.get("limit") or "Link Validation"),
-            "length": _format_pdf_value(record.get("length")),
-            "next_margin": _format_pdf_value(record.get("next_margin")),
-            "date_time": _format_lc_datetime(record),
-        }
-
-        for field_name in ["cable_label", "limit", "length", "next_margin", "date_time"]:
-            if field_name == "date_time":
-                continue
-            field = row.get(field_name)
-            if not field:
-                continue
-            redacts.append(_expanded_rect(field["bbox"], 1.2, 1.0))
-            baseline = field["origin"][1] if field.get("origin") else field["bbox"][3]
-            inserts.append({
-                "x": field["bbox"][0],
-                "y": baseline,
-                "text": values[field_name],
-                "size": field["size"],
-                "font": "calibri",
-            })
-
-    for rect in redacts:
-        _cover_rect(page, rect)
-
-    _insert_text_items(page, inserts)
-    _replace_template_datetimes(page, page_records)
-    _rewrite_lc_datetimes(page, rows, page_records)
-    _redraw_lc_data_outline(page)
-    _draw_failed_result_icons(page, page_records, "lc")
-    return len(page_records)
-
-
 from pdf_engine.summary import (
-    _clear_summary_body,
     _draw_export_logo,
     _draw_lc_fx_icon,
     _draw_media_icon,
@@ -502,10 +439,8 @@ from pdf_engine.summary import (
     _render_footer_logo_stream,
     _row_baseline,
     _row_bottom_padding,
-    _safe_float,
     _summary_rows_capacity,
     draw_final_footer as _draw_final_footer,
-    draw_lc_summary_boxes as _draw_lc_summary_boxes,
     draw_non_lc_summary_boxes as _draw_non_lc_summary_boxes,
 )
 
@@ -692,140 +627,6 @@ def edit_non_lc_pdf(input_path, output_path, records, site=None, template_kind='
         return {'error': 'PDF rendering failed'}
 
 
-def _fill_lc_summary_page(page, page_records, all_records, site, page_num):
-    redacts = []
-    inserts = []
-    rows = _get_lc_rows(page, max_y=440)
-    _queue_lc_site_update(page, site, redacts, inserts)
-
-    fail_count = sum(1 for record in all_records if str(record.get("result", "")).strip().upper() == "FAIL")
-    pass_count = len(all_records) - fail_count
-    total_length = sum(_safe_float(record.get("length")) for record in all_records)
-    total_length_str = _format_pdf_value(total_length)
-
-    if not page_records:
-        _clear_summary_body(page)
-        _draw_lc_summary_boxes(page, 55.0, site, pass_count, fail_count, total_length_str)
-        _draw_final_footer(page, page)
-        return
-
-    for row_idx, row in enumerate(rows):
-        if row_idx >= len(page_records):
-            redacts.append(_row_clear_rect(row))
-            continue
-
-        record = page_records[row_idx]
-        values = {
-            "cable_label": _format_lc_label(record),
-            "limit": str(record.get("limit") or "Link Validation"),
-            "length": _format_pdf_value(record.get("length")),
-            "next_margin": _format_pdf_value(record.get("next_margin")),
-            "date_time": _format_lc_datetime(record),
-        }
-
-        for field_name in ["cable_label", "limit", "length", "next_margin", "date_time"]:
-            if field_name == "date_time":
-                continue
-            field = row.get(field_name)
-            if not field:
-                continue
-            redacts.append(_expanded_rect(field["bbox"], 1.2, 1.0))
-            baseline = field["origin"][1] if field.get("origin") else field["bbox"][3]
-            inserts.append({
-                "x": field["bbox"][0],
-                "y": baseline,
-                "text": values[field_name],
-                "size": field["size"],
-                "font": "calibri",
-            })
-
-    if page_records:
-        last_row = rows[len(page_records) - 1]
-        data_bottom_y = last_row["baseline"] + 8.53
-    else:
-        data_bottom_y = 110.0
-
-    first_summary_top = data_bottom_y + 6.23
-
-    # Remove the unused lower part of the original data rectangle and the old
-    # fixed-position summary boxes. They will be redrawn immediately below the
-    # final populated row.
-    redacts.append(fitz.Rect(8.5, data_bottom_y - 0.4, 576.5, 523.5))
-
-    spans = _iter_page_spans(page)
-    for span in spans:
-        text = span["text"]
-        baseline = span["origin"][1] if span.get("origin") else span["bbox"][3]
-
-        if text.startswith("Printed:"):
-            printed_text = f"Printed: {datetime.now().strftime('%Y/%m/%d %H:%M:%S')}"
-            redacts.append(_expanded_rect(span["bbox"], 2.0, 1.0))
-            inserts.append({
-                "x": span["bbox"][0],
-                "y": baseline,
-                "text": printed_text,
-                "size": span["size"],
-                "font": "calibri-bold",
-            })
-
-    _apply_redacts_and_inserts(page, redacts, inserts)
-    _replace_template_datetimes(page, page_records)
-    _rewrite_lc_datetimes(page, rows, page_records)
-    _redraw_lc_data_outline(page, data_bottom_y)
-    _draw_failed_result_icons(page, page_records, "lc")
-    _draw_lc_summary_boxes(page, first_summary_top, site, pass_count, fail_count, total_length_str)
-    _draw_final_footer(page, page)
-
-
-def edit_lc_pdf(input_path, output_path, records, site=None):
-    """Fill the LC template without using MPO/Cat5e column assumptions."""
-    try:
-        template_doc = fitz.open(input_path)
-        _fix_lc_template_date(template_doc)
-        doc = fitz.open()
-
-        rows_per_page = len(_get_lc_rows(template_doc[0]))
-        rows_per_page = max(rows_per_page, 1)
-        summary_rows = len(_get_lc_rows(template_doc[-1], max_y=440))
-        summary_rows = max(summary_rows, 1)
-        total_records = len(records)
-        template_data_pages = max(1, len(template_doc) - 1)
-        data_pages_needed = max(0, (max(0, total_records - summary_rows) + rows_per_page - 1) // rows_per_page)
-        summary_start_idx = min(total_records, data_pages_needed * rows_per_page)
-        summary_records = records[summary_start_idx:]
-
-        print(f"[INFO] : LC", file=sys.stderr)
-        print(f"[INFO] LC rows/page: {rows_per_page}", file=sys.stderr)
-        print(f"[INFO] LC summary rows/page: {summary_rows}", file=sys.stderr)
-        print(f"[INFO] LC data pages needed before summary: {data_pages_needed}", file=sys.stderr)
-
-        for page_idx in range(data_pages_needed):
-            source_page = min(page_idx, template_data_pages - 1)
-            doc.insert_pdf(template_doc, from_page=source_page, to_page=source_page)
-            page = doc[-1]
-            start = page_idx * rows_per_page
-            page_records = records[start:start + rows_per_page]
-            _fill_lc_data_page(page, page_records, site, page_idx + 1)
-
-        doc.insert_pdf(template_doc, from_page=len(template_doc) - 1, to_page=len(template_doc) - 1)
-        _fill_lc_summary_page(doc[-1], summary_records, records, site, data_pages_needed + 1)
-
-        _save_pdf_compact(doc, output_path)
-        doc.close()
-        template_doc.close()
-
-        return {
-            'success': True,
-            'method': 'lc_template_fill',
-            'records_processed': total_records,
-            'pages_used': data_pages_needed + 1,
-            'output_path': output_path
-        }
-    except Exception:
-        print("[ERROR] PDF rendering failed", file=sys.stderr)
-        return {'error': 'PDF rendering failed'}
-
-
 def edit_pdf(input_path, output_path, records, site=None):
     """Edit PDF template with test records.
 
@@ -843,7 +644,14 @@ def edit_pdf(input_path, output_path, records, site=None):
         template_kind = detect_template_kind(template_doc)
         if template_kind == 'lc':
             template_doc.close()
-            return edit_lc_pdf(input_path, output_path, records, site)
+            result = edit_lc_pdf(input_path, output_path, records, site)
+            return {
+                'success': True,
+                'method': 'lc_template_fill',
+                'records_processed': result.records,
+                'pages_used': result.pages,
+                'output_path': output_path
+            }
         if template_kind in ('mpo', 'cat5e'):
             template_doc.close()
             return edit_non_lc_pdf(input_path, output_path, records, site, template_kind)
@@ -873,11 +681,6 @@ def edit_pdf(input_path, output_path, records, site=None):
             if has_data_rows:
                 template_data_pages = i + 1  # (0, +1)
                 print(f"[DEBUG] {i} (template_data_pages={template_data_pages})", file=sys.stderr)
-
-        # Fix corrupted date Tj in template_doc page 1 (if LC template)
-        # Page 1 of LC template has corrupted date Tj (37 chars) instead of correct 45 chars
-        # This is a template issue that needs to be fixed before inserting
-        _fix_lc_template_date(template_doc)
 
         # 
         doc.insert_pdf(template_doc)
