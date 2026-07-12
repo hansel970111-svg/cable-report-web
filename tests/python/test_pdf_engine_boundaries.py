@@ -495,6 +495,171 @@ def test_non_lc_shared_mechanics_are_defined_in_exactly_one_module():
     }
 
 
+_TEMPLATE_KINDS = {"cat5e", "mpo", "lc"}
+_TEMPLATE_EDITORS = {"edit_cat5e_pdf", "edit_mpo_pdf", "edit_lc_pdf"}
+
+
+def _referenced_editor_names(node):
+    references = set()
+    for nested in ast.walk(node):
+        if isinstance(nested, ast.Name):
+            name = nested.id
+        elif isinstance(nested, ast.Attribute):
+            name = nested.attr
+        else:
+            continue
+        if name in _TEMPLATE_EDITORS:
+            references.add(name)
+    return references
+
+
+def _called_editor_names(statements):
+    calls = set()
+    for statement in statements:
+        for nested in ast.walk(statement):
+            if not isinstance(nested, ast.Call):
+                continue
+            if isinstance(nested.func, ast.Name):
+                name = nested.func.id
+            elif isinstance(nested.func, ast.Attribute):
+                name = nested.func.attr
+            else:
+                continue
+            if name in _TEMPLATE_EDITORS:
+                calls.add(name)
+    return calls
+
+
+def _literal_template_kinds(node):
+    return {
+        nested.value
+        for nested in ast.walk(node)
+        if isinstance(nested, ast.Constant)
+        and isinstance(nested.value, str)
+        and nested.value in _TEMPLATE_KINDS
+    }
+
+
+def _is_complete_dict_switch(node):
+    if not isinstance(node, ast.Dict):
+        return False
+    key_kinds = set()
+    editor_references = set()
+    for key, value in zip(node.keys, node.values, strict=True):
+        if isinstance(key, ast.Constant) and key.value in _TEMPLATE_KINDS:
+            key_kinds.add(key.value)
+        editor_references.update(_referenced_editor_names(value))
+    return key_kinds == _TEMPLATE_KINDS and editor_references == _TEMPLATE_EDITORS
+
+
+def _is_complete_if_switch(node):
+    if not isinstance(node, ast.If):
+        return False
+    branch_kinds = set()
+    editor_calls = set()
+    branch = node
+    while isinstance(branch, ast.If):
+        branch_kinds.update(_literal_template_kinds(branch.test))
+        editor_calls.update(_called_editor_names(branch.body))
+        branch = (
+            branch.orelse[0]
+            if len(branch.orelse) == 1 and isinstance(branch.orelse[0], ast.If)
+            else None
+        )
+    return branch_kinds == _TEMPLATE_KINDS and editor_calls == _TEMPLATE_EDITORS
+
+
+def _is_complete_match_switch(node):
+    if not isinstance(node, ast.Match):
+        return False
+    branch_kinds = set()
+    editor_calls = set()
+    for case in node.cases:
+        branch_kinds.update(_literal_template_kinds(case.pattern))
+        editor_calls.update(_called_editor_names(case.body))
+    return branch_kinds == _TEMPLATE_KINDS and editor_calls == _TEMPLATE_EDITORS
+
+
+def _assert_no_template_switches_outside_dispatch(sources):
+    violations = []
+    for relative_path, source in sources.items():
+        if relative_path == "scripts/pdf_engine/dispatch.py":
+            continue
+        tree = ast.parse(source, filename=relative_path)
+        for node in ast.walk(tree):
+            if (
+                _is_complete_dict_switch(node)
+                or _is_complete_if_switch(node)
+                or _is_complete_match_switch(node)
+            ):
+                violations.append(f"{relative_path}:{node.lineno}")
+    assert violations == [], (
+        "secondary template editor switch outside dispatch: "
+        + ", ".join(violations)
+    )
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        """
+EDITORS = {
+    "cat5e": edit_cat5e_pdf,
+    "mpo": edit_mpo_pdf,
+    "lc": edit_lc_pdf,
+}
+""",
+        """
+def duplicate_switch(kind, input_path, output_path, records, site):
+    if kind == "cat5e":
+        return edit_cat5e_pdf(input_path, output_path, records, site)
+    elif kind == "mpo":
+        return edit_mpo_pdf(input_path, output_path, records, site)
+    elif kind == "lc":
+        return edit_lc_pdf(input_path, output_path, records, site)
+""",
+        """
+def duplicate_switch(kind, input_path, output_path, records, site):
+    match kind:
+        case "cat5e":
+            return edit_cat5e_pdf(input_path, output_path, records, site)
+        case "mpo":
+            return edit_mpo_pdf(input_path, output_path, records, site)
+        case "lc":
+            return edit_lc_pdf(input_path, output_path, records, site)
+""",
+    ],
+    ids=["dict-map", "if-chain", "match-branches"],
+)
+def test_unique_dispatch_guard_rejects_synthetic_secondary_switch(source):
+    with pytest.raises(AssertionError, match="secondary template editor switch"):
+        _assert_no_template_switches_outside_dispatch(
+            {"scripts/synthetic_duplicate.py": source}
+        )
+
+
+def test_unique_dispatch_guard_ignores_editor_names_that_are_only_strings():
+    source = """
+DOCUMENTATION = {
+    "cat5e": "edit_cat5e_pdf",
+    "mpo": "edit_mpo_pdf",
+    "lc": "edit_lc_pdf",
+}
+
+def describe_switch(kind):
+    if kind == "cat5e":
+        return "edit_cat5e_pdf"
+    elif kind == "mpo":
+        return "edit_mpo_pdf"
+    elif kind == "lc":
+        return "edit_lc_pdf"
+"""
+
+    _assert_no_template_switches_outside_dispatch(
+        {"scripts/synthetic_documentation.py": source}
+    )
+
+
 def test_dispatch_is_the_only_template_editor_switch():
     dispatch_path = ROOT / "scripts/pdf_engine/dispatch.py"
     tree = ast.parse(
@@ -518,6 +683,12 @@ def test_dispatch_is_the_only_template_editor_switch():
         "mpo": "edit_mpo_pdf",
         "lc": "edit_lc_pdf",
     }
+
+    production_sources = {
+        path.relative_to(ROOT).as_posix(): path.read_text(encoding="utf-8")
+        for path in sorted((ROOT / "scripts").rglob("*.py"))
+    }
+    _assert_no_template_switches_outside_dispatch(production_sources)
 
 
 def test_dispatch_is_the_only_production_template_detector_definition():
