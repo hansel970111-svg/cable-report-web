@@ -103,7 +103,7 @@ describe('verifyDesktopRequest', () => {
 
 describe('API auth boundary', () => {
   test('returns null when a direct route request is authorized', () => {
-    const request = new Request(`${expectedOrigin}/api/load-template`, {
+    const request = new Request(`${expectedOrigin}/api/generate-report`, {
       headers: {
         Origin: expectedOrigin,
         'X-Cable-Desktop-Token': expectedToken,
@@ -118,7 +118,7 @@ describe('API auth boundary', () => {
   });
 
   test('returns the stable error envelope for an unauthorized request', async () => {
-    const request = new Request(`${expectedOrigin}/api/load-template`, {
+    const request = new Request(`${expectedOrigin}/api/generate-report`, {
       headers: { Origin: expectedOrigin },
     });
     const response = requireDesktopApi(request, {

@@ -20,7 +20,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 sys.path.insert(0, str(ROOT / "tests/python"))
 
-import pdf_editor  # noqa: E402
+from pdf_engine.dispatch import edit_report  # noqa: E402
+from pdf_engine.resources import EMBED_INSERT_FONTS  # noqa: E402
 from pdf_golden import (  # noqa: E402
     GOLDEN_ROOT,
     RENDER_DPI,
@@ -36,7 +37,7 @@ _CLI_AUTHORIZATION = object()
 
 
 def _assert_generation_environment() -> None:
-    if pdf_editor.EMBED_INSERT_FONTS is not False:
+    if EMBED_INSERT_FONTS is not False:
         raise AssertionError(
             "CABLE_REPORT_EMBED_INSERT_FONTS must be unset/false for canonical PDF goldens"
         )
@@ -260,14 +261,16 @@ def update(cases, *, authorization=None) -> None:
             for case in cases:
                 case_stage = stage_root / case.name
                 pdf_path = stage_root / f"{case.name}.pdf"
-                result = pdf_editor.modify_pdf_precise(
-                    str(ROOT / case.template),
-                    str(pdf_path),
-                    {"site": case.site, "records": build_records(case)},
+                records = build_records(case)
+                result = edit_report(
+                    ROOT / case.template,
+                    pdf_path,
+                    records,
+                    case.site,
                 )
-                if result.get("success") is not True:
-                    raise AssertionError(f"PDF generation failed for {case.name}: {result}")
-                if result.get("pages_used") != case.expected_pages:
+                if result.output != pdf_path or result.records != len(records):
+                    raise AssertionError(f"PDF generation result mismatch for {case.name}: {result}")
+                if result.pages != case.expected_pages:
                     raise AssertionError(f"reported page count mismatch for {case.name}: {result}")
                 _assert_generated_pdf(pdf_path, case.expected_pages)
                 write_golden_candidate(case, pdf_path, case_stage)

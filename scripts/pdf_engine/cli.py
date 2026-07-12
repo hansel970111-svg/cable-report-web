@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 import re
+import sys
 from typing import Any, TextIO, TypeAlias
 
 import fitz
@@ -250,3 +251,9 @@ def run_editor_cli(
     }
     emit_result(result, stdout)
     return 0
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """Adapt process arguments and streams to the strict editor CLI."""
+    editor_args = sys.argv[1:] if argv is None else argv
+    return run_editor_cli(editor_args, stdout=sys.stdout, stderr=sys.stderr)

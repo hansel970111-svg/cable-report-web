@@ -188,7 +188,7 @@ def test_cli_uses_dispatch_when_no_test_editor_is_injected(monkeypatch, tmp_path
     )
 
 
-def test_legacy_compatibility_module_has_no_secondary_editor_or_switch_body():
+def test_compatibility_module_defines_no_local_behavior():
     module_path = ROOT / "scripts/pdf_editor.py"
     tree = ast.parse(
         module_path.read_text(encoding="utf-8"),
@@ -198,14 +198,14 @@ def test_legacy_compatibility_module_has_no_secondary_editor_or_switch_body():
         node.name for node in tree.body if isinstance(node, ast.FunctionDef)
     }
 
-    assert function_names == {"modify_pdf_precise", "main"}
+    assert function_names == set()
 
 
-def test_legacy_compatibility_module_reexports_field_position_helper():
+def test_compatibility_module_reexports_only_the_canonical_cli_entry():
     compatibility = importlib.import_module("pdf_editor")
-    layout = importlib.import_module("pdf_engine.layout")
+    cli = importlib.import_module("pdf_engine.cli")
 
-    assert compatibility.get_field_positions is layout.get_field_positions
+    assert compatibility.main is cli.main
 
 
 @pytest.mark.parametrize("template_kind", ["cat5e", "mpo", "lc"])

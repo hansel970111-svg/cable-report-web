@@ -12,7 +12,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from pdf_editor import modify_pdf_precise  # noqa: E402
+from pdf_engine.dispatch import edit_report  # noqa: E402
 
 
 CASES = [
@@ -215,12 +215,15 @@ def test_pass_and_fail_result_icons_are_rendered(
     tmp_path: Path,
 ) -> None:
     output = tmp_path / f"{kind}-result-icons.pdf"
-    result = modify_pdf_precise(
-        str(template),
-        str(output),
-        {"site": "M138-DE46", "records": _records(kind)},
+    records = _records(kind)
+    result = edit_report(
+        template,
+        output,
+        records,
+        "M138-DE46",
     )
-    assert result.get("success") is True, result
+    assert result.output == output
+    assert result.records == len(records)
 
     with fitz.open(output) as document:
         assert document.page_count == 1
@@ -243,12 +246,16 @@ def test_pass_and_fail_result_icons_are_rendered(
 def test_lc_data_page_renders_failed_result_icon(tmp_path: Path) -> None:
     template = ROOT / "assets/M138-DE46-D-P-cross-LC.pdf"
     output = tmp_path / "lc-cross-page-result-icons.pdf"
-    result = modify_pdf_precise(
-        str(template),
-        str(output),
-        {"site": "M138-DE46", "records": _records("lc", count=49)},
+    records = _records("lc", count=49)
+    result = edit_report(
+        template,
+        output,
+        records,
+        "M138-DE46",
     )
-    assert result.get("success") is True, result
+    assert result.output == output
+    assert result.pages == 2
+    assert result.records == len(records)
 
     with fitz.open(output) as document:
         assert document.page_count == 2

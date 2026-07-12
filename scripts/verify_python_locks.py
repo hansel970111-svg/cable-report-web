@@ -16,8 +16,6 @@ REQUIREMENT_PATTERN = re.compile(
 )
 APPROVED_RUNTIME = {
     "pymupdf": "1.26.7",
-    "pdfplumber": "0.11.10",
-    "reportlab": "5.0.0",
     "pyinstaller": "6.21.0",
     "pillow": "12.2.0",
 }

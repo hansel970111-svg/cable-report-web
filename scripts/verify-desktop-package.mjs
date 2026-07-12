@@ -125,20 +125,7 @@ const sharedWorkerFiles = [
   path.join(externalWorkerDir, `pdf_worker${workerExt}`),
 ];
 
-if (!sharedWorkerFiles.some(filePath => fs.existsSync(filePath) && fs.statSync(filePath).isFile())) {
-  const workerFiles = [
-    [`pdf_editor${workerExt}`, 'PDF editor worker'],
-    [`pdf_processor${workerExt}`, 'PDF processor worker'],
-  ];
-
-  for (const [fileName, description] of workerFiles) {
-    requireAnyFile([
-      path.join(appWorkerDir, fileName),
-      path.join(legacyAppWorkerDir, fileName),
-      path.join(externalWorkerDir, fileName),
-    ], description);
-  }
-}
+requireAnyFile(sharedWorkerFiles, 'shared PDF worker');
 
 const templateFiles = [
   ['assets/M138-DE46-OOB-Cat5e.pdf', 'Cat 5e template PDF'],

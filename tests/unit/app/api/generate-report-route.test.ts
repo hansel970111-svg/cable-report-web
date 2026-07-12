@@ -1,21 +1,11 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
-const { runPythonScriptMock } = vi.hoisted(() => ({
-  runPythonScriptMock: vi.fn(),
-}));
-
-vi.mock('@/lib/platform', async importOriginal => ({
-  ...await importOriginal<typeof import('@/lib/platform')>(),
-  runPythonScript: runPythonScriptMock,
-}));
-
 import type { ReportDraft } from '@/domain/report/model';
 import {
   createGenerateReportHandler,
   MAX_REPORT_BODY_BYTES,
 } from '@/server/pdf';
 import { POST as productionPost } from '@/app/api/generate-report/route';
-import { POST as compatibilityPost } from '@/app/api/modify-pdf/route';
 import { PdfJobError } from '@/server/pdf/errors';
 
 
@@ -117,7 +107,6 @@ async function expectApiError(
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllEnvs();
-  runPythonScriptMock.mockReset();
 });
 
 describe('generate-report authentication and body bounds', () => {
@@ -356,41 +345,5 @@ describe('generate-report result and error presentation', () => {
     });
     expect(serialized).not.toContain(name);
     expect(response.headers.has('X-Evil')).toBe(false);
-  });
-});
-
-describe('modify-pdf compatibility response', () => {
-  test('never returns a worker-provided error or absolute path', async () => {
-    const secret = '/private/cable-report-worker traceback SECRET-SITE';
-    runPythonScriptMock.mockResolvedValue({
-      stdout: `${JSON.stringify({ error: secret })}\n`,
-      stderr: '',
-    });
-    const response = await compatibilityPost(new Request(
-      `${ORIGIN}/api/modify-pdf`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          cableType: 'MPO',
-          site: 'M138-DE46',
-          records: [{
-            cable_number: '1',
-            limit: '200GBASE-SR10',
-            result: 'PASS',
-            length: 20,
-            next_margin: 10,
-            date_time: '10-07-2026 09:00:00 AM',
-            page: 1,
-          }],
-        }),
-      },
-    ) as never);
-    const serialized = await response.clone().text();
-
-    expect(response.status).toBe(500);
-    await expect(response.json()).resolves.toEqual({ error: 'Failed to modify PDF' });
-    expect(serialized).not.toContain(secret);
-    expect(serialized).not.toMatch(/private|traceback|SECRET-SITE/);
   });
 });

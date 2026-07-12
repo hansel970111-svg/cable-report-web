@@ -11,16 +11,12 @@ import sys
 ROOT = Path(__file__).resolve().parents[2]
 RUNTIME_REQUIREMENTS = [
     "PyMuPDF==1.26.7",
-    "pdfplumber==0.11.10",
-    "reportlab==5.0.0",
     "pyinstaller==6.21.0",
     "Pillow==12.2.0",
 ]
 DEV_REQUIREMENTS = ["-r requirements.txt", "pytest==9.0.3"]
 INSTALLED_VERSIONS = {
     "PyMuPDF": "1.26.7",
-    "pdfplumber": "0.11.10",
-    "reportlab": "5.0.0",
     "pyinstaller": "6.21.0",
     "Pillow": "12.2.0",
     "pytest": "9.0.3",
@@ -89,7 +85,7 @@ def test_installed_direct_versions_match_approved_inputs() -> None:
 
 
 def test_runtime_modules_import() -> None:
-    for module in ("fitz", "pdfplumber", "reportlab", "PyInstaller", "PIL", "pytest"):
+    for module in ("fitz", "PyInstaller", "PIL", "pytest"):
         assert importlib.import_module(module) is not None
 
 

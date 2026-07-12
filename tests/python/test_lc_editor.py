@@ -57,7 +57,6 @@ def test_lc_editor_has_stable_public_entry_point():
         "return": PdfEditResult,
     }
     assert importlib.import_module("pdf_engine.editors").edit_lc_pdf is function
-    assert importlib.import_module("pdf_editor").edit_lc_pdf is function
 
 
 def test_lc_editor_only_imports_shared_engine_modules_stdlib_and_fitz():

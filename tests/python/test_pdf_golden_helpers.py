@@ -19,9 +19,10 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-import pdf_editor  # noqa: E402
 import pdf_golden  # noqa: E402
 import update_pdf_goldens  # noqa: E402
+from pdf_engine import summary as pdf_summary  # noqa: E402
+from pdf_engine.dispatch import edit_report  # noqa: E402
 from pdf_golden import (  # noqa: E402
     APPROVED_CASE_NAMES,
     PRINTED_MASK_RECT,
@@ -43,12 +44,16 @@ def _tree_digest(path: Path) -> dict[str, str]:
 
 
 def _generate_case_pdf(case, output: Path) -> None:
-    result = pdf_editor.modify_pdf_precise(
-        str(ROOT / case.template),
-        str(output),
-        {"site": case.site, "records": build_records(case)},
+    records = build_records(case)
+    result = edit_report(
+        ROOT / case.template,
+        output,
+        records,
+        case.site,
     )
-    assert result.get("success") is True, result
+    assert result.output == output
+    assert result.pages == case.expected_pages
+    assert result.records == len(records)
 
 
 @pytest.fixture(scope="module")
@@ -446,10 +451,10 @@ def test_only_valid_printed_timestamp_is_normalized_and_masked(
     second_pdf = tmp_path / "printed-second.pdf"
     golden_dir = tmp_path / "cat5e-minimal"
     second_golden_dir = tmp_path / "second" / "cat5e-minimal"
-    monkeypatch.setattr(pdf_editor, "datetime", FirstClock)
+    monkeypatch.setattr(pdf_summary, "datetime", FirstClock)
     _generate_case_pdf(case, first_pdf)
     write_golden_candidate(case, first_pdf, golden_dir)
-    monkeypatch.setattr(pdf_editor, "datetime", SecondClock)
+    monkeypatch.setattr(pdf_summary, "datetime", SecondClock)
     _generate_case_pdf(case, second_pdf)
     write_golden_candidate(case, second_pdf, second_golden_dir)
 
@@ -745,7 +750,7 @@ def test_updater_refuses_ci_before_generating_anything(tmp_path: Path) -> None:
 
 
 def test_updater_rejects_noncanonical_font_environment(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(pdf_editor, "EMBED_INSERT_FONTS", True)
+    monkeypatch.setattr(update_pdf_goldens, "EMBED_INSERT_FONTS", True)
     with pytest.raises(AssertionError, match="CABLE_REPORT_EMBED_INSERT_FONTS"):
         update_pdf_goldens._assert_generation_environment()
 
@@ -810,7 +815,7 @@ def test_direct_update_requires_cli_authorization_and_rechecks_ci(
         raise AssertionError("generation must not run")
 
     monkeypatch.setattr(update_pdf_goldens, "GOLDEN_ROOT", fake_root)
-    monkeypatch.setattr(pdf_editor, "modify_pdf_precise", forbidden_generation)
+    monkeypatch.setattr(update_pdf_goldens, "edit_report", forbidden_generation)
     with pytest.raises(AssertionError, match="explicit CLI authorization"):
         update_pdf_goldens.update([case])
     assert calls == 0
@@ -848,7 +853,7 @@ def test_all_targets_are_preflighted_before_generation(
     monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
     monkeypatch.setattr(update_pdf_goldens, "GOLDEN_ROOT", fake_root)
     monkeypatch.setattr(update_pdf_goldens, "REVIEW_ROOT", tmp_path / "review")
-    monkeypatch.setattr(pdf_editor, "modify_pdf_precise", forbidden_generation)
+    monkeypatch.setattr(update_pdf_goldens, "edit_report", forbidden_generation)
 
     with pytest.raises(AssertionError, match="unmanaged"):
         update_pdf_goldens.update(

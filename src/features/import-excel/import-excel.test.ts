@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as XLSX from 'xlsx';
 
 import type { CableImportRow, CableType } from '@/domain/report/model';
-import { POST } from '@/app/api/upload-excel/route';
+import { POST } from '@/app/api/import-excel/route';
 import {
   excelStrategies,
   importExcel,
@@ -92,7 +92,7 @@ function uploadRequest(
   const formData = new FormData();
   formData.append('file', new Blob([arrayBuffer], { type: mimeType }), fileName);
   formData.append('cableType', cableType);
-  return new NextRequest('http://localhost/api/upload-excel', {
+  return new NextRequest('http://localhost/api/import-excel', {
     method: 'POST',
     headers: {
       'Content-Length': '1024',
@@ -489,7 +489,7 @@ describe('expansion and record limits', () => {
   );
 });
 
-describe('legacy upload route adapter', () => {
+describe('canonical import route', () => {
   beforeEach(() => {
     vi.stubEnv('CABLE_DESKTOP_ORIGIN', ROUTE_ORIGIN);
     vi.stubEnv('CABLE_DESKTOP_TOKEN', ROUTE_TOKEN);
@@ -500,15 +500,15 @@ describe('legacy upload route adapter', () => {
   });
 
   it.each([
-    ['cat5e-oob.xlsx', 'Cat 5e', XLSX_MIME, 'OOB'],
-    ['vertical.xlsx', 'Cat 5e (Vertical Cabling)', XLSX_MIME, 'Vertical Cabling'],
-    ['lc.xls', 'LC', XLS_MIME, 'LC'],
-    ['mpo.xlsx', 'MPO', XLSX_MIME, 'MPO'],
-  ])('maps %s to the legacy %s data source', async (
+    ['cat5e-oob.xlsx', 'Cat 5e', XLSX_MIME, 'cat5e-oob'],
+    ['vertical.xlsx', 'Cat 5e (Vertical Cabling)', XLSX_MIME, 'vertical-cabling'],
+    ['lc.xls', 'LC', XLS_MIME, 'lc'],
+    ['mpo.xlsx', 'MPO', XLSX_MIME, 'mpo'],
+  ])('maps %s to the canonical %s rule', async (
     fileName,
     cableType,
     mimeType,
-    dataSource,
+    rule,
   ) => {
     const response = await POST(uploadRequest(
       readFixtureBytes(fileName),
@@ -518,11 +518,11 @@ describe('legacy upload route adapter', () => {
     ));
 
     expect(response.status).toBe(200);
-    expect(response.headers.get('Deprecation')).toBe('true');
-    expect(await response.json()).toMatchObject({ dataSource });
+    expect(response.headers.get('Deprecation')).toBeNull();
+    expect(await response.json()).toMatchObject({ data: { metadata: { rule } } });
   });
 
-  it('preserves the current page fields and legacy source labels', async () => {
+  it('returns canonical rows with source provenance', async () => {
     const response = await POST(uploadRequest(
       readFixtureBytes('vertical.xlsx'),
       'vertical.xlsx',
@@ -532,23 +532,24 @@ describe('legacy upload route adapter', () => {
 
     expect(response.status).toBe(200);
     expect(body).toMatchObject({
-      success: true,
-      totalCount: 2,
-      cableType: 'Cat 5e (Vertical Cabling)',
-      sheetName: 'Vertical Cabling',
-      dataSource: 'Vertical Cabling',
-      filteredRows: [
-        {
-          cableNo: 'DE46-01-1', cableType: '红', length: 30, dateTime: null,
-          sourceLabel: null, bandwidth: null, rowIndex: 2,
-          sheetName: 'Vertical Cabling', qtyIndex: 1,
+      data: {
+        metadata: {
+          rule: 'vertical-cabling',
+          sheetNames: ['Vertical Cabling'],
         },
-        {
-          cableNo: 'DE46-01-2', cableType: '红', length: 30, dateTime: null,
-          sourceLabel: null, bandwidth: null, rowIndex: 2,
-          sheetName: 'Vertical Cabling', qtyIndex: 2,
-        },
-      ],
+        rows: [
+          {
+            cableNumber: 'DE46-01-1', cableTypeText: '红', length: 30, dateTime: null,
+            sourceLabel: null, bandwidth: null,
+            source: { rowNumber: 2, sheetName: 'Vertical Cabling', expansionIndex: 0 },
+          },
+          {
+            cableNumber: 'DE46-01-2', cableTypeText: '红', length: 30, dateTime: null,
+            sourceLabel: null, bandwidth: null,
+            source: { rowNumber: 2, sheetName: 'Vertical Cabling', expansionIndex: 1 },
+          },
+        ],
+      },
     });
   });
 
@@ -570,12 +571,12 @@ describe('legacy upload route adapter', () => {
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(body.sheetName).toBe('OOB A, OOB B');
-    expect(body.filteredRows.map((row: { sheetName: string }) => row.sheetName))
+    expect(body.data.metadata.sheetNames).toEqual(['OOB A', 'OOB B']);
+    expect(body.data.rows.map((row: { source: { sheetName: string } }) => row.source.sheetName))
       .toEqual(['OOB A', 'OOB B']);
   });
 
-  it('maps a known no-match import error to a safe legacy 400 envelope', async () => {
+  it('maps a known no-match import error to a safe 400 envelope', async () => {
     const response = await POST(uploadRequest(makeWorkbookBytes([
       ['OOB', [
         ['线缆类型', '线号', '线长'],
@@ -592,7 +593,7 @@ describe('legacy upload route adapter', () => {
         retryable: false,
       },
     });
-    expect(response.headers.get('Deprecation')).toBe('true');
+    expect(response.headers.get('Deprecation')).toBeNull();
   });
 
   it('returns a safe 400 error for an unsupported cable type', async () => {
@@ -628,14 +629,14 @@ describe('legacy upload route adapter', () => {
         field: 'file',
       },
     });
-    expect(response.headers.get('Deprecation')).toBe('true');
+    expect(response.headers.get('Deprecation')).toBeNull();
   });
 
   it('returns a stable 400 envelope when request form parsing fails', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
     try {
-      const response = await POST(new NextRequest('http://localhost/api/upload-excel', {
+      const response = await POST(new NextRequest('http://localhost/api/import-excel', {
         method: 'POST',
         headers: {
           'content-length': '128',
@@ -654,13 +655,13 @@ describe('legacy upload route adapter', () => {
           retryable: false,
         },
       });
-      expect(response.headers.get('Deprecation')).toBe('true');
+      expect(response.headers.get('Deprecation')).toBeNull();
     } finally {
       consoleError.mockRestore();
     }
   });
 
-  it('keeps authentication errors canonical and marks them deprecated', async () => {
+  it('keeps authentication errors canonical', async () => {
     const request = uploadRequest(
       readFixtureBytes('cat5e-oob.xlsx'),
       'cat5e-oob.xlsx',
@@ -671,7 +672,7 @@ describe('legacy upload route adapter', () => {
     const response = await POST(request);
 
     expect(response.status).toBe(401);
-    expect(response.headers.get('Deprecation')).toBe('true');
+    expect(response.headers.get('Deprecation')).toBeNull();
     await expect(response.json()).resolves.toMatchObject({
       error: { code: 'DESKTOP_TOKEN_REQUIRED', retryable: false },
     });

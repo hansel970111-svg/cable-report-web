@@ -81,7 +81,10 @@ const workers = [
       pyinstallerDataArg(path.join(workspace, 'fonts', 'LiberationSans-Regular.ttf'), 'fonts'),
       pyinstallerDataArg(path.join(workspace, 'fonts', 'LiberationSans-Bold.ttf'), 'fonts'),
     ],
-    hiddenImports: ['pdf_editor', 'pdf_processor'],
+    hiddenImports: [
+      'pdf_engine.cli', 'pdf_engine.dispatch',
+      'pdf_engine.editors.cat5e', 'pdf_engine.editors.mpo', 'pdf_engine.editors.lc',
+    ],
   },
 ];
 

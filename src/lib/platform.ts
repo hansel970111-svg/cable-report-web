@@ -6,10 +6,7 @@
 import os from 'os';
 import path from 'path';
 import fs from 'fs';
-import { execFile, spawnSync } from 'child_process';
-import { promisify } from 'util';
-
-const execFileAsync = promisify(execFile);
+import { spawnSync } from 'child_process';
 
 function uniquePaths(paths: Array<string | null | undefined>): string[] {
   return Array.from(new Set(paths.filter(Boolean) as string[]));
@@ -150,47 +147,6 @@ export function resolvePythonCommand(
   )) ?? candidates[0];
 }
 
-function getBundledWorker(scriptPath: string): { command: string; argsPrefix: string[] } | null {
-  const scriptName = path.basename(scriptPath, '.py');
-  const executableName = process.platform === 'win32' ? `${scriptName}.exe` : scriptName;
-  const sharedWorkerName = process.platform === 'win32' ? 'pdf_worker.exe' : 'pdf_worker';
-  const resourcePath = getElectronResourcesPath();
-
-  const envKey = scriptName === 'pdf_editor'
-    ? 'PDF_EDITOR_BIN'
-    : scriptName === 'pdf_processor'
-      ? 'PDF_PROCESSOR_BIN'
-      : '';
-
-  const candidates = [
-    envKey ? process.env[envKey] : null,
-    process.env.PDF_WORKER_DIR ? path.join(process.env.PDF_WORKER_DIR, executableName) : null,
-    resourcePath ? path.join(resourcePath, 'bin', executableName) : null,
-    path.join(getAppRoot(), 'worker-bin', executableName),
-    path.join(getAppRoot(), 'resources', 'bin', executableName),
-    path.join(process.cwd(), 'worker-bin', executableName),
-    path.join(process.cwd(), 'resources', 'bin', executableName),
-  ].filter(Boolean) as string[];
-
-  const directWorker = candidates.find(candidate => fs.existsSync(candidate));
-  if (directWorker) {
-    return { command: directWorker, argsPrefix: [] };
-  }
-
-  const sharedCandidates = [
-    process.env.PDF_WORKER_BIN,
-    process.env.PDF_WORKER_DIR ? path.join(process.env.PDF_WORKER_DIR, sharedWorkerName) : null,
-    resourcePath ? path.join(resourcePath, 'bin', sharedWorkerName) : null,
-    path.join(getAppRoot(), 'worker-bin', sharedWorkerName),
-    path.join(getAppRoot(), 'resources', 'bin', sharedWorkerName),
-    path.join(process.cwd(), 'worker-bin', sharedWorkerName),
-    path.join(process.cwd(), 'resources', 'bin', sharedWorkerName),
-  ].filter(Boolean) as string[];
-
-  const sharedWorker = sharedCandidates.find(candidate => fs.existsSync(candidate));
-  return sharedWorker ? { command: sharedWorker, argsPrefix: [scriptName] } : null;
-}
-
 export function getPythonEnv(): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ...process.env };
   const localDeps = path.join(getAppRoot(), '.codex_pydeps');
@@ -202,58 +158,4 @@ export function getPythonEnv(): NodeJS.ProcessEnv {
   }
 
   return env;
-}
-
-/**
- * 用参数数组运行 Python 脚本，避免 shell 引号、空格路径、反斜杠在 Windows 上出问题。
- */
-export async function runPythonScript(
-  scriptPath: string,
-  args: string[],
-  options: { maxBuffer?: number; cwd?: string } = {}
-) {
-  const bundledWorker = getBundledWorker(scriptPath);
-  if (bundledWorker) {
-    return execFileAsync(
-      bundledWorker.command,
-      [...bundledWorker.argsPrefix, ...args],
-      {
-        maxBuffer: options.maxBuffer ?? 10 * 1024 * 1024,
-        cwd: options.cwd,
-        env: getPythonEnv(),
-        windowsHide: true,
-      }
-    );
-  }
-
-  let lastError: unknown;
-
-  for (const candidate of getPythonCandidates()) {
-    try {
-      return await execFileAsync(
-        candidate.command,
-        [...candidate.argsPrefix, scriptPath, ...args],
-        {
-          maxBuffer: options.maxBuffer ?? 10 * 1024 * 1024,
-          cwd: options.cwd,
-          env: getPythonEnv(),
-          windowsHide: true,
-        }
-      );
-    } catch (error) {
-      const code = (error as NodeJS.ErrnoException).code;
-      lastError = error;
-      if (code !== 'ENOENT') break;
-    }
-  }
-
-  throw lastError;
-}
-
-/**
- * 创建项目内的临时目录路径
- */
-export function getProjectTempDir(projectPath: string): string {
-  const tempDir = path.join(projectPath, '.temp');
-  return tempDir;
 }
