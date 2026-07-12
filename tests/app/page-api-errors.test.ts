@@ -46,6 +46,6 @@ test('the renderer uses direct import and generation without a template request'
 
   expect(pageSource).toContain('<ReportEditor services={browserReportServices} />');
   expect(servicesSource).toContain("desktopFetch('/api/import-excel'");
-  expect(servicesSource).toContain("desktopFetch('/api/modify-pdf'");
+  expect(servicesSource).toContain("desktopFetch('/api/generate-report'");
   expect(rendererSource).not.toContain('/api/load-template');
 });

@@ -1,4 +1,4 @@
-import type { ApiError, ReportDraft } from '@/domain/report/model';
+import type { ApiError } from '@/domain/report/model';
 import type { ImportExcelResult } from '@/features/import-excel/import-excel';
 import { desktopFetch, readApiError } from '@/lib/desktop-api';
 import type { ReportWorkflowServices } from './services';
@@ -34,30 +34,20 @@ function responseFileName(response: Response): string {
   const utf8Name = /filename\*=UTF-8''([^;]+)/i.exec(disposition)?.[1];
   if (utf8Name) {
     try {
-      return decodeURIComponent(utf8Name).trim() || 'cable_test_report.pdf';
+      return safeFileName(decodeURIComponent(utf8Name));
     } catch {
       // Fall back to the simple filename parameter.
     }
   }
   const simpleName = /filename[^;=]*=(?:"([^"]+)"|([^;]+))/i.exec(disposition);
-  return (simpleName?.[1] ?? simpleName?.[2] ?? '').trim()
-    || 'cable_test_report.pdf';
+  return safeFileName(simpleName?.[1] ?? simpleName?.[2] ?? '');
 }
 
-function reportPayload(draft: ReportDraft) {
-  return {
-    cableType: draft.cableType,
-    site: draft.site,
-    records: draft.records.map(record => ({
-      cable_label: record.cableLabel,
-      cable_number: record.cableNumber,
-      limit: record.limit,
-      result: record.result,
-      length: record.length,
-      next_margin: record.nextMargin,
-      date_time: record.dateTime,
-    })),
-  };
+function safeFileName(value: string): string {
+  const basename = value.trim().replace(/\\/g, '/').split('/').pop()?.trim() ?? '';
+  return /^[A-Za-z0-9_-]+\.pdf$/i.test(basename)
+    ? basename
+    : 'cable_test_report.pdf';
 }
 
 export const browserReportServices: ReportWorkflowServices = {
@@ -81,10 +71,10 @@ export const browserReportServices: ReportWorkflowServices = {
   },
 
   async generateReport(draft, signal) {
-    const response = await desktopFetch('/api/modify-pdf', {
+    const response = await desktopFetch('/api/generate-report', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(reportPayload(draft)),
+      body: JSON.stringify(draft),
       signal,
     });
     if (!response.ok) await throwResponseError(response);
@@ -96,6 +86,28 @@ export const browserReportServices: ReportWorkflowServices = {
   },
 
   async savePdf({ bytes, suggestedName }) {
+    if (window.cableReport?.savePdf) {
+      try {
+        return await window.cableReport.savePdf({ bytes, suggestedName });
+      } catch {
+        return {
+          status: 'error',
+          code: 'SAVE_FAILED',
+          message: '无法保存 PDF，请重试。',
+          retryable: true,
+        };
+      }
+    }
+
+    if (document.documentElement.dataset.devBrowserMode !== 'true') {
+      return {
+        status: 'error',
+        code: 'IPC_FORBIDDEN',
+        message: '桌面保存服务不可用，请重启应用。',
+        retryable: false,
+      };
+    }
+
     let objectUrl: string | null = null;
     let anchor: HTMLAnchorElement | null = null;
     try {

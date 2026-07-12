@@ -35,9 +35,6 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { cableType, site, records } = body;
     
-    // 调试日志
-    console.log(`[API] 收到请求: cableType=${cableType}, site=${site}`);
-    
     if (!cableType) {
       return NextResponse.json({ error: 'Cable type is required' }, { status: 400 });
     }
@@ -112,16 +109,9 @@ export async function POST(request: NextRequest) {
       })),
     };
     
-    // 调试：记录发送的记录数量
-    console.log(`[API] 准备发送 ${modifications.records.length} 条记录到Python脚本`);
-    console.log(`[API] 第一条: ${JSON.stringify(modifications.records[0])}`);
-    console.log(`[API] 最后一条: ${JSON.stringify(modifications.records[modifications.records.length - 1])}`);
-    
     // Execute PDF editor
     const scriptPath = resolveAppPath('scripts', 'pdf_editor.py');
     const modificationsJson = JSON.stringify(modifications);
-    console.log(`[API] JSON字符串长度: ${modificationsJson.length} 字符`);
-    
     // Write modifications to temp file (跨平台兼容方式)
     const jsonPath = path.join(tempDir, `modifications-${timestamp}.json`);
     await fs.writeFile(jsonPath, modificationsJson, 'utf-8');
@@ -144,14 +134,13 @@ export async function POST(request: NextRequest) {
     const hasError = stderr && stderr.includes('Error') && !hasValidOutput;
     
     if (hasError) {
-      console.error('Python error:', stderr);
       return NextResponse.json({ error: 'Failed to modify PDF' }, { status: 500 });
     }
     
     const result = hasValidOutput ? JSON.parse(stdout) : {};
     
     if (result.error) {
-      return NextResponse.json({ error: result.error }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to modify PDF' }, { status: 500 });
     }
     
     // Generate filename: 项目号_线缆类型_生成时间.pdf
@@ -173,14 +162,6 @@ export async function POST(request: NextRequest) {
     // Read the modified PDF
     const pdfBuffer = await fs.readFile(outputPath);
 
-    // The in-app browser may not persist attachment downloads to Finder's Downloads
-    // folder, so keep a local copy there as a reliable fallback for manual testing.
-    const downloadsPath = path.join(os.homedir(), 'Downloads', filename);
-    await fs.writeFile(downloadsPath, pdfBuffer).catch((writeError) => {
-      console.warn(`[API] Failed to save copy to Downloads: ${downloadsPath}`, writeError);
-    });
-    console.log(`[API] PDF saved to Downloads: ${downloadsPath}`);
-
     // Clean up temp files
     await fs.unlink(outputPath).catch(() => {});
 
@@ -190,12 +171,10 @@ export async function POST(request: NextRequest) {
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `attachment; filename="${filename}"`,
-        'X-Saved-Path': downloadsPath,
       }
     });
     
-  } catch (error) {
-    console.error('Modify error:', error);
+  } catch {
     return NextResponse.json(
       { error: 'Failed to modify PDF' },
       { status: 500 }

@@ -6,7 +6,7 @@
 import os from 'os';
 import path from 'path';
 import fs from 'fs';
-import { execFile } from 'child_process';
+import { execFile, spawnSync } from 'child_process';
 import { promisify } from 'util';
 
 const execFileAsync = promisify(execFile);
@@ -77,27 +77,77 @@ export function getTempDir(): string {
  * macOS/Linux: python3
  * Windows: python (通常)
  */
-export function getPythonCommand(): string {
-  if (process.env.PYTHON_CMD) return process.env.PYTHON_CMD;
-  if (process.env.PYTHON) return process.env.PYTHON;
+export function getPythonCommand(
+  environment: NodeJS.ProcessEnv = process.env,
+  platform: NodeJS.Platform = process.platform,
+): string {
+  if (environment.PYTHON_CMD) return environment.PYTHON_CMD;
+  if (environment.PYTHON) return environment.PYTHON;
 
   // Windows 通常使用 python，macOS/Linux 通常使用 python3
-  return process.platform === 'win32' ? 'python' : 'python3';
+  return platform === 'win32' ? 'python' : 'python3';
 }
 
-function getPythonCandidates(): Array<{ command: string; args: string[] }> {
-  const configured = getPythonCommand();
-  const candidates: Array<{ command: string; args: string[] }> = [
-    { command: configured, args: [] },
-  ];
+export type PythonCommand = {
+  command: string;
+  argsPrefix: readonly string[];
+};
 
-  if (process.platform === 'win32' && configured !== 'py') {
-    candidates.push({ command: 'py', args: ['-3'] });
-  } else if (process.platform !== 'win32' && configured !== 'python') {
-    candidates.push({ command: 'python', args: [] });
+type ResolvePythonCommandOptions = {
+  platform?: NodeJS.Platform;
+  environment?: NodeJS.ProcessEnv;
+  isAvailable?: (command: string, argsPrefix: readonly string[]) => boolean;
+};
+
+function getPythonCandidates(
+  platform: NodeJS.Platform = process.platform,
+  environment: NodeJS.ProcessEnv = process.env,
+): PythonCommand[] {
+  const configured = getPythonCommand(environment, platform);
+  const candidates: PythonCommand[] = [{ command: configured, argsPrefix: [] }];
+  const fallbacks: PythonCommand[] = platform === 'win32'
+    ? [
+        { command: 'python', argsPrefix: [] },
+        { command: 'py', argsPrefix: ['-3'] },
+      ]
+    : [
+        { command: 'python3', argsPrefix: [] },
+        { command: 'python', argsPrefix: [] },
+      ];
+
+  for (const candidate of fallbacks) {
+    const duplicate = candidates.some(existing => (
+      existing.command === candidate.command &&
+      existing.argsPrefix.join('\0') === candidate.argsPrefix.join('\0')
+    ));
+    if (!duplicate) candidates.push(candidate);
   }
-
   return candidates;
+}
+
+function pythonIsAvailable(
+  command: string,
+  argsPrefix: readonly string[],
+): boolean {
+  const result = spawnSync(command, [...argsPrefix, '--version'], {
+    shell: false,
+    stdio: 'ignore',
+    timeout: 5_000,
+    windowsHide: true,
+  });
+  return result.error === undefined && result.status === 0;
+}
+
+export function resolvePythonCommand(
+  options: ResolvePythonCommandOptions = {},
+): PythonCommand {
+  const platform = options.platform ?? process.platform;
+  const environment = options.environment ?? process.env;
+  const candidates = getPythonCandidates(platform, environment);
+  const isAvailable = options.isAvailable ?? pythonIsAvailable;
+  return candidates.find(candidate => (
+    isAvailable(candidate.command, candidate.argsPrefix)
+  )) ?? candidates[0];
 }
 
 function getBundledWorker(scriptPath: string): { command: string; argsPrefix: string[] } | null {
@@ -141,7 +191,7 @@ function getBundledWorker(scriptPath: string): { command: string; argsPrefix: st
   return sharedWorker ? { command: sharedWorker, argsPrefix: [scriptName] } : null;
 }
 
-function getPythonEnv(): NodeJS.ProcessEnv {
+export function getPythonEnv(): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ...process.env };
   const localDeps = path.join(getAppRoot(), '.codex_pydeps');
 
@@ -182,7 +232,7 @@ export async function runPythonScript(
     try {
       return await execFileAsync(
         candidate.command,
-        [...candidate.args, scriptPath, ...args],
+        [...candidate.argsPrefix, scriptPath, ...args],
         {
           maxBuffer: options.maxBuffer ?? 10 * 1024 * 1024,
           cwd: options.cwd,
@@ -198,37 +248,6 @@ export async function runPythonScript(
   }
 
   throw lastError;
-}
-
-/**
- * 构建跨平台兼容的命令参数
- * 避免使用 shell 特定语法（如 cat, $(...)）
- */
-export function buildPythonCommand(
-  scriptPath: string,
-  args: string[]
-): { command: string; useShell: boolean } {
-  const pythonCmd = getPythonCommand();
-  
-  // 对路径进行转义处理
-  const escapedScriptPath = process.platform === 'win32' 
-    ? `"${scriptPath}"` 
-    : `'${scriptPath}'`;
-  
-  const escapedArgs = args.map(arg => {
-    if (process.platform === 'win32') {
-      return `"${arg}"`;
-    } else {
-      return `'${arg}'`;
-    }
-  });
-  
-  const command = `${pythonCmd} ${escapedScriptPath} ${escapedArgs.join(' ')}`;
-  
-  return {
-    command,
-    useShell: true
-  };
 }
 
 /**

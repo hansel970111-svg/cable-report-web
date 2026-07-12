@@ -45,7 +45,12 @@ export function WorkflowAlert({
       )}
 
       {announcement !== null && (
-        <p aria-live="polite" aria-atomic="true" className="workflow-announcement">
+        <p
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          className="workflow-announcement"
+        >
           <CheckCircle2 aria-hidden="true" />
           {announcement}
         </p>

@@ -3,11 +3,12 @@ import { expect, test } from '@playwright/test';
 import { makeCat5eWorkbookBuffer, XLSX_MIME } from './support/workbook';
 
 type GeneratedPayload = {
+  revision: number;
   cableType: string;
   site: string;
   records: Array<{
-    cable_label: string;
-    date_time: string;
+    cableLabel: string;
+    dateTime: string;
   }>;
 };
 
@@ -18,7 +19,7 @@ test('imports, edits, deletes, and generates a report in browser mode', async ({
     releaseGeneration = resolve;
   });
 
-  await page.route('**/api/modify-pdf', async route => {
+  await page.route('**/api/generate-report', async route => {
     generatedRequests.push(route.request().postDataJSON() as GeneratedPayload);
     await generationPaused;
     await route.fulfill({
@@ -87,8 +88,8 @@ test('imports, edits, deletes, and generates a report in browser mode', async ({
   expect(generatedPayload.site).toBe('DE46-E2E');
   expect(generatedPayload.cableType).toBe('Cat 5e');
   expect(generatedPayload.records).toHaveLength(2);
-  expect(generatedPayload.records[0]?.cable_label).toBe('#EDITED-001');
-  expect(generatedPayload.records[0]?.date_time).toMatch(
+  expect(generatedPayload.records[0]?.cableLabel).toBe('#EDITED-001');
+  expect(generatedPayload.records[0]?.dateTime).toMatch(
     /^\d{2}-\d{2}-\d{4} \d{2}:00:\d{2} (?:AM|PM)$/,
   );
 });
