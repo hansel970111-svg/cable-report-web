@@ -1,0 +1,161 @@
+import { execFileSync } from 'node:child_process';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, describe, expect, it } from 'vitest';
+
+const roots: string[] = [];
+
+function git(cwd: string, args: string[], env?: Record<string, string | undefined>) {
+  return execFileSync('git', args, {
+    cwd,
+    encoding: 'utf8',
+    env: { ...process.env, ...env },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  }).trim();
+}
+
+async function writePackage(work: string, version: string) {
+  await writeFile(
+    join(work, 'package.json'),
+    `${JSON.stringify({ name: 'fixture', version, private: true }, null, 2)}\n`,
+  );
+}
+
+async function fixture() {
+  const root = await mkdtemp(join(tmpdir(), 'calver-validate-'));
+  roots.push(root);
+  const origin = join(root, 'origin.git');
+  const work = join(root, 'work');
+  git(root, ['init', '--bare', '--initial-branch=main', origin]);
+  git(root, ['clone', origin, work]);
+  git(work, ['config', 'user.name', 'Release Test']);
+  git(work, ['config', 'user.email', 'release@example.test']);
+  await writePackage(work, '0.1.1');
+  git(work, ['add', 'package.json']);
+  git(work, ['commit', '-m', 'initial']);
+  git(work, ['tag', '-a', 'v0.1.1', '-m', 'historical']);
+  git(work, ['push', '-u', 'origin', 'main', 'v0.1.1']);
+  return { root, origin, work };
+}
+
+async function commitVersion(work: string, version: string) {
+  await writePackage(work, version);
+  git(work, ['add', 'package.json']);
+  git(work, ['commit', '-m', `version ${version}`]);
+}
+
+function annotatedTag(work: string, version: string, date = '2026-07-10T12:00:00+02:00') {
+  git(work, ['tag', '-a', `v${version}`, '-m', `Release v${version}`], {
+    GIT_COMMITTER_DATE: date,
+  });
+}
+
+async function validate(work: string, options: Record<string, unknown> = {}) {
+  const { validateReleaseVersion } = await import('../../scripts/validate-release-version.mjs');
+  return validateReleaseVersion({ cwd: work, ...options });
+}
+
+afterEach(async () => {
+  await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true })));
+});
+
+describe('validate-release command with real Git tags', () => {
+  it('exports a programmatic entry point', async () => {
+    const command = await import('../../scripts/validate-release-version.mjs');
+    expect(command.validateReleaseVersion).toBeTypeOf('function');
+  });
+
+  it('accepts a prepared CalVer higher than every published version with no same-name tag', async () => {
+    const { work } = await fixture();
+    await commitVersion(work, '2026.710.1');
+    annotatedTag(work, '2026.710.1');
+    await commitVersion(work, '2026.710.2');
+
+    await expect(validate(work, { prepared: true }))
+      .resolves.toMatchObject({ mode: 'prepared', version: '2026.710.2' });
+  });
+
+  it('rejects invalid prepared candidates, non-increasing candidates, and collisions', async () => {
+    const invalid = await fixture();
+    await commitVersion(invalid.work, 'banana');
+    await expect(validate(invalid.work, { prepared: true }))
+      .rejects.toMatchObject({ code: 'INVALID_CURRENT_VERSION' });
+
+    const lower = await fixture();
+    await commitVersion(lower.work, '2026.710.2');
+    annotatedTag(lower.work, '2026.710.2');
+    await commitVersion(lower.work, '2026.710.1');
+    await expect(validate(lower.work, { prepared: true }))
+      .rejects.toMatchObject({ code: 'CURRENT_VERSION_NOT_LATEST' });
+
+    const collision = await fixture();
+    await commitVersion(collision.work, '2026.710.1');
+    annotatedTag(collision.work, '2026.710.1');
+    await expect(validate(collision.work, { prepared: true }))
+      .rejects.toMatchObject({ code: 'VERSION_COLLISION' });
+  });
+
+  it('accepts an exact annotated HEAD tag whose tagger Berlin date matches', async () => {
+    const { work } = await fixture();
+    await commitVersion(work, '2026.710.1');
+    annotatedTag(work, '2026.710.1', '2026-07-10T23:30:00+02:00');
+
+    await expect(validate(work)).resolves.toMatchObject({
+      mode: 'tag',
+      tag: 'v2026.710.1',
+      version: '2026.710.1',
+    });
+  });
+
+  it('rejects a lightweight tag and a mismatched HEAD tag', async () => {
+    const lightweight = await fixture();
+    await commitVersion(lightweight.work, '2026.710.1');
+    git(lightweight.work, ['tag', 'v2026.710.1']);
+    await expect(validate(lightweight.work)).rejects.toMatchObject({ code: 'TAG_VERSION_MISMATCH' });
+
+    const mismatch = await fixture();
+    await commitVersion(mismatch.work, '2026.710.2');
+    annotatedTag(mismatch.work, '2026.710.1');
+    await expect(validate(mismatch.work)).rejects.toMatchObject({ code: 'TAG_VERSION_MISMATCH' });
+  });
+
+  it('rejects a tagger instant whose Berlin date differs from the CalVer date', async () => {
+    const { work } = await fixture();
+    await commitVersion(work, '2026.710.1');
+    annotatedTag(work, '2026.710.1', '2026-07-09T23:30:00+02:00');
+
+    await expect(validate(work)).rejects.toMatchObject({ code: 'TAG_DATE_MISMATCH' });
+  });
+
+  it('requires the exact tag to be the highest published version', async () => {
+    const { work } = await fixture();
+    await commitVersion(work, '2026.710.1');
+    annotatedTag(work, '2026.710.1');
+    annotatedTag(work, '2026.710.2');
+
+    await expect(validate(work)).rejects.toMatchObject({ code: 'CURRENT_VERSION_NOT_LATEST' });
+  });
+
+  it('rejects malformed release tags and artifact version drift', async () => {
+    const malformed = await fixture();
+    await commitVersion(malformed.work, '2026.710.1');
+    annotatedTag(malformed.work, '2026.710.1');
+    git(malformed.work, ['tag', 'vbad']);
+    await expect(validate(malformed.work)).rejects.toMatchObject({ code: 'INVALID_RELEASE_TAG' });
+
+    const drift = await fixture();
+    await commitVersion(drift.work, '2026.710.1');
+    annotatedTag(drift.work, '2026.710.1');
+    await expect(validate(drift.work, {
+      artifacts: { uiVersion: '2026.710.2' },
+    })).rejects.toMatchObject({ code: 'VERSION_NOT_IN_ARTIFACT' });
+  });
+
+  it('keeps historical 0.1.1 valid only as a tagged migration baseline', async () => {
+    const { work } = await fixture();
+    await expect(validate(work)).resolves.toMatchObject({ version: '0.1.1', tag: 'v0.1.1' });
+    await expect(validate(work, { prepared: true }))
+      .rejects.toMatchObject({ code: 'INVALID_CURRENT_VERSION' });
+  });
+});

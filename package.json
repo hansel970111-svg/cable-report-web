@@ -13,6 +13,8 @@
     "dev": "node ./scripts/dev.mjs",
     "preinstall": "npx only-allow pnpm",
     "lint": "eslint . --max-warnings=0",
+    "release:prepare": "node scripts/prepare-release.mjs",
+    "release:validate": "node scripts/validate-release-version.mjs",
     "start": "node ./scripts/start.mjs",
     "start:browser": "node scripts/start.mjs --browser-dev",
     "ts-check": "tsc -p tsconfig.json",
