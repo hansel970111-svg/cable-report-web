@@ -36,6 +36,10 @@ EXPECTED = {
         "draw_final_footer",
     ],
     "pdf_engine.editors.lc": ["edit_lc_pdf"],
+    "pdf_engine.editors.non_lc": ["edit_non_lc_pdf"],
+    "pdf_engine.editors.cat5e": ["edit_cat5e_pdf"],
+    "pdf_engine.editors.mpo": ["edit_mpo_pdf"],
+    "pdf_engine.dispatch": ["detect_template_kind", "edit_report"],
 }
 
 EMPTY = inspect.Signature.empty
@@ -126,6 +130,50 @@ EXPECTED_SIGNATURES = {
             return_annotation="PdfEditResult",
         ),
     },
+    "pdf_engine.editors.non_lc": {
+        "edit_non_lc_pdf": _signature(
+            _parameter("input_path", annotation="Path"),
+            _parameter("output_path", annotation="Path"),
+            _parameter("records", annotation="Sequence[CableRecordPayload]"),
+            _parameter("site", annotation="str | None"),
+            _parameter(
+                "template_kind",
+                annotation="Literal['cat5e', 'mpo']",
+            ),
+            return_annotation="PdfEditResult",
+        ),
+    },
+    "pdf_engine.editors.cat5e": {
+        "edit_cat5e_pdf": _signature(
+            _parameter("input_path", annotation="Path"),
+            _parameter("output_path", annotation="Path"),
+            _parameter("records", annotation="Sequence[CableRecordPayload]"),
+            _parameter("site", annotation="str | None"),
+            return_annotation="PdfEditResult",
+        ),
+    },
+    "pdf_engine.editors.mpo": {
+        "edit_mpo_pdf": _signature(
+            _parameter("input_path", annotation="Path"),
+            _parameter("output_path", annotation="Path"),
+            _parameter("records", annotation="Sequence[CableRecordPayload]"),
+            _parameter("site", annotation="str | None"),
+            return_annotation="PdfEditResult",
+        ),
+    },
+    "pdf_engine.dispatch": {
+        "detect_template_kind": _signature(
+            _parameter("document", annotation="fitz.Document"),
+            return_annotation="TemplateKind",
+        ),
+        "edit_report": _signature(
+            _parameter("input_path", annotation="Path"),
+            _parameter("output_path", annotation="Path"),
+            _parameter("records", annotation="Sequence[CableRecordPayload]"),
+            _parameter("site", annotation="str | None"),
+            return_annotation="PdfEditResult",
+        ),
+    },
 }
 
 ALLOWED_PDF_ENGINE_IMPORTS = {
@@ -141,6 +189,26 @@ ALLOWED_PDF_ENGINE_IMPORTS = {
         "pdf_engine.cid",
         "pdf_engine.layout",
         "pdf_engine.summary",
+        "pdf_engine.types",
+    },
+    "pdf_engine.editors.non_lc": {
+        "pdf_engine.cid",
+        "pdf_engine.layout",
+        "pdf_engine.summary",
+        "pdf_engine.types",
+    },
+    "pdf_engine.editors.cat5e": {
+        "pdf_engine.editors.non_lc",
+        "pdf_engine.types",
+    },
+    "pdf_engine.editors.mpo": {
+        "pdf_engine.editors.non_lc",
+        "pdf_engine.types",
+    },
+    "pdf_engine.dispatch": {
+        "pdf_engine.editors.cat5e",
+        "pdf_engine.editors.lc",
+        "pdf_engine.editors.mpo",
         "pdf_engine.types",
     },
 }
@@ -244,6 +312,7 @@ def test_shared_modules_only_import_inward(module_name):
     forbidden = {
         imported
         for imported in imported_modules
+        if imported not in ALLOWED_PDF_ENGINE_IMPORTS[module_name]
         if any(
             imported == name or imported.startswith(f"{name}.")
             for name in FORBIDDEN_IMPORTS
@@ -329,6 +398,26 @@ def test_signature_guard_rejects_return_annotation_mutation():
         ("pdf_engine.layout", "from . import summary", "pdf_engine.summary"),
         ("pdf_engine.summary", "from . import editors", "pdf_engine.editors"),
         ("pdf_engine.editors.lc", "from .. import dispatch", "pdf_engine.dispatch"),
+        (
+            "pdf_engine.editors.non_lc",
+            "from .. import dispatch",
+            "pdf_engine.dispatch",
+        ),
+        (
+            "pdf_engine.editors.cat5e",
+            "from .mpo import edit_mpo_pdf",
+            "pdf_engine.editors.mpo",
+        ),
+        (
+            "pdf_engine.editors.mpo",
+            "from .cat5e import edit_cat5e_pdf",
+            "pdf_engine.editors.cat5e",
+        ),
+        (
+            "pdf_engine.dispatch",
+            "from . import cli",
+            "pdf_engine.cli",
+        ),
     ],
 )
 def test_import_guard_resolves_and_rejects_relative_outward_edges(
@@ -373,3 +462,89 @@ def test_import_guard_keeps_legal_absolute_and_relative_inward_edges(source):
         "pdf_engine.layout"
     }
     _assert_allowed_pdf_engine_imports(tree, "pdf_engine.summary")
+
+
+def test_non_lc_shared_mechanics_are_defined_in_exactly_one_module():
+    paths = [
+        ROOT / "scripts/pdf_editor.py",
+        ROOT / "scripts/pdf_engine/editors/non_lc.py",
+        ROOT / "scripts/pdf_engine/editors/cat5e.py",
+        ROOT / "scripts/pdf_engine/editors/mpo.py",
+    ]
+    definitions = {
+        name: []
+        for name in (
+            "fill_page",
+            "_rewrite_non_lc_datetimes",
+            "_rewrite_non_lc_cable_labels",
+            "edit_non_lc_pdf",
+        )
+    }
+
+    for path in paths:
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in tree.body:
+            if isinstance(node, ast.FunctionDef) and node.name in definitions:
+                definitions[node.name].append(path.name)
+
+    assert definitions == {
+        "fill_page": ["non_lc.py"],
+        "_rewrite_non_lc_datetimes": ["non_lc.py"],
+        "_rewrite_non_lc_cable_labels": ["non_lc.py"],
+        "edit_non_lc_pdf": ["non_lc.py"],
+    }
+
+
+def test_dispatch_is_the_only_template_editor_switch():
+    dispatch_path = ROOT / "scripts/pdf_engine/dispatch.py"
+    tree = ast.parse(
+        dispatch_path.read_text(encoding="utf-8"),
+        filename=str(dispatch_path),
+    )
+    editor_map = next(
+        node.value
+        for node in tree.body
+        if isinstance(node, ast.AnnAssign)
+        and isinstance(node.target, ast.Name)
+        and node.target.id == "_EDITORS"
+    )
+
+    assert isinstance(editor_map, ast.Dict)
+    assert {
+        key.value: value.id
+        for key, value in zip(editor_map.keys, editor_map.values, strict=True)
+    } == {
+        "cat5e": "edit_cat5e_pdf",
+        "mpo": "edit_mpo_pdf",
+        "lc": "edit_lc_pdf",
+    }
+
+
+def test_dispatch_is_the_only_production_template_detector_definition():
+    production_paths = [ROOT / "scripts/pdf_editor.py"]
+    production_paths.extend(
+        sorted((ROOT / "scripts/pdf_engine").rglob("*.py"))
+    )
+    detector_definitions = []
+    layout_detector_imports = []
+
+    for path in production_paths:
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.FunctionDef)
+                and node.name == "detect_template_kind"
+            ):
+                detector_definitions.append(path.relative_to(ROOT).as_posix())
+            if (
+                isinstance(node, ast.ImportFrom)
+                and node.module in {"pdf_engine.layout", "layout"}
+                and any(
+                    alias.name == "detect_template_kind"
+                    for alias in node.names
+                )
+            ):
+                layout_detector_imports.append(path.relative_to(ROOT).as_posix())
+
+    assert detector_definitions == ["scripts/pdf_engine/dispatch.py"]
+    assert layout_detector_imports == []

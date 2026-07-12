@@ -399,42 +399,6 @@ def clear_row_images(page, start_row, end_row, is_mpo_template=False):
             rect = fitz.Rect(x - 1, y - 2, x + width + 1, y + 12)
             _draw_clear_rect(page, rect)
 
-def detect_template_kind(template_doc):
-    """Return 'lc', 'mpo', or 'cat5e' based on stable header positions."""
-    if len(template_doc) == 0:
-        return 'cat5e'
-
-    page = template_doc[0]
-    spans = []
-    for block in page.get_text("dict").get("blocks", []):
-        if "lines" not in block:
-            continue
-        for line in block["lines"]:
-            for span in line["spans"]:
-                text = span["text"].strip()
-                if text:
-                    spans.append({
-                        "text": text,
-                        "x": span["bbox"][0],
-                        "y": span["bbox"][1],
-                    })
-
-    factory_xs = [s["x"] for s in spans if s["text"] == "Factory"]
-    has_early_factory = any(250 <= x <= 320 for x in factory_xs)
-    if has_early_factory:
-        return 'lc'
-
-    has_mpo_limit_data = any("GBASE" in s["text"] and s["x"] < 170 for s in spans)
-    if has_mpo_limit_data:
-        return 'mpo'
-
-    limit_xs = [s["x"] for s in spans if s["text"] == "Limit"]
-    if any(x < 150 for x in limit_xs) and not factory_xs:
-        return 'mpo'
-
-    return 'cat5e'
-
-
 def _iter_page_spans(page):
     spans = []
     for block in page.get_text("dict").get("blocks", []):

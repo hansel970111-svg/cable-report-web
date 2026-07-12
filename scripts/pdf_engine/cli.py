@@ -13,7 +13,9 @@ from typing import Any, TextIO, TypeAlias
 
 import fitz
 
+from .dispatch import edit_report
 from .protocol import PdfWorkerFailure, PdfWorkerSuccess, emit_result
+from .types import PdfEditResult
 
 
 EditorCallable: TypeAlias = Callable[[str, str, dict[str, Any]], Mapping[str, Any] | None]
@@ -133,7 +135,7 @@ def _emit_failure(
 
 def run_editor_cli(
     argv: Sequence[str],
-    editor: EditorCallable,
+    editor: EditorCallable | None = None,
     *,
     stdout: TextIO,
     stderr: TextIO,
@@ -190,13 +192,25 @@ def run_editor_cli(
 
     try:
         with redirect_stdout(sanitized_logs), redirect_stderr(sanitized_logs):
-            editor_result = editor(input_path, output_path, request)
+            if editor is None:
+                editor_result = edit_report(
+                    Path(input_path),
+                    Path(output_path),
+                    records,
+                    request.get("site"),
+                )
+            else:
+                editor_result = editor(input_path, output_path, request)
     except Exception:
         editor_result = None
     finally:
         sanitized_logs.flush()
 
-    if not isinstance(editor_result, Mapping) or editor_result.get("success") is not True:
+    edit_succeeded = isinstance(editor_result, PdfEditResult) or (
+        isinstance(editor_result, Mapping)
+        and editor_result.get("success") is True
+    )
+    if not edit_succeeded:
         return _emit_failure(
             stdout,
             code="PDF_RENDER_FAILED",

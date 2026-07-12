@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 import pdf_editor  # noqa: E402
-from pdf_editor import modify_pdf_precise  # noqa: E402
+from pdf_engine.dispatch import edit_report  # noqa: E402
 from pdf_golden import (  # noqa: E402
     assert_pdf_matches_golden,
     build_records,
@@ -21,14 +21,17 @@ from pdf_golden import (  # noqa: E402
 def test_pdf_matches_approved_golden(case, tmp_path):
     assert pdf_editor.EMBED_INSERT_FONTS is False
     output = tmp_path / f"{case.name}.pdf"
-    result = modify_pdf_precise(
-        str(ROOT / case.template),
-        str(output),
-        {"site": case.site, "records": build_records(case)},
+    records = build_records(case)
+    result = edit_report(
+        ROOT / case.template,
+        output,
+        records,
+        case.site,
     )
 
-    assert result.get("success") is True, result
-    assert result.get("pages_used") == case.expected_pages, result
+    assert result.output == output
+    assert result.pages == case.expected_pages
+    assert result.records == len(records)
     with fitz.open(output) as document:
         assert document.page_count == case.expected_pages
         assert document.is_repaired is False
