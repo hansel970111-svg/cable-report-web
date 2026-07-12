@@ -22,6 +22,8 @@ const {
   savePdfAtomically,
   writeAndSyncTemporary,
 } = require('./save-pdf.cjs');
+const { createUpdateChecker } = require('./update-check.cjs');
+const { loadVersioningModule } = require('./versioning-loader.cjs');
 
 if (!process.env.NEXT_TELEMETRY_DISABLED) {
   process.env.NEXT_TELEMETRY_DISABLED = '1';
@@ -29,9 +31,7 @@ if (!process.env.NEXT_TELEMETRY_DISABLED) {
 
 let mainWindow = null;
 let nextServer = null;
-let checkingForUpdates = false;
 let unregisterSavePdfHandler = null;
-let versioningModulePromise = null;
 
 const desktopSessionToken = createDesktopSessionToken();
 process.env.CABLE_DESKTOP_TOKEN = desktopSessionToken;
@@ -115,16 +115,6 @@ function normalizeVersion(version) {
     .replace(/^v/i, '');
 }
 
-function loadVersioningModule() {
-  if (!versioningModulePromise) {
-    versioningModulePromise = import('../scripts/versioning.mjs').catch(error => {
-      versioningModulePromise = null;
-      throw error;
-    });
-  }
-  return versioningModulePromise;
-}
-
 function getJson(url) {
   return new Promise((resolve, reject) => {
     const request = https.get(
@@ -192,33 +182,18 @@ function showMessageBox(options) {
     : dialog.showMessageBox(options);
 }
 
-async function checkForUpdates({ manual = false } = {}) {
-  if (checkingForUpdates) return;
-  checkingForUpdates = true;
-
-  try {
-    const { compareAppVersions } = await loadVersioningModule();
-    const release = await getJson(LATEST_RELEASE_API);
-    const currentVersion = app.getVersion();
-    const latestTag = release.tag_name || release.name || '';
-    const latestVersion = normalizeVersion(latestTag);
-
-    if (!latestVersion) {
-      throw new Error('最新版没有有效版本号');
-    }
-
-    if (compareAppVersions(latestVersion, currentVersion) <= 0) {
-      if (manual) {
-        await showMessageBox({
-          type: 'info',
-          title: '检查更新',
-          message: '当前已经是最新版本',
-          detail: `当前版本：${currentVersion}\n最新版本：${latestTag}`,
-        });
-      }
-      return;
-    }
-
+const checkForUpdates = createUpdateChecker({
+  loadVersioningModule,
+  fetchLatestRelease: () => getJson(LATEST_RELEASE_API),
+  getCurrentVersion: () => app.getVersion(),
+  normalizeVersion,
+  onUpToDate: ({ currentVersion, latestTag }) => showMessageBox({
+    type: 'info',
+    title: '检查更新',
+    message: '当前已经是最新版本',
+    detail: `当前版本：${currentVersion}\n最新版本：${latestTag}`,
+  }),
+  onUpdateAvailable: async ({ currentVersion, latestTag, release }) => {
     const result = await showMessageBox({
       type: 'info',
       title: '发现新版本',
@@ -232,26 +207,23 @@ async function checkForUpdates({ manual = false } = {}) {
     if (result.response === 0) {
       openApprovedExternal(getPreferredAsset(release));
     }
-  } catch (error) {
-    if (manual) {
-      const result = await showMessageBox({
-        type: 'warning',
-        title: '检查更新失败',
-        message: error instanceof Error ? error.message : String(error),
-        detail: '可以手动打开 GitHub Releases 页面查看最新版。',
-        buttons: ['打开发布页', '取消'],
-        defaultId: 0,
-        cancelId: 1,
-      });
+  },
+  onManualError: async error => {
+    const result = await showMessageBox({
+      type: 'warning',
+      title: '检查更新失败',
+      message: error instanceof Error ? error.message : String(error),
+      detail: '可以手动打开 GitHub Releases 页面查看最新版。',
+      buttons: ['打开发布页', '取消'],
+      defaultId: 0,
+      cancelId: 1,
+    });
 
-      if (result.response === 0) {
-        openApprovedExternal(RELEASES_URL);
-      }
+    if (result.response === 0) {
+      openApprovedExternal(RELEASES_URL);
     }
-  } finally {
-    checkingForUpdates = false;
-  }
-}
+  },
+});
 
 function setupApplicationMenu() {
   const template = [

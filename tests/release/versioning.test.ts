@@ -106,6 +106,43 @@ describe('formatCalVer', () => {
     expect(formatCalVer(new Date(iso), 1, BERLIN)).toBe(expected);
   });
 
+  test.each([
+    [
+      'spring transition-day start in CET',
+      '2026-03-28T22:59:59.999Z',
+      '2026.328.1',
+      '2026-03-28T23:00:00.000Z',
+      '2026.329.1',
+    ],
+    [
+      'spring transition-day end in CEST',
+      '2026-03-29T21:59:59.999Z',
+      '2026.329.1',
+      '2026-03-29T22:00:00.000Z',
+      '2026.330.1',
+    ],
+    [
+      'autumn transition-day start in CEST',
+      '2026-10-24T21:59:59.999Z',
+      '2026.1024.1',
+      '2026-10-24T22:00:00.000Z',
+      '2026.1025.1',
+    ],
+    [
+      'autumn transition-day end in CET',
+      '2026-10-25T22:59:59.999Z',
+      '2026.1025.1',
+      '2026-10-25T23:00:00.000Z',
+      '2026.1026.1',
+    ],
+  ])(
+    'crosses Berlin local midnight at the %s while UTC remains on the prior date',
+    (_label, beforeIso, beforeExpected, afterIso, afterExpected) => {
+      expect(formatCalVer(new Date(beforeIso), 1, BERLIN)).toBe(beforeExpected);
+      expect(formatCalVer(new Date(afterIso), 1, BERLIN)).toBe(afterExpected);
+    },
+  );
+
   test.each([0, -1, 1.5, 100, Number.NaN, Number.POSITIVE_INFINITY])(
     'rejects invalid release sequence %j',
     sequence => {

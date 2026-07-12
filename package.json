@@ -111,6 +111,7 @@
     "afterPack": "scripts/electron-after-pack.cjs",
     "files": [
       "electron/**/*",
+      "scripts/versioning.mjs",
       "next-build/standalone/**/*",
       "package.json",
       "next.config.mjs",

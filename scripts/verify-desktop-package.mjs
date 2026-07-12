@@ -73,6 +73,10 @@ const resourcesDir = platform === 'win'
   ? path.join(unpackedDir, 'resources')
   : path.join(macAppDir, 'Contents', 'Resources');
 const appDir = path.join(resourcesDir, 'app');
+function packagedAppPath(...segments) {
+  return path.join(appDir, ...segments);
+}
+
 const nextBuildDir = path.join(appDir, 'next-build');
 const standaloneDir = path.join(nextBuildDir, 'standalone');
 const standaloneNextBuildDir = path.join(standaloneDir, 'next-build');
@@ -109,6 +113,11 @@ const requiredFiles = hasStandaloneRuntime
       [path.join(nextBuildDir, 'server'), 'Next server output'],
       [path.join(nextBuildDir, 'static'), 'Next static output'],
     ];
+
+requiredFiles.push([
+  packagedAppPath('scripts', 'versioning.mjs'),
+  'CalVer runtime module',
+]);
 
 for (const [filePath, description] of requiredFiles) {
   const stat = fs.existsSync(filePath) ? fs.statSync(filePath) : null;
