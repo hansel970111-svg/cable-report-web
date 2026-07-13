@@ -32,6 +32,9 @@ function reportPath(value) {
 export function setupCiPython({
   version,
   githubPath,
+  runnerTemp,
+  platform = process.platform,
+  pathApi = path,
   run = runCommand,
   append = appendPathEntry,
   report = reportPath,
@@ -42,6 +45,9 @@ export function setupCiPython({
   if (!githubPath) {
     throw new Error('GITHUB_PATH is required');
   }
+  if (!runnerTemp) {
+    throw new Error('RUNNER_TEMP is required');
+  }
 
   run('uv', ['python', 'install', version]);
   const pythonPath = run('uv', [
@@ -51,7 +57,7 @@ export function setupCiPython({
     '--managed-python',
   ]).trim();
 
-  if (!path.isAbsolute(pythonPath)) {
+  if (!pathApi.isAbsolute(pythonPath)) {
     throw new Error(`uv returned a non-absolute Python path: ${pythonPath}`);
   }
 
@@ -61,14 +67,30 @@ export function setupCiPython({
     throw new Error(`expected ${expectedVersion}, received ${actualVersion || 'no version'}`);
   }
 
-  append(githubPath, `${path.dirname(pythonPath)}\n`);
-  report(`${expectedVersion} -> ${pythonPath}\n`);
+  const venvPath = pathApi.join(runnerTemp, `cable-python-${version}`);
+  run(pythonPath, ['-m', 'venv', venvPath]);
+  const venvPython = platform === 'win32'
+    ? pathApi.join(venvPath, 'Scripts', 'python.exe')
+    : pathApi.join(venvPath, 'bin', 'python');
+  const venvVersion = run(venvPython, ['--version']).trim();
+  if (venvVersion !== expectedVersion) {
+    throw new Error(
+      `expected virtual environment ${expectedVersion}, received ${venvVersion || 'no version'}`,
+    );
+  }
+
+  append(githubPath, `${pathApi.dirname(venvPython)}\n`);
+  report(`${expectedVersion} -> ${venvPython}\n`);
 }
 
 function main() {
   const version = process.argv[2];
   try {
-    setupCiPython({ version, githubPath: process.env.GITHUB_PATH });
+    setupCiPython({
+      version,
+      githubPath: process.env.GITHUB_PATH,
+      runnerTemp: process.env.RUNNER_TEMP,
+    });
   } catch (error) {
     process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
     process.exitCode = 1;
