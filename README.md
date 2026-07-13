@@ -370,16 +370,27 @@ export const useStore = create<Store>((set) => ({
 corepack prepare pnpm@9.15.9 --activate
 pnpm install --frozen-lockfile
 python -m pip install --require-hashes --only-binary=:all: -r requirements-dev.lock
-pnpm check:fast
-pnpm test:python
-pnpm test:e2e:browser -- --workers=1
-pnpm desktop:dist:mac
-pnpm test:e2e:mac
-pnpm verify:acceptance -- --platform mac
+mkdir -p artifacts/acceptance
+node scripts/verify-dependency-policy.mjs
+python scripts/verify_python_locks.py
+pnpm lint
+pnpm ts-check
+node scripts/verify-runtime-surface.mjs
+node scripts/run-evidence-command.mjs --name unit --platform mac --artifact artifacts/acceptance/unit.json -- pnpm exec vitest run --reporter=json --outputFile=artifacts/acceptance/unit.json
+node scripts/run-evidence-command.mjs --name python --platform mac --artifact artifacts/acceptance/python.xml -- python -m pytest -q --junitxml=artifacts/acceptance/python.xml
+PLAYWRIGHT_JSON_OUTPUT_FILE=artifacts/acceptance/browser.json PLAYWRIGHT_PORT=51237 node scripts/run-evidence-command.mjs --name browser --platform mac --artifact artifacts/acceptance/browser.json -- pnpm exec playwright test --project=chromium --workers=1 --reporter=json
+node scripts/run-evidence-command.mjs --name audit --platform mac --capture artifacts/acceptance/audit-mac.json -- pnpm audit --prod --audit-level high --registry=https://registry.npmjs.org --json
+CSC_IDENTITY_AUTO_DISCOVERY=false PYTHON_CMD=python node scripts/run-evidence-command.mjs --name package --platform mac -- pnpm desktop:dist:mac
+node scripts/verify-desktop-package.mjs mac
+node scripts/check-package-size.mjs mac
+PYTHON_CMD=python node scripts/run-evidence-command.mjs --name desktop --platform mac --artifact artifacts/acceptance/desktop-mac.json -- pnpm test:e2e:mac
+node scripts/write-acceptance-evidence.mjs mac
+PYTHON_CMD=python pnpm verify:acceptance -- --platform mac
 ```
 
-Windows 必须在 Windows 主机上用 `pnpm desktop:dist:win`、`pnpm test:e2e:win` 和
-`pnpm verify:acceptance -- --platform win` 完成同等验证。不能用 macOS 交叉构建代替 Windows 实包测试。
+`verify:acceptance` 只可在同一提交已经通过 evidence runner、生成全部机器报告并执行
+`write-acceptance-evidence.mjs` 后运行；它会拒绝旧提交或摘要不符的报告和安装包。Windows
+必须按 [WINDOWS.md](WINDOWS.md) 的同等证据流程在 Windows 主机运行，不能用 macOS 交叉构建代替。
 
 输入上限为 25 MiB Excel、10,000 条记录，Vertical Cabling 单行 QTY 最多 5,000。
 PDF worker 最长运行 10 分钟，输出 PDF 最多 256 MiB。桌面版必须通过原生 Save As

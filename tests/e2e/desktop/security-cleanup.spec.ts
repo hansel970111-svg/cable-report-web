@@ -31,6 +31,9 @@ test('packaged renderer API and external navigation stay inside the allowlist', 
     'https://github.com/hansel970111-svg/cable-report-web/releases/v1.0.0',
     `${RELEASES_URL}?source=desktop`,
     `${RELEASES_URL}#download`,
+    'https://user@github.com/hansel970111-svg/cable-report-web/releases/latest',
+    'https://user:pass@github.com/hansel970111-svg/cable-report-web/releases/latest',
+    'https://github.com:444/hansel970111-svg/cable-report-web/releases/latest',
   ];
   for (const url of [desktop.window.url(), ...denied, RELEASES_URL]) {
     await desktop.window.evaluate(target => {

@@ -37,14 +37,17 @@ pnpm desktop:dev
 必须在 macOS 上执行：
 
 ```bash
-pnpm check:fast
-pnpm test:python
-pnpm test:e2e:browser -- --workers=1
-pnpm desktop:dist:mac
+mkdir -p artifacts/acceptance
+node scripts/run-evidence-command.mjs --name unit --platform mac --artifact artifacts/acceptance/unit.json -- pnpm exec vitest run --reporter=json --outputFile=artifacts/acceptance/unit.json
+node scripts/run-evidence-command.mjs --name python --platform mac --artifact artifacts/acceptance/python.xml -- python -m pytest -q --junitxml=artifacts/acceptance/python.xml
+PLAYWRIGHT_JSON_OUTPUT_FILE=artifacts/acceptance/browser.json PLAYWRIGHT_PORT=51237 node scripts/run-evidence-command.mjs --name browser --platform mac --artifact artifacts/acceptance/browser.json -- pnpm exec playwright test --project=chromium --workers=1 --reporter=json
+node scripts/run-evidence-command.mjs --name audit --platform mac --capture artifacts/acceptance/audit-mac.json -- pnpm audit --prod --audit-level high --registry=https://registry.npmjs.org --json
+CSC_IDENTITY_AUTO_DISCOVERY=false PYTHON_CMD=python node scripts/run-evidence-command.mjs --name package --platform mac -- pnpm desktop:dist:mac
 node scripts/verify-desktop-package.mjs mac
 node scripts/check-package-size.mjs mac
-pnpm test:e2e:mac
-pnpm verify:acceptance -- --platform mac
+PYTHON_CMD=python node scripts/run-evidence-command.mjs --name desktop --platform mac --artifact artifacts/acceptance/desktop-mac.json -- pnpm test:e2e:mac
+node scripts/write-acceptance-evidence.mjs mac
+PYTHON_CMD=python pnpm verify:acceptance -- --platform mac
 ```
 
 产物在 `release/` 目录。
@@ -54,19 +57,29 @@ pnpm verify:acceptance -- --platform mac
 建议在 Windows 上执行：
 
 ```powershell
-pnpm check:fast
-pnpm test:python
-pnpm test:e2e:browser -- --workers=1
-pnpm desktop:dist:win
+New-Item -ItemType Directory -Force artifacts/acceptance | Out-Null
+node scripts/run-evidence-command.mjs --name unit --platform win --artifact artifacts/acceptance/unit.json -- pnpm exec vitest run --reporter=json --outputFile=artifacts/acceptance/unit.json
+node scripts/run-evidence-command.mjs --name python --platform win --artifact artifacts/acceptance/python.xml -- python -m pytest -q --junitxml=artifacts/acceptance/python.xml
+$env:PLAYWRIGHT_JSON_OUTPUT_FILE = "artifacts/acceptance/browser.json"
+$env:PLAYWRIGHT_PORT = "51237"
+node scripts/run-evidence-command.mjs --name browser --platform win --artifact artifacts/acceptance/browser.json -- pnpm exec playwright test --project=chromium --workers=1 --reporter=json
+node scripts/run-evidence-command.mjs --name audit --platform win --capture artifacts/acceptance/audit-win.json -- pnpm audit --prod --audit-level high --registry=https://registry.npmjs.org --json
+$env:CSC_IDENTITY_AUTO_DISCOVERY = "false"
+$env:PYTHON_CMD = "python"
+node scripts/run-evidence-command.mjs --name package --platform win -- pnpm desktop:dist:win
 node scripts/verify-desktop-package.mjs win
 node scripts/check-package-size.mjs win
-pnpm test:e2e:win
+node scripts/run-evidence-command.mjs --name desktop --platform win --artifact artifacts/acceptance/desktop-win.json -- pnpm test:e2e:win
+node scripts/write-acceptance-evidence.mjs win
 pnpm verify:acceptance -- --platform win
 ```
 
 产物在 `release\` 目录，包含 NSIS 安装程序。
 
 ## 验收限制
+
+以上命令必须在同一干净提交中按顺序运行；`verify:acceptance` 不会自行生成报告，且会拒绝
+缺少 evidence runner 收据、缺少 manifest、提交不一致或 SHA-256 不一致的旧产物。
 
 - Excel 最大 25 MiB，一次最多 10,000 条记录。
 - Vertical Cabling 单行 QTY 最大 5,000。

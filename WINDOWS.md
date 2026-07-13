@@ -45,19 +45,34 @@ corepack pnpm start
 ## 构建 Windows 桌面 EXE
 
 ```powershell
-pnpm check:fast
-pnpm test:python
-pnpm test:e2e:browser -- --workers=1
-pnpm desktop:dist:win
+New-Item -ItemType Directory -Force artifacts/acceptance | Out-Null
+node scripts/verify-dependency-policy.mjs
+python scripts/verify_python_locks.py
+pnpm lint
+pnpm ts-check
+node scripts/verify-runtime-surface.mjs
+node scripts/run-evidence-command.mjs --name unit --platform win --artifact artifacts/acceptance/unit.json -- pnpm exec vitest run --reporter=json --outputFile=artifacts/acceptance/unit.json
+node scripts/run-evidence-command.mjs --name python --platform win --artifact artifacts/acceptance/python.xml -- python -m pytest -q --junitxml=artifacts/acceptance/python.xml
+$env:PLAYWRIGHT_JSON_OUTPUT_FILE = "artifacts/acceptance/browser.json"
+$env:PLAYWRIGHT_PORT = "51237"
+node scripts/run-evidence-command.mjs --name browser --platform win --artifact artifacts/acceptance/browser.json -- pnpm exec playwright test --project=chromium --workers=1 --reporter=json
+node scripts/run-evidence-command.mjs --name audit --platform win --capture artifacts/acceptance/audit-win.json -- pnpm audit --prod --audit-level high --registry=https://registry.npmjs.org --json
+$env:CSC_IDENTITY_AUTO_DISCOVERY = "false"
+$env:PYTHON_CMD = "python"
+node scripts/run-evidence-command.mjs --name package --platform win -- pnpm desktop:dist:win
 node scripts/verify-desktop-package.mjs win
 node scripts/check-package-size.mjs win
-pnpm test:e2e:win
+node scripts/run-evidence-command.mjs --name desktop --platform win --artifact artifacts/acceptance/desktop-win.json -- pnpm test:e2e:win
+node scripts/write-acceptance-evidence.mjs win
 pnpm verify:acceptance -- --platform win
 ```
 
 构建完成后，NSIS 安装包会在 `release` 目录中。
 
 ## 发布验收限制
+
+上述命令必须在同一干净提交中按顺序运行。最终验收依赖 evidence runner 机器报告和
+`write-acceptance-evidence.mjs` manifest；缺失、旧提交或摘要不符的产物会被拒绝。
 
 - Node.js 必须为 24.14.0，pnpm 必须为 9.15.9，Python 必须为 3.12.13。
 - Excel 最大 25 MiB，最多 10,000 条记录；单行 QTY 最大 5,000。
