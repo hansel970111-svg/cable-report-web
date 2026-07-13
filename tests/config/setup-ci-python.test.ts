@@ -78,7 +78,7 @@ test('CI Python setup exports the Windows virtual-environment interpreter', () =
 });
 
 test('CI Python setup rejects an interpreter that does not match the requested patch', () => {
-  const pythonPath = path.join(path.parse(process.cwd()).root, 'managed-python', 'bin', 'python');
+  const pythonPath = '/managed-python/bin/python';
 
   expect(() => setupCiPython({
     version: '3.12.13',

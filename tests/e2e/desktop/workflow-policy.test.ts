@@ -26,7 +26,8 @@ test('machine reports and Playwright scratch output cannot dirty acceptance stat
 });
 
 test('CI matrix and frozen runtimes retain the release contract', async () => {
-  const source = await readFile('.github/workflows/desktop-e2e.yml', 'utf8');
+  const source = (await readFile('.github/workflows/desktop-e2e.yml', 'utf8'))
+    .replaceAll('\r\n', '\n');
   const browserConfig = await readFile('playwright.config.ts', 'utf8');
 
   expect(source).toContain('os: macos-latest');

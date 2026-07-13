@@ -140,6 +140,7 @@ test('desktop package verification rejects a packaged tree without the runtime v
 
     await mkdir(join(appSourceDir, 'scripts'));
     await writeFile(join(appSourceDir, 'scripts', 'versioning.mjs'), 'export {};');
+    await rm(appAsarPath, { force: true });
     await createPackage(appSourceDir, appAsarPath);
     const completeResult = spawnSync(
       process.execPath,
@@ -151,7 +152,10 @@ test('desktop package verification rejects a packaged tree without the runtime v
       },
     );
 
-    expect(completeResult.status).toBe(0);
+    expect(
+      completeResult.status,
+      `${completeResult.stdout}\n${completeResult.stderr}`,
+    ).toBe(0);
     expect(completeResult.stdout).toContain('mac package structure looks good');
   } finally {
     await rm(workspace, { recursive: true, force: true });

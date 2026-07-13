@@ -291,7 +291,7 @@ describe('prepare-release command with a real bare origin', () => {
     git(ahead.work, ['add', '.']);
     git(ahead.work, ['commit', '-m', 'local']);
     await expect(prepare(ahead.work)).resolves.toMatchObject({ version: '2026.710.1' });
-  });
+  }, 20_000);
 
   it('strictly rejects malformed local and remote v* tags', async () => {
     const local = await fixture();

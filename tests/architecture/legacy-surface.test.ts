@@ -21,7 +21,9 @@ describe('production API surface', () => {
     const apiRoot = join(process.cwd(), 'src/app/api');
     const routes = readdirSync(apiRoot, { recursive: true, withFileTypes: true })
       .filter(entry => entry.isFile() && entry.name === 'route.ts')
-      .map(entry => relative(process.cwd(), join(entry.parentPath, entry.name)))
+      .map(entry => (
+        relative(process.cwd(), join(entry.parentPath, entry.name)).replaceAll('\\', '/')
+      ))
       .sort();
 
     expect(routes).toEqual([

@@ -41,7 +41,7 @@ async function trustedInputs() {
     readFile('package.json', 'utf8'),
     readFile('pnpm-lock.yaml', 'utf8'),
   ]);
-  return { packageJson, lockfile };
+  return { packageJson, lockfile: lockfile.replaceAll('\r\n', '\n') };
 }
 
 test('dependency verifier accepts the trusted root importer', async () => {

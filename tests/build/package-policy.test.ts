@@ -91,37 +91,43 @@ test('Electron Builder uses the exact minimal ASAR graph', () => {
 });
 
 test('packaged runtime keeps application and external resource roots separate', () => {
-  process.env.COZE_WORKSPACE_PATH = '/Applications/Cable.app/Contents/Resources/app.asar';
-  process.env.CABLE_RESOURCES_PATH = '/Applications/Cable.app/Contents/Resources';
+  const appRoot = '/Applications/Cable.app/Contents/Resources/app.asar';
+  const resourcesRoot = '/Applications/Cable.app/Contents/Resources';
+  process.env.COZE_WORKSPACE_PATH = appRoot;
+  process.env.CABLE_RESOURCES_PATH = resourcesRoot;
 
-  expect(getAppRoot()).toBe('/Applications/Cable.app/Contents/Resources/app.asar');
+  expect(getAppRoot()).toBe(appRoot);
   expect(getAppPathCandidates('scripts', 'versioning.mjs')).toEqual([
-    '/Applications/Cable.app/Contents/Resources/app.asar/scripts/versioning.mjs',
+    path.join(appRoot, 'scripts', 'versioning.mjs'),
   ]);
   expect(getAppPathCandidates('assets', 'M138-DE46-P-A-MPO.pdf')).toEqual([
-    '/Applications/Cable.app/Contents/Resources/assets/M138-DE46-P-A-MPO.pdf',
+    path.join(resourcesRoot, 'assets', 'M138-DE46-P-A-MPO.pdf'),
   ]);
   expect(getAppPathCandidates('bin', 'pdf_worker')).toEqual([
-    '/Applications/Cable.app/Contents/Resources/bin/pdf_worker',
+    path.join(resourcesRoot, 'bin', 'pdf_worker'),
   ]);
 
-  const candidates = getAppPathCandidates('assets', 'M138-DE46-P-A-MPO.pdf').join('\n');
+  const candidates = getAppPathCandidates('assets', 'M138-DE46-P-A-MPO.pdf')
+    .join('\n')
+    .replaceAll('\\', '/');
   expect(candidates).not.toContain('resources/app');
   expect(candidates).not.toContain('app.asar.unpacked');
 });
 
 test('packaged runtime routes normalized single-string resource paths externally', () => {
-  process.env.COZE_WORKSPACE_PATH = '/Applications/Cable.app/Contents/Resources/app.asar';
-  process.env.CABLE_RESOURCES_PATH = '/Applications/Cable.app/Contents/Resources';
+  const appRoot = '/Applications/Cable.app/Contents/Resources/app.asar';
+  const resourcesRoot = '/Applications/Cable.app/Contents/Resources';
+  process.env.COZE_WORKSPACE_PATH = appRoot;
+  process.env.CABLE_RESOURCES_PATH = resourcesRoot;
 
   expect(getAppPathCandidates('assets/M138-DE46-P-A-MPO.pdf')).toEqual([
-    '/Applications/Cable.app/Contents/Resources/assets/M138-DE46-P-A-MPO.pdf',
+    path.join(resourcesRoot, 'assets', 'M138-DE46-P-A-MPO.pdf'),
   ]);
   expect(getAppPathCandidates('bin/pdf_worker')).toEqual([
-    '/Applications/Cable.app/Contents/Resources/bin/pdf_worker',
+    path.join(resourcesRoot, 'bin', 'pdf_worker'),
   ]);
   expect(getAppPathCandidates('resources/bin/pdf_worker')).toEqual([
-    '/Applications/Cable.app/Contents/Resources/bin/pdf_worker',
+    path.join(resourcesRoot, 'bin', 'pdf_worker'),
   ]);
 
   const absolutePath = path.resolve('/tmp/cable-template.pdf');
@@ -129,18 +135,19 @@ test('packaged runtime routes normalized single-string resource paths externally
 });
 
 test('development runtime uses the project root for code and resources', () => {
-  process.env.COZE_WORKSPACE_PATH = '/workspace/cable-report';
-  process.env.CABLE_RESOURCES_PATH = '/workspace/cable-report';
+  const appRoot = '/workspace/cable-report';
+  process.env.COZE_WORKSPACE_PATH = appRoot;
+  process.env.CABLE_RESOURCES_PATH = appRoot;
 
-  expect(getAppRoot()).toBe('/workspace/cable-report');
+  expect(getAppRoot()).toBe(appRoot);
   expect(getAppPathCandidates('scripts', 'pdf_editor.py')).toEqual([
-    '/workspace/cable-report/scripts/pdf_editor.py',
+    path.join(appRoot, 'scripts', 'pdf_editor.py'),
   ]);
   expect(getAppPathCandidates('worker-bin', 'pdf_worker')).toEqual([
-    '/workspace/cable-report/worker-bin/pdf_worker',
+    path.join(appRoot, 'worker-bin', 'pdf_worker'),
   ]);
   expect(getAppPathCandidates('assets', 'M138-DE46-P-A-MPO.pdf')).toEqual([
-    '/workspace/cable-report/assets/M138-DE46-P-A-MPO.pdf',
+    path.join(appRoot, 'assets', 'M138-DE46-P-A-MPO.pdf'),
   ]);
 });
 
