@@ -3,6 +3,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
+import { fileURLToPath } from 'node:url';
 
 function parse(argv) {
   const options = {};
@@ -45,17 +46,18 @@ function safeArtifact(workspace, relativePath) {
   return absolutePath;
 }
 
-function commandInvocation(command, args) {
+export function commandInvocation(command, args, platform = process.platform) {
   if (command === 'pnpm') {
     return {
-      command: process.platform === 'win32' ? 'corepack.cmd' : 'corepack',
+      command: 'corepack',
       args: ['pnpm@9.15.9', ...args],
+      shell: platform === 'win32',
     };
   }
-  if (process.platform === 'win32' && command === 'corepack') {
-    return { command: 'corepack.cmd', args };
+  if (platform === 'win32' && command === 'corepack') {
+    return { command: 'corepack', args, shell: true };
   }
-  return { command, args };
+  return { command, args, shell: false };
 }
 
 function run(command, args, workspace, capture) {
@@ -65,7 +67,7 @@ function run(command, args, workspace, capture) {
     env: process.env,
     encoding: capture ? 'utf8' : undefined,
     stdio: capture ? 'pipe' : 'inherit',
-    shell: false,
+    shell: invocation.shell,
     windowsHide: true,
     maxBuffer: 64 * 1024 * 1024,
   });
@@ -125,4 +127,4 @@ function main() {
   }
 }
 
-main();
+if (path.resolve(process.argv[1] || '') === fileURLToPath(import.meta.url)) main();

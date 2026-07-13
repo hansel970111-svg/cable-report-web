@@ -8,6 +8,7 @@ import {
   createAcceptanceManifest,
   verifyAcceptanceManifest,
 } from '../../../scripts/acceptance-evidence.mjs';
+import { commandInvocation } from '../../../scripts/run-evidence-command.mjs';
 
 import {
   assertCiPlatformEvidence,
@@ -124,6 +125,24 @@ test('cross-platform claims cannot be enabled from an untrusted local JSON repor
     '--require-ci-platform', 'win',
     '--ci-report', 'hand-written.json',
   ])).toThrow(/GitHub API/i);
+});
+
+test('evidence commands pin pnpm and use a shell only for Windows command shims', () => {
+  expect(commandInvocation('pnpm', ['exec', 'vitest'], 'darwin')).toEqual({
+    command: 'corepack',
+    args: ['pnpm@9.15.9', 'exec', 'vitest'],
+    shell: false,
+  });
+  expect(commandInvocation('pnpm', ['exec', 'vitest'], 'win32')).toEqual({
+    command: 'corepack',
+    args: ['pnpm@9.15.9', 'exec', 'vitest'],
+    shell: true,
+  });
+  expect(commandInvocation('python', ['-m', 'pytest'], 'win32')).toEqual({
+    command: 'python',
+    args: ['-m', 'pytest'],
+    shell: false,
+  });
 });
 
 test('acceptance manifest binds every report, package, and installer to current HEAD', async () => {
