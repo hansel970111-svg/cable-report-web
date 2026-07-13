@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import {
@@ -266,13 +266,55 @@ function formatFailure(error) {
   return error instanceof Error ? error.stack ?? error.message : String(error);
 }
 
-async function main() {
-  const args = process.argv.slice(2);
-  const unknown = args.filter(arg => arg !== '--prepared');
-  if (unknown.length > 0) {
-    throw new Error(`Unknown argument: ${unknown[0]}`);
+function parseCliArguments(args) {
+  let prepared = false;
+  let artifactsPath;
+  for (let index = 0; index < args.length; index += 1) {
+    const argument = args[index];
+    if (argument === '--') continue;
+    if (argument === '--prepared') {
+      if (prepared) throw new Error('Duplicate argument: --prepared');
+      prepared = true;
+      continue;
+    }
+    if (argument === '--artifacts') {
+      if (artifactsPath !== undefined) failArtifact('Artifact evidence may be provided only once.');
+      const path = args[index + 1];
+      if (!path || path.startsWith('--')) {
+        failArtifact('The --artifacts option requires a JSON file path.');
+      }
+      artifactsPath = path;
+      index += 1;
+      continue;
+    }
+    throw new Error(`Unknown argument: ${argument}`);
   }
-  const result = await validateReleaseVersion({ prepared: args.includes('--prepared') });
+  return { artifactsPath, prepared };
+}
+
+async function readArtifactEvidence(cwd, artifactsPath) {
+  let text;
+  try {
+    text = await readFile(resolve(cwd, artifactsPath), 'utf8');
+  } catch (error) {
+    failArtifact(
+      `Could not read artifact evidence JSON: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    failArtifact('Artifact evidence file is not valid JSON.');
+  }
+}
+
+async function main() {
+  const cwd = process.cwd();
+  const { artifactsPath, prepared } = parseCliArguments(process.argv.slice(2));
+  const artifacts = artifactsPath === undefined
+    ? undefined
+    : await readArtifactEvidence(cwd, artifactsPath);
+  const result = await validateReleaseVersion({ artifacts, cwd, prepared });
   if (result.mode === 'prepared' && !result.artifactsValidated) {
     process.stdout.write(
       `Validated prepared version prerequisites ${result.version}; consumer validation pending.\n`,

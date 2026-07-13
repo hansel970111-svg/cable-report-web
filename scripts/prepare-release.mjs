@@ -2,7 +2,9 @@ import { spawnSync } from 'node:child_process';
 import {
   readFile, rename, unlink, writeFile,
 } from 'node:fs/promises';
-import { basename, dirname, join } from 'node:path';
+import {
+  basename, dirname, join, relative,
+} from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import {
@@ -52,7 +54,8 @@ function command(runner, commandName, args, cwd) {
   }
 }
 
-async function writeTextAtomically(packagePath, text, fileSystem) {
+async function writeTextAtomically(packagePath, text, fileSystem, options = {}) {
+  const { beforeRename, expectedCurrentText } = options;
   const directory = dirname(packagePath);
   const temporaryPath = join(
     directory,
@@ -60,6 +63,13 @@ async function writeTextAtomically(packagePath, text, fileSystem) {
   );
   try {
     await fileSystem.writeFile(temporaryPath, text, 'utf8');
+    if (beforeRename) await beforeRename(temporaryPath);
+    if (expectedCurrentText !== undefined) {
+      const currentText = await fileSystem.readFile(packagePath, 'utf8');
+      if (currentText !== expectedCurrentText) {
+        releaseError('DIRTY_WORKTREE', 'package.json changed during release preparation.');
+      }
+    }
     await fileSystem.rename(temporaryPath, packagePath);
   } catch (error) {
     try {
@@ -68,6 +78,27 @@ async function writeTextAtomically(packagePath, text, fileSystem) {
       // The temporary file may not have been created or may already have been renamed.
     }
     throw error;
+  }
+}
+
+function assertCandidateStateUnchanged(git, cwd, expectedHead, temporaryPath) {
+  if (git(['branch', '--show-current']).stdout !== 'main') {
+    releaseError('NOT_ON_MAIN', 'The current branch changed during release preparation.');
+  }
+  if (git(['rev-parse', 'HEAD']).stdout !== expectedHead) {
+    releaseError('MAIN_NOT_CURRENT', 'HEAD changed during release preparation.');
+  }
+  const temporaryRelativePath = relative(cwd, temporaryPath).replaceAll('\\', '/');
+  const status = git([
+    'status',
+    '--porcelain=v1',
+    '--untracked-files=all',
+    '--',
+    '.',
+    `:(top,exclude,literal)${temporaryRelativePath}`,
+  ]).stdout;
+  if (status !== '') {
+    releaseError('DIRTY_WORKTREE', 'The worktree or index changed during release preparation.');
   }
 }
 
@@ -125,6 +156,7 @@ export async function prepareRelease(options = {}) {
   if (git(['branch', '--show-current']).stdout !== 'main') {
     releaseError('NOT_ON_MAIN', 'Release preparation is allowed only on main.');
   }
+  const originalHead = git(['rev-parse', 'HEAD']).stdout;
   if (git(['status', '--porcelain=v1', '--untracked-files=all']).stdout !== '') {
     releaseError('DIRTY_WORKTREE', 'The worktree or index has uncommitted changes.');
   }
@@ -210,7 +242,15 @@ export async function prepareRelease(options = {}) {
     packageJsonText: nextText,
   });
 
-  await writeTextAtomically(packagePath, nextText, fileSystem);
+  await writeTextAtomically(packagePath, nextText, fileSystem, {
+    beforeRename: temporaryPath => assertCandidateStateUnchanged(
+      git,
+      cwd,
+      originalHead,
+      temporaryPath,
+    ),
+    expectedCurrentText: originalText,
+  });
   if (runPostChecks) {
     try {
       command(
@@ -225,7 +265,9 @@ export async function prepareRelease(options = {}) {
       command(checkRunner, process.execPath, ['scripts/verify-dependency-policy.mjs'], cwd);
     } catch (postcheckError) {
       try {
-        await writeTextAtomically(packagePath, originalText, fileSystem);
+        await writeTextAtomically(packagePath, originalText, fileSystem, {
+          expectedCurrentText: nextText,
+        });
       } catch (rollbackError) {
         const combined = new AggregateError(
           [postcheckError, rollbackError],

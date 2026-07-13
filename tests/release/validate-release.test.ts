@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -193,6 +193,44 @@ describe('validate-release command with real Git tags', () => {
       .rejects.toMatchObject({ code: 'VERSION_NOT_IN_ARTIFACT' });
     await expect(validate(work, { artifacts: { uiVersion: '2026.710.1' } }))
       .rejects.toMatchObject({ code: 'VERSION_NOT_IN_ARTIFACT' });
+  });
+
+  it('accepts strict artifact JSON through the real formal-tag CLI and rejects unusable evidence', async () => {
+    const { work } = await fixture();
+    const version = '2026.710.1';
+    await commitVersion(work, version);
+    annotatedTag(work, version);
+
+    const validPath = join(work, 'valid-artifacts.json');
+    const malformedPath = join(work, 'malformed-artifacts.json');
+    const incompletePath = join(work, 'incomplete-artifacts.json');
+    const driftingPath = join(work, 'drifting-artifacts.json');
+    await writeFile(validPath, `${JSON.stringify(artifactEvidence(version), null, 2)}\n`);
+    await writeFile(malformedPath, '{not json}\n');
+    await writeFile(incompletePath, `${JSON.stringify({ uiVersion: version })}\n`);
+    await writeFile(driftingPath, `${JSON.stringify({
+      ...artifactEvidence(version),
+      electronVersion: '2026.710.2',
+    })}\n`);
+
+    const runCli = (args: string[]) => spawnSync(process.execPath, [validatorScript, ...args], {
+      cwd: work,
+      encoding: 'utf8',
+    });
+    const valid = runCli(['--artifacts', validPath]);
+    expect(valid.status).toBe(0);
+    expect(valid.stdout).toContain(`Validated tag release version ${version}.`);
+
+    for (const args of [
+      [],
+      ['--artifacts', malformedPath],
+      ['--artifacts', incompletePath],
+      ['--artifacts', driftingPath],
+    ]) {
+      const result = runCli(args);
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('[VERSION_NOT_IN_ARTIFACT]');
+    }
   });
 
   it('rejects artifact filename substring collisions but accepts complete exact evidence', async () => {

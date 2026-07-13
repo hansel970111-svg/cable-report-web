@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import {
   mkdtemp, readFile, readdir, rename, rm, unlink, writeFile,
 } from 'node:fs/promises';
@@ -207,6 +207,51 @@ describe('prepare-release command with a real bare origin', () => {
     expect(await packageText(work)).toBe(before);
   });
 
+  it('rejects a package edit after the final fetch and preserves the external bytes', async () => {
+    const { work } = await fixture();
+    const externalText = `${JSON.stringify({
+      name: 'fixture',
+      version: '0.1.1',
+      private: true,
+      external: 'keep me',
+    }, null, 2)}\n`;
+    let fetches = 0;
+    const runner = (command: string, args: string[], options: Record<string, unknown>) => {
+      const result = spawnSync(command, args, options);
+      if (command === 'git' && args[0] === 'fetch') {
+        fetches += 1;
+        if (fetches === 2) writeFileSync(join(work, 'package.json'), externalText);
+      }
+      return result;
+    };
+
+    await expect(prepare(work, { runner })).rejects.toMatchObject({ code: 'DIRTY_WORKTREE' });
+    expect(fetches).toBe(2);
+    expect(await packageText(work)).toBe(externalText);
+    expect(await temporaryReleaseFiles(work)).toEqual([]);
+  });
+
+  it('rejects a HEAD move after the final fetch', async () => {
+    const { work } = await fixture();
+    const before = await packageText(work);
+    const originalHead = git(work, ['rev-parse', 'HEAD']);
+    let fetches = 0;
+    const runner = (command: string, args: string[], options: Record<string, unknown>) => {
+      const result = spawnSync(command, args, options);
+      if (command === 'git' && args[0] === 'fetch') {
+        fetches += 1;
+        if (fetches === 2) git(work, ['commit', '--allow-empty', '-m', 'concurrent head move']);
+      }
+      return result;
+    };
+
+    await expect(prepare(work, { runner })).rejects.toMatchObject({ code: 'MAIN_NOT_CURRENT' });
+    expect(fetches).toBe(2);
+    expect(git(work, ['rev-parse', 'HEAD'])).not.toBe(originalHead);
+    expect(await packageText(work)).toBe(before);
+    expect(await temporaryReleaseFiles(work)).toEqual([]);
+  });
+
   it('rejects a behind or diverged main but allows a locally-ahead main', async () => {
     const behind = await fixture();
     await remoteCommit(behind.origin, behind.root, 'remote-behind');
@@ -391,6 +436,35 @@ describe('prepare-release command with a real bare origin', () => {
     await expect(prepare(work, { runPostChecks: true, checkRunner, fileSystem }))
       .rejects.toThrow(/postcheck exploded[\s\S]*rollback blocked/);
     expect(renames).toBe(2);
+    expect(await temporaryReleaseFiles(work)).toEqual([]);
+  });
+
+  it('does not overwrite an external package edit while rolling back a failed postcheck', async () => {
+    const { work } = await fixture();
+    const externalText = `${JSON.stringify({
+      name: 'fixture',
+      version: '2026.710.1',
+      private: true,
+      external: 'postcheck edit',
+    }, null, 2)}\n`;
+    const checkRunner = () => {
+      writeFileSync(join(work, 'package.json'), externalText);
+      return { status: 1, stdout: '', stderr: 'postcheck exploded' };
+    };
+
+    let caught: unknown;
+    try {
+      await prepare(work, { runPostChecks: true, checkRunner });
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(AggregateError);
+    const aggregate = caught as AggregateError;
+    expect(aggregate.errors).toHaveLength(2);
+    expect(aggregate.errors[0]).toMatchObject({ message: expect.stringContaining('postcheck exploded') });
+    expect(aggregate.errors[1]).toMatchObject({ code: 'DIRTY_WORKTREE' });
+    expect(await packageText(work)).toBe(externalText);
     expect(await temporaryReleaseFiles(work)).toEqual([]);
   });
 
