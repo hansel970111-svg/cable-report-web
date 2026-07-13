@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
 import { createHash } from 'node:crypto';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { access, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -216,6 +217,33 @@ test('acceptance manifest binds every report, package, and installer to current 
     await writeFile(path.join(workspace, 'artifacts/acceptance/unit.json'), 'stale-or-mutated');
     expect(() => verifyAcceptanceManifest({ workspace, manifest, platform: 'mac', head }))
       .toThrow(/digest mismatch/i);
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
+  }
+});
+
+test('a failed evidence rerun removes any stale successful gate receipt first', async () => {
+  const workspace = await mkdtemp(path.join(tmpdir(), 'failed-evidence-rerun-'));
+  const receipt = path.join(workspace, 'artifacts/acceptance/gate-unit-mac.json');
+  try {
+    expect(spawnSync('git', ['init'], { cwd: workspace }).status).toBe(0);
+    expect(spawnSync('git', ['config', 'user.email', 'fixture@example.test'], { cwd: workspace }).status).toBe(0);
+    expect(spawnSync('git', ['config', 'user.name', 'Fixture'], { cwd: workspace }).status).toBe(0);
+    await writeFile(path.join(workspace, 'tracked.txt'), 'fixture');
+    expect(spawnSync('git', ['add', 'tracked.txt'], { cwd: workspace }).status).toBe(0);
+    expect(spawnSync('git', ['commit', '-m', 'fixture'], { cwd: workspace }).status).toBe(0);
+    await mkdir(path.dirname(receipt), { recursive: true });
+    await writeFile(receipt, '{"conclusion":"stale-success"}\n');
+
+    const result = spawnSync(process.execPath, [
+      path.resolve('scripts/run-evidence-command.mjs'),
+      '--name', 'unit',
+      '--platform', 'mac',
+      '--', process.execPath, '-e', 'process.exit(7)',
+    ], { cwd: workspace, encoding: 'utf8' });
+
+    expect(result.status).toBe(1);
+    await expect(access(receipt)).rejects.toMatchObject({ code: 'ENOENT' });
   } finally {
     await rm(workspace, { recursive: true, force: true });
   }

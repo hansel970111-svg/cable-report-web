@@ -96,6 +96,14 @@ function main() {
     if (git.error || git.status !== 0 || !/^[0-9a-f]{40}$/i.test(head || '')) {
       throw new Error(`Unable to resolve Git HEAD: ${git.stderr || git.error || head}`);
     }
+    const output = path.join(
+      workspace,
+      'artifacts',
+      'acceptance',
+      `gate-${options.name}-${options.platform}.json`,
+    );
+    fs.mkdirSync(path.dirname(output), { recursive: true });
+    fs.rmSync(output, { force: true });
     const capturePath = options.capture ? path.join(workspace, options.capture) : undefined;
     run(options.command[0], options.command.slice(1), workspace, capturePath);
     const artifact = options.artifact || options.capture;
@@ -110,13 +118,6 @@ function main() {
       exitCode: 0,
       ...(artifact ? { artifact, artifactSha256 } : {}),
     };
-    const output = path.join(
-      workspace,
-      'artifacts',
-      'acceptance',
-      `gate-${options.name}-${options.platform}.json`,
-    );
-    fs.mkdirSync(path.dirname(output), { recursive: true });
     const temporary = `${output}.${process.pid}.tmp`;
     fs.writeFileSync(temporary, `${JSON.stringify(evidence, null, 2)}\n`, { flag: 'wx' });
     fs.renameSync(temporary, output);
