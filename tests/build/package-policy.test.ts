@@ -509,20 +509,27 @@ test('quality workflow runs the fixed PR gates in exact order', () => {
   if (!existsSync(workflowPath)) return;
   const workflow = readFileSync(workflowPath, 'utf8');
   const commands = [
-    'corepack prepare pnpm@9.15.9 --activate',
-    'pnpm install --frozen-lockfile',
+    'node scripts/setup-ci-python.mjs 3.12.13',
+    'corepack pnpm@9.15.9 install --frozen-lockfile',
     'python -m pip install --require-hashes -r requirements-dev.lock',
-    'pnpm lint',
-    'pnpm ts-check',
-    'pnpm test:unit',
+    'corepack pnpm@9.15.9 lint',
+    'corepack pnpm@9.15.9 ts-check',
+    'corepack pnpm@9.15.9 test:unit',
     'python -m pytest -q',
-    'pnpm audit --prod --audit-level high --registry=https://registry.npmjs.org',
-    'pnpm build',
+    'corepack pnpm@9.15.9 audit --prod --audit-level high --registry=https://registry.npmjs.org',
+    'corepack pnpm@9.15.9 build',
     'node scripts/verify-build-inputs.mjs',
   ];
   const positions = commands.map(command => workflow.indexOf(`run: ${command}`));
 
   expect(workflow).toContain('pull_request:');
+  expect(workflow).toContain('ref: ${{ github.event.pull_request.head.sha || github.sha }}');
+  expect(workflow).toContain(
+    'uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0',
+  );
+  expect(workflow).toContain('version: "0.11.28"');
+  expect(workflow).not.toContain('actions/setup-python');
+  expect(workflow).not.toMatch(/^\s*- run: pnpm /m);
   expect(positions.every(position => position >= 0)).toBe(true);
   expect(positions).toEqual([...positions].sort((left, right) => left - right));
 });
@@ -534,13 +541,16 @@ test('Windows CI is read-only and has one desktop build entry', () => {
   );
 
   expect(workflow).toMatch(/permissions:\s+contents: read/);
-  expect(workflow).toContain('corepack prepare pnpm@9.15.9 --activate');
-  expect(workflow).toContain('corepack pnpm install --frozen-lockfile');
+  expect(workflow).toContain(
+    'uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0',
+  );
+  expect(workflow).toContain('node scripts/setup-ci-python.mjs 3.12.13');
+  expect(workflow).toContain('corepack pnpm@9.15.9 install --frozen-lockfile');
   expect(workflow).toContain(
     'python -m pip install --require-hashes --only-binary=:all: -r requirements-dev.lock',
   );
-  expect(workflow.match(/corepack pnpm desktop:dist:win/g)).toHaveLength(1);
-  expect(workflow).not.toContain('corepack pnpm build');
+  expect(workflow.match(/corepack pnpm@9\.15\.9 desktop:dist:win/g)).toHaveLength(1);
+  expect(workflow).not.toContain('corepack pnpm@9.15.9 build');
   expect(workflow).not.toContain('build-python-workers.mjs');
   expect(workflow).not.toContain('electron-builder --win');
   expect(workflow).not.toContain('softprops/action-gh-release');

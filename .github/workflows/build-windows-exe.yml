@@ -44,16 +44,17 @@ jobs:
         with:
           node-version: "24.14.0"
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Install frozen uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
-          python-version: "3.12.13"
+          version: "0.11.28"
+          enable-cache: false
 
-      - name: Enable pnpm
-        shell: pwsh
-        run: |
-          corepack enable
-          corepack prepare pnpm@9.15.9 --activate
+      - name: Set up exact managed Python
+        run: node scripts/setup-ci-python.mjs 3.12.13
+
+      - name: Verify pnpm
+        run: corepack pnpm@9.15.9 --version
 
       - name: Install Node dependencies
         shell: pwsh
@@ -61,7 +62,7 @@ jobs:
           Add-Content -Path .npmrc -Value ""
           Add-Content -Path .npmrc -Value "node-linker=hoisted"
           Add-Content -Path .npmrc -Value "virtual-store-dir=.pnpm"
-          corepack pnpm install --frozen-lockfile
+          corepack pnpm@9.15.9 install --frozen-lockfile
 
       - name: Install Python dependencies
         shell: pwsh
@@ -74,19 +75,19 @@ jobs:
         run: |
           node scripts/verify-dependency-policy.mjs
           python scripts/verify_python_locks.py
-          corepack pnpm audit --audit-level high --registry=https://registry.npmjs.org
+          corepack pnpm@9.15.9 audit --audit-level high --registry=https://registry.npmjs.org
 
       - name: Run release quality gates
         shell: pwsh
         run: |
-          corepack pnpm check:fast
-          corepack pnpm test:python
+          corepack pnpm@9.15.9 check:fast
+          corepack pnpm@9.15.9 test:python
 
       - name: Build Windows EXE
         shell: pwsh
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
-        run: corepack pnpm desktop:dist:win
+        run: corepack pnpm@9.15.9 desktop:dist:win
 
       - name: Show build outputs
         shell: pwsh

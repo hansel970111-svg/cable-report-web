@@ -14,10 +14,9 @@
 - Python 3.12.13
 
 ```bash
-corepack prepare pnpm@9.15.9 --activate
-pnpm install --frozen-lockfile
+corepack pnpm@9.15.9 install --frozen-lockfile
 python -m pip install --require-hashes --only-binary=:all: -r requirements-dev.lock
-pnpm exec playwright install chromium
+corepack pnpm@9.15.9 exec playwright install chromium
 ```
 
 Windows 完整发布流程要求 `python` 命令本身解析到 Python 3.12.13。若安装了多个版本，
@@ -31,7 +30,7 @@ python -m pip install --require-hashes --only-binary=:all: -r requirements-dev.l
 ## 本机调试桌面版
 
 ```bash
-pnpm desktop:dev
+corepack pnpm@9.15.9 desktop:dev
 ```
 
 ## 构建 macOS 版本
@@ -49,7 +48,7 @@ node scripts/verify-desktop-package.mjs mac
 node scripts/check-package-size.mjs mac
 PYTHON_CMD=python node scripts/run-evidence-command.mjs --name desktop --platform mac --artifact artifacts/acceptance/desktop-mac.json -- pnpm test:e2e:mac
 node scripts/write-acceptance-evidence.mjs mac
-PYTHON_CMD=python pnpm verify:acceptance -- --platform mac
+PYTHON_CMD=python corepack pnpm@9.15.9 verify:acceptance -- --platform mac
 ```
 
 产物在 `release/` 目录。
@@ -73,7 +72,7 @@ node scripts/verify-desktop-package.mjs win
 node scripts/check-package-size.mjs win
 node scripts/run-evidence-command.mjs --name desktop --platform win --artifact artifacts/acceptance/desktop-win.json -- pnpm test:e2e:win
 node scripts/write-acceptance-evidence.mjs win
-pnpm verify:acceptance -- --platform win
+corepack pnpm@9.15.9 verify:acceptance -- --platform win
 ```
 
 产物在 `release\` 目录，包含 NSIS 安装程序。

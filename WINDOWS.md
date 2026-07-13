@@ -11,10 +11,9 @@
 在项目目录打开 PowerShell，执行：
 
 ```powershell
-corepack prepare pnpm@9.15.9 --activate
-pnpm install --frozen-lockfile
+corepack pnpm@9.15.9 install --frozen-lockfile
 python -m pip install --require-hashes --only-binary=:all: -r requirements-dev.lock
-pnpm exec playwright install chromium
+corepack pnpm@9.15.9 exec playwright install chromium
 ```
 
 完整发布验证要求 `python` 命令本身解析到 Python 3.12.13。如果电脑上同时安装多个
@@ -28,7 +27,7 @@ python -m pip install --require-hashes --only-binary=:all: -r requirements-dev.l
 ## 开发启动
 
 ```powershell
-corepack pnpm dev
+corepack pnpm@9.15.9 dev
 ```
 
 启动后打开：
@@ -40,8 +39,8 @@ http://localhost:5000
 ## 生产构建和启动
 
 ```powershell
-corepack pnpm build
-corepack pnpm start
+corepack pnpm@9.15.9 build
+corepack pnpm@9.15.9 start
 ```
 
 ## 构建 Windows 桌面 EXE
@@ -50,8 +49,8 @@ corepack pnpm start
 New-Item -ItemType Directory -Force artifacts/acceptance | Out-Null
 node scripts/verify-dependency-policy.mjs
 python scripts/verify_python_locks.py
-pnpm lint
-pnpm ts-check
+corepack pnpm@9.15.9 lint
+corepack pnpm@9.15.9 ts-check
 node scripts/verify-runtime-surface.mjs
 node scripts/run-evidence-command.mjs --name unit --platform win --artifact artifacts/acceptance/unit.json -- pnpm exec vitest run --reporter=json --outputFile=artifacts/acceptance/unit.json
 node scripts/run-evidence-command.mjs --name python --platform win --artifact artifacts/acceptance/python.xml -- python -m pytest -q --junitxml=artifacts/acceptance/python.xml
@@ -66,7 +65,7 @@ node scripts/verify-desktop-package.mjs win
 node scripts/check-package-size.mjs win
 node scripts/run-evidence-command.mjs --name desktop --platform win --artifact artifacts/acceptance/desktop-win.json -- pnpm test:e2e:win
 node scripts/write-acceptance-evidence.mjs win
-pnpm verify:acceptance -- --platform win
+corepack pnpm@9.15.9 verify:acceptance -- --platform win
 ```
 
 构建完成后，NSIS 安装包会在 `release` 目录中。
@@ -85,5 +84,5 @@ pnpm verify:acceptance -- --platform win
 ## 常见问题
 
 - 如果提示找不到 `python`，请安装 Python 3.12，并勾选 “Add python.exe to PATH”，或使用 `py -3.12`。
-- 如果提示找不到 `pnpm`，先执行 `corepack enable`，再用 `corepack pnpm ...`。
+- 如果提示找不到 `pnpm`，直接使用固定调用 `corepack pnpm@9.15.9 ...`。
 - 正式产物必须由 Windows CI 的 `pnpm test:e2e:win` 验证，macOS 上的交叉构建不算 Windows 验收。

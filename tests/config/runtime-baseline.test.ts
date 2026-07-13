@@ -38,9 +38,13 @@ test('Windows build uses the same Node, pnpm, and frozen lock baseline', async (
   const workflow = await readFile('.github/workflows/build-windows-exe.yml', 'utf8');
   expect(workflow).toContain('runs-on: windows-2025');
   expect(workflow).toContain('node-version: "24.14.0"');
-  expect(workflow).toContain('corepack prepare pnpm@9.15.9 --activate');
-  expect(workflow).toContain('corepack pnpm install --frozen-lockfile');
-  expect(workflow).toContain('python-version: "3.12.13"');
+  expect(workflow).toContain(
+    'uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0',
+  );
+  expect(workflow).toContain('version: "0.11.28"');
+  expect(workflow).toContain('node scripts/setup-ci-python.mjs 3.12.13');
+  expect(workflow).toContain('corepack pnpm@9.15.9 install --frozen-lockfile');
+  expect(workflow).not.toContain('actions/setup-python');
   expect(workflow).toContain(
     'python -m pip install --require-hashes --only-binary=:all: -r requirements-dev.lock',
   );
@@ -48,16 +52,16 @@ test('Windows build uses the same Node, pnpm, and frozen lock baseline', async (
   expect(workflow).toContain('node scripts/verify-dependency-policy.mjs');
   expect(workflow).toContain('python scripts/verify_python_locks.py');
   expect(workflow).toContain(
-    'corepack pnpm audit --audit-level high --registry=https://registry.npmjs.org',
+    'corepack pnpm@9.15.9 audit --audit-level high --registry=https://registry.npmjs.org',
   );
-  expect(workflow).toContain('corepack pnpm check:fast');
-  expect(workflow).toContain('corepack pnpm test:python');
-  expect(workflow).toContain('corepack pnpm desktop:dist:win');
-  expect(workflow).not.toContain('corepack pnpm build');
-  expect(workflow).not.toContain('corepack pnpm exec electron-builder');
+  expect(workflow).toContain('corepack pnpm@9.15.9 check:fast');
+  expect(workflow).toContain('corepack pnpm@9.15.9 test:python');
+  expect(workflow).toContain('corepack pnpm@9.15.9 desktop:dist:win');
+  expect(workflow).not.toContain('corepack pnpm@9.15.9 build');
+  expect(workflow).not.toContain('corepack pnpm@9.15.9 exec electron-builder');
 
   const dependencyGate = workflow.indexOf('node scripts/verify-dependency-policy.mjs');
-  const build = workflow.indexOf('corepack pnpm desktop:dist:win');
+  const build = workflow.indexOf('corepack pnpm@9.15.9 desktop:dist:win');
   expect(dependencyGate).toBeGreaterThan(-1);
   expect(dependencyGate).toBeLessThan(build);
 

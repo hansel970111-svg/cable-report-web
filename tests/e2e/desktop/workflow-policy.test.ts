@@ -34,11 +34,17 @@ test('CI matrix and frozen runtimes retain the release contract', async () => {
   expect(source).toContain('os: windows-latest');
   expect(source).toContain('platform: win');
   expect(source).toContain('node-version: "24.14.0"');
-  expect(source).toContain('python-version: "3.12.13"');
-  expect(source).toContain('corepack prepare pnpm@9.15.9 --activate');
-  expect(source).toContain('pnpm install --frozen-lockfile');
+  expect(source).toContain('ref: ${{ github.event.pull_request.head.sha || github.sha }}');
+  expect(source).toContain(
+    'uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0',
+  );
+  expect(source).toContain('version: "0.11.28"');
+  expect(source).toContain('node scripts/setup-ci-python.mjs 3.12.13');
+  expect(source).not.toContain('actions/setup-python');
+  expect(source).toContain('corepack pnpm@9.15.9 install --frozen-lockfile');
+  expect(source).not.toMatch(/^\s*run: pnpm /m);
   expect(source).toContain('python -m pip install --require-hashes --only-binary=:all: -r requirements-dev.lock');
-  expect(source).toContain('pnpm exec playwright install chromium');
+  expect(source).toContain('corepack pnpm@9.15.9 exec playwright install chromium');
   expect(source).toContain('node scripts/write-acceptance-evidence.mjs mac');
   expect(source).toContain('node scripts/write-acceptance-evidence.mjs win');
   expect(source.match(/node scripts\/run-evidence-command\.mjs/g)).toHaveLength(9);
@@ -72,9 +78,14 @@ test('release documentation uses the actual frozen toolchain and dev lock', asyn
     readFile('WINDOWS.md', 'utf8'),
   ]);
   const releaseDocs = `${packaging}\n${windows}`;
+  const releaseReadme = readme.slice(readme.indexOf('## 发布验证'));
+  const frozenReleaseDocs = `${releaseReadme}\n${releaseDocs}`;
 
   expect(readme).toContain('Next.js 16.2.10');
   expect(readme).toContain('pnpm 9.15.9');
+  expect(frozenReleaseDocs).not.toContain('corepack prepare pnpm@9.15.9');
+  expect(frozenReleaseDocs).not.toMatch(/^pnpm /m);
+  expect(frozenReleaseDocs).toContain('corepack pnpm@9.15.9 install --frozen-lockfile');
   expect(releaseDocs).not.toContain('requirements.lock');
   expect(releaseDocs.match(/requirements-dev\.lock/g)?.length).toBeGreaterThanOrEqual(4);
 });

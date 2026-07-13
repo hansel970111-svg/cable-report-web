@@ -367,15 +367,14 @@ export const useStore = create<Store>((set) => ({
 发布环境固定为 Node.js 24.14.0、pnpm 9.15.9 和 Python 3.12.13。从干净检出开始执行：
 
 ```bash
-corepack prepare pnpm@9.15.9 --activate
-pnpm install --frozen-lockfile
+corepack pnpm@9.15.9 install --frozen-lockfile
 python -m pip install --require-hashes --only-binary=:all: -r requirements-dev.lock
-pnpm exec playwright install chromium
+corepack pnpm@9.15.9 exec playwright install chromium
 mkdir -p artifacts/acceptance
 node scripts/verify-dependency-policy.mjs
 python scripts/verify_python_locks.py
-pnpm lint
-pnpm ts-check
+corepack pnpm@9.15.9 lint
+corepack pnpm@9.15.9 ts-check
 node scripts/verify-runtime-surface.mjs
 node scripts/run-evidence-command.mjs --name unit --platform mac --artifact artifacts/acceptance/unit.json -- pnpm exec vitest run --reporter=json --outputFile=artifacts/acceptance/unit.json
 node scripts/run-evidence-command.mjs --name python --platform mac --artifact artifacts/acceptance/python.xml -- python -m pytest -q --junitxml=artifacts/acceptance/python.xml
@@ -386,7 +385,7 @@ node scripts/verify-desktop-package.mjs mac
 node scripts/check-package-size.mjs mac
 PYTHON_CMD=python node scripts/run-evidence-command.mjs --name desktop --platform mac --artifact artifacts/acceptance/desktop-mac.json -- pnpm test:e2e:mac
 node scripts/write-acceptance-evidence.mjs mac
-PYTHON_CMD=python pnpm verify:acceptance -- --platform mac
+PYTHON_CMD=python corepack pnpm@9.15.9 verify:acceptance -- --platform mac
 ```
 
 `verify:acceptance` 只可在同一提交已经通过 evidence runner、生成全部机器报告并执行
