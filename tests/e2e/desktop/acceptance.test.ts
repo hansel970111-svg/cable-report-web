@@ -13,12 +13,14 @@ import { commandInvocation } from '../../../scripts/run-evidence-command.mjs';
 
 import {
   assertCiPlatformEvidence,
+  auditEvidence,
   formulaEvidence,
   parseArguments,
   parsePorcelainStatus,
   playwrightEvidence,
   pythonEvidence,
   qualityCommandInvocations,
+  unitEvidence,
 } from '../../../scripts/verify-acceptance.mjs';
 
 test('pnpm argument separator is ignored by the acceptance CLI', () => {
@@ -39,6 +41,44 @@ test('Playwright evidence fails closed unless every expected story passed', () =
   });
   expect(playwrightEvidence(report, ['missing story'])).toMatchObject({ passed: false });
   expect(playwrightEvidence({ ...report, stats: { expected: 1, unexpected: 1 } }, []))
+    .toMatchObject({ passed: false });
+  expect(playwrightEvidence({
+    ...report,
+    suites: [{ specs: [{ title: 'first story', ok: true, tests: [] }] }],
+  }, ['first story'])).toMatchObject({ passed: false });
+  const withoutStats: Partial<typeof report> = { ...report };
+  delete withoutStats.stats;
+  expect(playwrightEvidence(withoutStats, ['first story', 'second story']))
+    .toMatchObject({ passed: false });
+});
+
+test('unit and audit reports require complete internally consistent counters', () => {
+  const unit = {
+    numTotalTestSuites: 105,
+    numPassedTestSuites: 105,
+    numFailedTestSuites: 0,
+    numPendingTestSuites: 0,
+    numTotalTests: 609,
+    numPassedTests: 609,
+    numFailedTests: 0,
+    numPendingTests: 0,
+    numTodoTests: 0,
+    success: true,
+  };
+  expect(unitEvidence(unit)).toMatchObject({ passed: true });
+  expect(unitEvidence({ ...unit, success: undefined })).toMatchObject({ passed: false });
+  expect(unitEvidence({ ...unit, numPendingTests: 1 })).toMatchObject({ passed: false });
+  expect(unitEvidence({ ...unit, numPassedTestSuites: 104 })).toMatchObject({ passed: false });
+
+  const vulnerabilities = { info: 0, low: 0, moderate: 0, high: 0, critical: 0 };
+  expect(auditEvidence({ metadata: { vulnerabilities } })).toMatchObject({ passed: true });
+  const missingHigh: Partial<typeof vulnerabilities> = { ...vulnerabilities };
+  delete missingHigh.high;
+  expect(auditEvidence({ metadata: { vulnerabilities: missingHigh } }))
+    .toMatchObject({ passed: false });
+  expect(auditEvidence({ metadata: { vulnerabilities: { ...vulnerabilities, high: 1 } } }))
+    .toMatchObject({ passed: false });
+  expect(auditEvidence({ metadata: { vulnerabilities: { ...vulnerabilities, total: 1 } } }))
     .toMatchObject({ passed: false });
 });
 

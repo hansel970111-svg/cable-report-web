@@ -53,22 +53,28 @@ function collectSpecs(value, target = []) {
 
 export function playwrightEvidence(report, expectedTitles) {
   const specs = collectSpecs(report);
-  const passedTitles = new Set(specs.filter(spec => (
-    spec.ok === true
-    && spec.tests.every(test => (
+  const unexpected = report?.stats?.unexpected;
+  const statsValid = Number.isSafeInteger(unexpected) && unexpected >= 0;
+  const missing = expectedTitles.filter(title => {
+    const matches = specs.filter(spec => spec.title === title);
+    return matches.length !== 1 || !(
+      matches[0].ok === true
+      && matches[0].tests.length > 0
+      && matches[0].tests.every(test => (
       test.status === 'expected'
       && test.results?.some(result => result.status === 'passed')
-    ))
-  )).map(spec => spec.title));
-  const missing = expectedTitles.filter(title => !passedTitles.has(title));
-  const unexpected = Number(report?.stats?.unexpected ?? 0);
+      ))
+    );
+  });
   return {
-    passed: unexpected === 0 && missing.length === 0,
-    detail: unexpected > 0
+    passed: statsValid && unexpected === 0 && missing.length === 0,
+    detail: !statsValid
+      ? 'Playwright report has no valid stats.unexpected counter'
+      : unexpected > 0
       ? `${unexpected} unexpected Playwright result(s)`
       : missing.length > 0
         ? `missing passed stories: ${missing.join(', ')}`
-        : `${passedTitles.size} Playwright stories passed`,
+        : `${expectedTitles.length} Playwright stories passed`,
   };
 }
 
@@ -185,12 +191,37 @@ function qualityCommandsEvidence(workspace) {
   }
 }
 
-function unitEvidence(report) {
-  const failed = Number(report?.numFailedTests ?? -1);
-  const passed = Number(report?.numPassedTests ?? -1);
+export function unitEvidence(report) {
+  const counters = [
+    'numTotalTestSuites',
+    'numPassedTestSuites',
+    'numFailedTestSuites',
+    'numPendingTestSuites',
+    'numTotalTests',
+    'numPassedTests',
+    'numFailedTests',
+    'numPendingTests',
+    'numTodoTests',
+  ];
+  const validCounters = counters.every(name => Number.isSafeInteger(report?.[name]));
+  const passed = report?.numPassedTests;
+  const failed = report?.numFailedTests;
+  const complete = validCounters
+    && report.success === true
+    && report.numTotalTests === passed
+    && passed >= 500
+    && failed === 0
+    && report.numPendingTests === 0
+    && report.numTodoTests === 0
+    && report.numTotalTestSuites === report.numPassedTestSuites
+    && report.numTotalTestSuites > 0
+    && report.numFailedTestSuites === 0
+    && report.numPendingTestSuites === 0;
   return {
-    passed: failed === 0 && passed >= 500,
-    detail: `${passed} unit tests passed; ${failed} failed`,
+    passed: complete,
+    detail: complete
+      ? `${passed} unit tests and ${report.numPassedTestSuites} suites passed with no pending/todo work`
+      : 'Vitest report is incomplete, unsuccessful, or has non-passing tests/suites',
   };
 }
 
@@ -283,13 +314,26 @@ export function pythonEvidence(xml) {
   };
 }
 
-function auditEvidence(report) {
+export function auditEvidence(report) {
   const vulnerabilities = report?.metadata?.vulnerabilities;
   if (!vulnerabilities || typeof vulnerabilities !== 'object') {
     return { passed: false, detail: 'audit report has no vulnerability summary' };
   }
-  const high = Number(vulnerabilities.high ?? 0);
-  const critical = Number(vulnerabilities.critical ?? 0);
+  const severities = ['info', 'low', 'moderate', 'high', 'critical'];
+  if (!severities.every(name => (
+    Number.isSafeInteger(vulnerabilities[name]) && vulnerabilities[name] >= 0
+  ))) {
+    return { passed: false, detail: 'audit report has incomplete vulnerability counters' };
+  }
+  const summed = severities.reduce((total, name) => total + vulnerabilities[name], 0);
+  if (
+    vulnerabilities.total !== undefined
+    && (!Number.isSafeInteger(vulnerabilities.total) || vulnerabilities.total !== summed)
+  ) {
+    return { passed: false, detail: 'audit vulnerability total does not match severity counters' };
+  }
+  const high = vulnerabilities.high;
+  const critical = vulnerabilities.critical;
   return {
     passed: high === 0 && critical === 0,
     detail: `${high} high and ${critical} critical production vulnerabilities`,
