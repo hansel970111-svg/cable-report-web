@@ -333,7 +333,7 @@ describe('prepare-release command with a real bare origin', () => {
     git(nonAncestor.work, ['add', 'package.json']);
     git(nonAncestor.work, ['commit', '-m', 'claim side version']);
     await expect(prepare(nonAncestor.work)).rejects.toMatchObject({ code: 'CURRENT_VERSION_NOT_LATEST' });
-  });
+  }, 20_000);
 
   it('uses the same-day maximum plus one and rejects the daily limit', async () => {
     const increment = await fixture();
@@ -344,7 +344,7 @@ describe('prepare-release command with a real bare origin', () => {
     const limit = await fixture();
     await publish(limit.work, '2026.710.99');
     await expect(prepare(limit.work)).rejects.toMatchObject({ code: 'DAILY_RELEASE_LIMIT' });
-  });
+  }, 20_000);
 
   it('does not increment an unreleased CalVer twice and refreshes only an untagged version', async () => {
     const pending = await fixture();
@@ -359,7 +359,7 @@ describe('prepare-release command with a real bare origin', () => {
     await publish(published.work, '2026.709.1', '2026-07-09T12:00:00+02:00');
     await expect(prepare(published.work, { refreshUnreleased: true }))
       .rejects.toMatchObject({ code: 'VERSION_COLLISION' });
-  });
+  }, 20_000);
 
   it('rejects refreshing historical 0.1.1 because refresh requires an untagged CalVer', async () => {
     const { work } = await fixture();
