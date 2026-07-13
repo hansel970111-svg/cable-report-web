@@ -680,7 +680,7 @@ def _manifest_for(case: GoldenCase, snapshot: _PdfSnapshot, page_entries: list[d
             "expected_pages": case.expected_pages,
         },
         "fixture": {
-            "path": str(CASES_PATH.relative_to(ROOT)),
+            "path": CASES_PATH.relative_to(ROOT).as_posix(),
             "sha256": _sha256(CASES_PATH),
         },
         "template": {
@@ -793,7 +793,10 @@ def _validate_manifest(manifest: dict[str, Any], golden_dir: Path, render_dpi: i
         "manifest case does not match approved fixture",
     )
 
-    _require(fixture["path"] == str(CASES_PATH.relative_to(ROOT)), "manifest fixture path mismatch")
+    _require(
+        fixture["path"] == CASES_PATH.relative_to(ROOT).as_posix(),
+        "manifest fixture path mismatch",
+    )
     _require(isinstance(fixture["sha256"], str) and SHA256_PATTERN.fullmatch(fixture["sha256"]) is not None, "manifest fixture sha256 invalid")
     _require(fixture["sha256"] == _sha256(CASES_PATH), "manifest fixture sha256 mismatch")
     _require(template["path"] == case.template.as_posix(), "manifest template path mismatch")

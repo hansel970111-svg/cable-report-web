@@ -400,7 +400,7 @@ def test_real_editor_entrypoints_emit_one_safe_result_line(entrypoint, tmp_path)
         ],
         check=False,
         capture_output=True,
-        text=True,
+        encoding="utf-8",
     )
 
     assert completed.returncode == 0, completed.stderr
@@ -436,7 +436,7 @@ def test_real_editor_entrypoints_propagate_a_stable_failure_exit(entrypoint, tmp
         ],
         check=False,
         capture_output=True,
-        text=True,
+        encoding="utf-8",
     )
 
     assert completed.returncode == 2
