@@ -8,6 +8,7 @@ import {
   parseCalVer,
   toMacBundleVersion,
 } from './versioning.mjs';
+import { collectVersionConsumerEvidence } from './release-consumer-evidence.mjs';
 
 export const RELEASE_ERROR_CODES = Object.freeze({
   NOT_ON_MAIN: 'NOT_ON_MAIN',
@@ -202,6 +203,18 @@ function validateArtifacts(version, artifacts, required) {
   return true;
 }
 
+async function validateConfiguredConsumers(cwd, version) {
+  try {
+    return await collectVersionConsumerEvidence({ cwd, expectedVersion: version });
+  } catch (error) {
+    failArtifact(
+      `Configured version consumer evidence is invalid: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
+}
+
 export async function validateReleaseVersion(options = {}) {
   const {
     cwd = process.cwd(),
@@ -209,6 +222,7 @@ export async function validateReleaseVersion(options = {}) {
     runner = spawnSync,
     packageJsonText,
     artifacts,
+    deferConsumerValidation = false,
   } = options;
   const git = createGit(cwd, runner);
   const text = packageJsonText ?? await readFile(join(cwd, 'package.json'), 'utf8');
@@ -224,14 +238,27 @@ export async function validateReleaseVersion(options = {}) {
     if (highest && compareAppVersions(version, highest) <= 0) {
       releaseError('CURRENT_VERSION_NOT_LATEST', `Prepared version ${version} is not above ${highest}.`);
     }
-    const artifactsValidated = validateArtifacts(version, artifacts, false);
+    const artifactsValidated = artifacts === undefined
+      ? false
+      : validateArtifacts(version, artifacts, true);
+    const consumerConfigurationsValidated = artifacts === undefined
+      && !deferConsumerValidation;
+    const consumerEvidence = consumerConfigurationsValidated
+      ? await validateConfiguredConsumers(cwd, version)
+      : undefined;
     return {
       mode: 'prepared',
       version,
       highestPublishedVersion: highest,
       artifactsValidated,
-      consumerValidationPending: !artifactsValidated,
+      consumerConfigurationsValidated,
+      consumerEvidence,
+      consumerValidationPending: artifacts === undefined && deferConsumerValidation,
     };
+  }
+
+  if (deferConsumerValidation) {
+    failArtifact('Formal tag validation cannot defer consumer evidence.');
   }
 
   const headTagsOutput = git(['tag', '--points-at', 'HEAD', '--list', 'v*']).stdout;
@@ -263,13 +290,21 @@ export async function validateReleaseVersion(options = {}) {
     }
   }
 
-  validateArtifacts(version, artifacts, true);
+  const artifactsValidated = artifacts === undefined
+    ? false
+    : validateArtifacts(version, artifacts, true);
+  const consumerConfigurationsValidated = artifacts === undefined;
+  const consumerEvidence = consumerConfigurationsValidated
+    ? await validateConfiguredConsumers(cwd, version)
+    : undefined;
   return {
     mode: 'tag',
     version,
     tag: expectedTag,
     highestPublishedVersion: highest,
-    artifactsValidated: true,
+    artifactsValidated,
+    consumerConfigurationsValidated,
+    consumerEvidence,
   };
 }
 
@@ -329,12 +364,6 @@ async function main() {
     ? undefined
     : await readArtifactEvidence(cwd, artifactsPath);
   const result = await validateReleaseVersion({ artifacts, cwd, prepared });
-  if (result.mode === 'prepared' && !result.artifactsValidated) {
-    process.stdout.write(
-      `Validated prepared version prerequisites ${result.version}; consumer validation pending.\n`,
-    );
-    return;
-  }
   process.stdout.write(`Validated ${result.mode} release version ${result.version}.\n`);
 }
 

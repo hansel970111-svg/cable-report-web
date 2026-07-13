@@ -102,8 +102,8 @@
     }
   },
   "build": {
+    "extends": "./electron-builder.config.mjs",
     "appId": "com.cable.report.generator",
-    "productName": "Cable Report Generator",
     "directories": {
       "output": "release"
     },

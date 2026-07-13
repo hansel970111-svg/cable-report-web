@@ -263,6 +263,14 @@ function setupApplicationMenu() {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
+function configureAboutPanel() {
+  app.setAboutPanelOptions({
+    applicationName: app.getName(),
+    applicationVersion: app.getVersion(),
+    version: app.getVersion(),
+  });
+}
+
 async function startNextServer() {
   const appRoot = getAppRoot();
   const port = await getFreePort(Number(process.env.PORT || 5000));
@@ -423,6 +431,7 @@ function createMainWindow(url) {
 app.whenReady().then(async () => {
   try {
     configureSessionSecurity();
+    configureAboutPanel();
     registerDesktopSessionBridge();
     registerNativeSaveBridge();
     setupApplicationMenu();

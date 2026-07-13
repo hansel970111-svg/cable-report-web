@@ -14,6 +14,7 @@ import type { ReportDraft } from '@/domain/report/model';
 import type { WorkflowState } from '@/features/report-workflow/model';
 import type { ReportWorkflowServices } from '@/features/report-workflow/services';
 import { useReportWorkflow } from '@/features/report-workflow/use-report-workflow';
+import { APP_VERSION } from '@/lib/app-version';
 import { ImportPanel } from './import-panel';
 import { createRecordDraftStore } from './record-draft-store';
 import { ReportActions } from './report-actions';
@@ -203,6 +204,10 @@ export function ReportEditor({ services }: ReportEditorProps) {
           选择 Excel 布线表并开始导入。
         </div>
       )}
+
+      <footer className="mt-8 text-center text-xs text-muted-foreground">
+        版本 {APP_VERSION}
+      </footer>
     </div>
   );
 }

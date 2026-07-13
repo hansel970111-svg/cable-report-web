@@ -92,18 +92,49 @@ describe('validate-release command with real Git tags', () => {
     annotatedTag(work, '2026.710.1');
     await commitVersion(work, '2026.710.2');
 
-    await expect(validate(work, { prepared: true }))
+    const artifacts = artifactEvidence('2026.710.2');
+    await expect(validate(work, { artifacts, prepared: true }))
       .resolves.toMatchObject({
         mode: 'prepared',
         version: '2026.710.2',
-        artifactsValidated: false,
+        artifactsValidated: true,
       });
 
-    const stdout = execFileSync(process.execPath, [validatorScript, '--prepared'], {
+    const artifactsPath = join(work, 'prepared-artifacts.json');
+    await writeFile(artifactsPath, `${JSON.stringify(artifacts, null, 2)}\n`);
+    const stdout = execFileSync(process.execPath, [
+      validatorScript,
+      '--prepared',
+      '--artifacts',
+      artifactsPath,
+    ], {
       cwd: work,
       encoding: 'utf8',
     });
-    expect(stdout).toContain('Validated prepared version prerequisites 2026.710.2; consumer validation pending.');
+    expect(stdout).toContain('Validated prepared release version 2026.710.2.');
+  });
+
+  it('explicitly defers consumer evidence only for an atomic pre-write candidate check', async () => {
+    const { work } = await fixture();
+    await commitVersion(work, '2026.710.1');
+    annotatedTag(work, '2026.710.1');
+
+    const candidate = `${JSON.stringify({
+      name: 'fixture',
+      version: '2026.710.2',
+      private: true,
+    }, null, 2)}\n`;
+    await expect(validate(work, {
+      deferConsumerValidation: true,
+      packageJsonText: candidate,
+      prepared: true,
+    })).resolves.toMatchObject({
+      artifactsValidated: false,
+      consumerConfigurationsValidated: false,
+      consumerValidationPending: true,
+      mode: 'prepared',
+      version: '2026.710.2',
+    });
   });
 
   it('rejects invalid prepared candidates, non-increasing candidates, and collisions', async () => {

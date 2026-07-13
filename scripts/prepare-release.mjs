@@ -249,6 +249,7 @@ export async function prepareRelease(options = {}) {
   const nextText = `${JSON.stringify(nextPackage, null, 2)}\n`;
   await validateReleaseVersion({
     cwd,
+    deferConsumerValidation: true,
     prepared: true,
     runner,
     packageJsonText: nextText,
