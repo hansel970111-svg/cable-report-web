@@ -17,6 +17,7 @@ import {
   parsePorcelainStatus,
   playwrightEvidence,
   pythonEvidence,
+  qualityCommandInvocations,
 } from '../../../scripts/verify-acceptance.mjs';
 
 test('pnpm argument separator is ignored by the acceptance CLI', () => {
@@ -142,6 +143,15 @@ test('evidence commands pin pnpm and use a shell only for Windows command shims'
     command: 'python',
     args: ['-m', 'pytest'],
     shell: false,
+  });
+
+  const quality = qualityCommandInvocations('win32', 'python');
+  expect(quality.filter(invocation => invocation.command === 'corepack')).toEqual([
+    { command: 'corepack', args: ['pnpm@9.15.9', 'lint'], shell: true },
+    { command: 'corepack', args: ['pnpm@9.15.9', 'ts-check'], shell: true },
+  ]);
+  expect(quality.find(invocation => invocation.command === 'python')).toEqual({
+    command: 'python', args: ['scripts/verify_python_locks.py'], shell: false,
   });
 });
 

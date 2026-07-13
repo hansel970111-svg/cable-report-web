@@ -58,8 +58,8 @@ test('package and acceptance evidence are bound to the current Git commit', asyn
   expect(packageVerifier).toContain("'next-build/standalone/.cable-build-commit'");
   expect(packageVerifier).toContain('does not match current HEAD');
   expect(acceptance).toContain('verifyAcceptanceManifest');
-  expect(acceptance).toContain("[corepack, ['pnpm', 'lint']]");
-  expect(acceptance).toContain("[corepack, ['pnpm', 'ts-check']]");
+  expect(acceptance).toContain("commandInvocation('pnpm', ['lint'], platform)");
+  expect(acceptance).toContain("commandInvocation('pnpm', ['ts-check'], platform)");
   const evidenceRunner = await readFile('scripts/run-evidence-command.mjs', 'utf8');
   expect(evidenceRunner).toContain("args: ['pnpm@9.15.9', ...args]");
 });

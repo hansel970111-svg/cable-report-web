@@ -5,6 +5,7 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 import { verifyAcceptanceManifest } from './acceptance-evidence.mjs';
+import { commandInvocation } from './run-evidence-command.mjs';
 
 const REQUIRED_DESKTOP_STORIES = [
   'packaged Cat5e import edit generate native save',
@@ -142,12 +143,12 @@ function readJson(workspace, relativePath) {
   }
 }
 
-function run(command, args, workspace) {
+function run(command, args, workspace, shell = false) {
   const result = spawnSync(command, args, {
     cwd: workspace,
     env: { ...process.env, COZE_WORKSPACE_PATH: workspace },
     encoding: 'utf8',
-    shell: false,
+    shell,
     windowsHide: true,
   });
   if (result.error || result.status !== 0) {
@@ -158,18 +159,23 @@ function run(command, args, workspace) {
   return result.stdout;
 }
 
-function qualityCommandsEvidence(workspace) {
-  const corepack = process.platform === 'win32' ? 'corepack.cmd' : 'corepack';
-  const python = process.env.PYTHON_CMD || (process.platform === 'win32' ? 'python.exe' : 'python3');
-  const commands = [
-    [process.execPath, ['scripts/verify-dependency-policy.mjs']],
-    [process.execPath, ['scripts/verify-runtime-surface.mjs']],
-    [python, ['scripts/verify_python_locks.py']],
-    [corepack, ['pnpm', 'lint']],
-    [corepack, ['pnpm', 'ts-check']],
+export function qualityCommandInvocations(
+  platform = process.platform,
+  python = process.env.PYTHON_CMD || (platform === 'win32' ? 'python.exe' : 'python3'),
+) {
+  return [
+    { command: process.execPath, args: ['scripts/verify-dependency-policy.mjs'], shell: false },
+    { command: process.execPath, args: ['scripts/verify-runtime-surface.mjs'], shell: false },
+    { command: python, args: ['scripts/verify_python_locks.py'], shell: false },
+    commandInvocation('pnpm', ['lint'], platform),
+    commandInvocation('pnpm', ['ts-check'], platform),
   ];
+}
+
+function qualityCommandsEvidence(workspace) {
+  const commands = qualityCommandInvocations();
   try {
-    for (const [command, args] of commands) run(command, args, workspace);
+    for (const { command, args, shell } of commands) run(command, args, workspace, shell);
     return {
       passed: true,
       detail: 'dependency/runtime/Python locks, lint, and TypeScript passed on current checkout',
