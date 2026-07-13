@@ -1,0 +1,2 @@
+# Golden evidence hashes this fixture byte-for-byte on every release platform.
+tests/python/fixtures/pdf-cases.json text eol=lf

@@ -113,6 +113,14 @@ def test_exact_six_case_matrix_is_validated() -> None:
     assert all((ROOT / case.template).is_file() for case in cases)
 
 
+def test_hashed_fixture_uses_checkout_stable_lf_bytes() -> None:
+    fixture_path = ROOT / "tests/python/fixtures/pdf-cases.json"
+    attributes = (ROOT / ".gitattributes").read_text(encoding="utf-8").splitlines()
+
+    assert "tests/python/fixtures/pdf-cases.json text eol=lf" in attributes
+    assert b"\r\n" not in fixture_path.read_bytes()
+
+
 def test_renderer_contract_uses_the_security_fixed_runtime() -> None:
     assert pdf_golden.RENDERER_VERSION == "1.26.7"
     assert fitz.VersionBind == pdf_golden.RENDERER_VERSION
