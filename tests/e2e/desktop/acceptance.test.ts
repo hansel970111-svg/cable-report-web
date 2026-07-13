@@ -103,7 +103,7 @@ test('Python JUnit evidence rejects skipped, duplicate, empty, and collection-er
     `<testcase classname="tests.python.test_pdf_golden" `
     + `name="test_pdf_matches_approved_golden[${name}]" time="0.1" />`
   )).join('');
-  const valid = `<testsuites tests="191" failures="0" errors="0" skipped="0">`
+  const valid = '<testsuites name="pytest tests">'
     + `<testsuite name="pytest" tests="191" failures="0" errors="0" skipped="0">`
     + `${testcases}</testsuite></testsuites>`;
 

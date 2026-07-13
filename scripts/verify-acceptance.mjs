@@ -226,11 +226,14 @@ function integerAttribute(attributes, name) {
 
 export function pythonEvidence(xml) {
   const document = String(xml);
-  const rootMatch = document.match(/<testsuites\b([^>]*)>/)
-    ?? document.match(/<testsuite\b([^>]*)>/);
-  if (!rootMatch) return { passed: false, detail: 'Python JUnit report has no test suite' };
+  const suiteOpenings = [...document.matchAll(/<testsuites?\b([^>]*)>/g)];
+  const root = suiteOpenings
+    .map(match => xmlAttributes(match[1]))
+    .find(attributes => ['tests', 'failures', 'errors', 'skipped'].every(name => (
+      attributes.has(name)
+    )));
+  if (!root) return { passed: false, detail: 'Python JUnit report has no complete suite counters' };
 
-  const root = xmlAttributes(rootMatch[1]);
   const tests = integerAttribute(root, 'tests');
   const failures = integerAttribute(root, 'failures');
   const errors = integerAttribute(root, 'errors');
