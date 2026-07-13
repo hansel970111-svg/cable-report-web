@@ -19,6 +19,7 @@ test('CI uploads installers before publishing final acceptance evidence', async 
 test('machine reports and Playwright scratch output cannot dirty acceptance status', async () => {
   const gitignore = await readFile('.gitignore', 'utf8');
   expect(gitignore.split(/\r?\n/)).toEqual(expect.arrayContaining([
+    '/.pnpm/',
     'artifacts/',
     'test-results/',
   ]));
