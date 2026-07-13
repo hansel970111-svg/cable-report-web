@@ -52,9 +52,12 @@ test('Windows build uses the same Node, pnpm, and frozen lock baseline', async (
   );
   expect(workflow).toContain('corepack pnpm check:fast');
   expect(workflow).toContain('corepack pnpm test:python');
+  expect(workflow).toContain('corepack pnpm desktop:dist:win');
+  expect(workflow).not.toContain('corepack pnpm build');
+  expect(workflow).not.toContain('corepack pnpm exec electron-builder');
 
   const dependencyGate = workflow.indexOf('node scripts/verify-dependency-policy.mjs');
-  const build = workflow.indexOf('corepack pnpm build');
+  const build = workflow.indexOf('corepack pnpm desktop:dist:win');
   expect(dependencyGate).toBeGreaterThan(-1);
   expect(dependencyGate).toBeLessThan(build);
 

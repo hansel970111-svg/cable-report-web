@@ -7,51 +7,38 @@ import path from 'path';
 import fs from 'fs';
 import { spawnSync } from 'child_process';
 
-function uniquePaths(paths: Array<string | null | undefined>): string[] {
-  return Array.from(new Set(paths.filter(Boolean) as string[]));
-}
-
 function getElectronResourcesPath(): string | null {
   return (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath || null;
 }
 
-function looksLikeAppRoot(dirPath: string): boolean {
-  return (
-    fs.existsSync(path.join(dirPath, 'package.json')) &&
-    (
-      fs.existsSync(path.join(dirPath, 'next.config.mjs')) ||
-      fs.existsSync(path.join(dirPath, 'next-build')) ||
-      fs.existsSync(path.join(dirPath, 'scripts'))
-    )
-  );
+export function getAppRoot(): string {
+  return process.env.COZE_WORKSPACE_PATH || process.cwd();
 }
 
-export function getAppRoot(): string {
-  const resourcesPath = getElectronResourcesPath();
-  const candidates = uniquePaths([
-    process.env.COZE_WORKSPACE_PATH,
-    process.cwd(),
-    resourcesPath ? path.join(resourcesPath, 'app') : null,
-    resourcesPath ? path.join(resourcesPath, 'app.asar.unpacked') : null,
-    process.env.PORTABLE_EXECUTABLE_DIR ? path.join(process.env.PORTABLE_EXECUTABLE_DIR, 'resources', 'app') : null,
-  ]);
-
-  return candidates.find(looksLikeAppRoot) || process.env.COZE_WORKSPACE_PATH || process.cwd();
+function getResourcesRoot(): string {
+  return (
+    process.env.CABLE_RESOURCES_PATH ||
+    getElectronResourcesPath() ||
+    getAppRoot()
+  );
 }
 
 export function getAppPathCandidates(...segments: string[]): string[] {
   const relativePath = path.join(...segments);
   if (path.isAbsolute(relativePath)) return [relativePath];
 
-  const resourcesPath = getElectronResourcesPath();
-  return uniquePaths([
-    path.join(getAppRoot(), relativePath),
-    path.join(process.cwd(), relativePath),
-    resourcesPath ? path.join(resourcesPath, 'app', relativePath) : null,
-    resourcesPath ? path.join(resourcesPath, relativePath) : null,
-    process.env.PORTABLE_EXECUTABLE_DIR ? path.join(process.env.PORTABLE_EXECUTABLE_DIR, 'resources', 'app', relativePath) : null,
-    process.env.PORTABLE_EXECUTABLE_DIR ? path.join(process.env.PORTABLE_EXECUTABLE_DIR, 'resources', relativePath) : null,
-  ]);
+  const firstSegment = segments[0];
+  if (
+    firstSegment === 'assets' ||
+    firstSegment === 'bin' ||
+    firstSegment === 'worker-bin' ||
+    firstSegment === 'resources'
+  ) {
+    const resourceSegments = firstSegment === 'resources' ? segments.slice(1) : segments;
+    return [path.join(getResourcesRoot(), ...resourceSegments)];
+  }
+
+  return [path.join(getAppRoot(), relativePath)];
 }
 
 export function resolveAppPath(...segments: string[]): string {

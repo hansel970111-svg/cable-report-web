@@ -45,6 +45,7 @@
     "zod": "4.4.3"
   },
   "devDependencies": {
+    "@electron/asar": "3.4.1",
     "@axe-core/playwright": "4.12.1",
     "@playwright/test": "1.61.1",
     "@testing-library/dom": "10.4.1",
@@ -109,16 +110,13 @@
     },
     "publish": null,
     "compression": "maximum",
-    "asar": false,
-    "afterPack": "scripts/electron-after-pack.cjs",
+    "asar": true,
     "files": [
       "electron/**/*",
       "scripts/versioning.mjs",
       "next-build/standalone/**/*",
       "package.json",
-      "next.config.mjs",
-      "!node_modules",
-      "!node_modules/**/*"
+      "next.config.mjs"
     ],
     "extraResources": [
       {

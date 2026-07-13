@@ -1,9 +1,14 @@
 node_modules
 .next
+next-build
+worker-bin
 dist
 release
 resources/bin
 .pyinstaller
+.superpowers
+docs/superpowers/plans
+tests/python/golden
 .codex_pydeps
 .git
 .cache

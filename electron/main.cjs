@@ -24,6 +24,7 @@ const {
 } = require('./save-pdf.cjs');
 const { createUpdateChecker } = require('./update-check.cjs');
 const { loadVersioningModule } = require('./versioning-loader.cjs');
+const { loadPackagedStandalone } = require('./standalone-runtime.cjs');
 
 if (!process.env.NEXT_TELEMETRY_DISABLED) {
   process.env.NEXT_TELEMETRY_DISABLED = '1';
@@ -52,14 +53,6 @@ function openApprovedExternal(targetUrl) {
     console.error('无法打开外部链接:', error);
   });
   return true;
-}
-
-function getAppRoot() {
-  if (app.isPackaged) {
-    return path.join(process.resourcesPath, 'app');
-  }
-
-  return path.resolve(__dirname, '..');
 }
 
 function getFreePort(preferredPort) {
@@ -272,14 +265,18 @@ function configureAboutPanel() {
 }
 
 async function startNextServer() {
-  const appRoot = getAppRoot();
+  const appRoot = app.getAppPath();
+  const resourcesRoot = app.isPackaged ? process.resourcesPath : appRoot;
   const port = await getFreePort(Number(process.env.PORT || 5000));
   const hostname = '127.0.0.1';
   const origin = `http://${hostname}:${port}`;
   const dev = !app.isPackaged && process.env.ELECTRON_NEXT_DEV !== 'false';
 
-  process.chdir(appRoot);
+  if (!app.isPackaged) {
+    process.chdir(appRoot);
+  }
   process.env.COZE_WORKSPACE_PATH = appRoot;
+  process.env.CABLE_RESOURCES_PATH = resourcesRoot;
   process.env.COZE_PROJECT_ENV = dev ? 'DEV' : 'PROD';
   process.env.NODE_ENV = dev ? 'development' : 'production';
   process.env.PORT = String(port);
@@ -292,7 +289,11 @@ async function startNextServer() {
   if (!dev) {
     const standaloneServerPath = path.join(appRoot, 'next-build', 'standalone', 'server.js');
     if (fs.existsSync(standaloneServerPath)) {
-      require(standaloneServerPath);
+      if (app.isPackaged) {
+        loadPackagedStandalone(standaloneServerPath);
+      } else {
+        require(standaloneServerPath);
+      }
       await waitForPort(port);
       return origin;
     }

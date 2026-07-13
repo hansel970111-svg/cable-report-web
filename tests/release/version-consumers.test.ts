@@ -12,6 +12,7 @@ import {
 type BuilderConfiguration = {
   artifactName?: string;
   asar?: boolean;
+  beforeBuild?: () => boolean | Promise<boolean>;
   buildVersion?: string;
   extraMetadata?: {
     shortVersion?: string;
@@ -218,6 +219,8 @@ describe('single-source application version consumers', () => {
     expect(config).not.toHaveProperty('buildVersion');
     expect(config.extraMetadata?.shortVersion).toBe(packageJson.version);
     expect(config.extraMetadata?.shortVersionWindows).toBe(packageJson.version);
+    expect(config.beforeBuild).toBeTypeOf('function');
+    expect(await config.beforeBuild!()).toBe(false);
 
     const fileVersion = appInfo.shortVersion ?? appInfo.buildVersion;
     const productVersion = appInfo.shortVersionWindows
@@ -238,7 +241,7 @@ describe('single-source application version consumers', () => {
       os: 'win',
     })).toBe(`Cable-Report-Generator-${packageJson.version}-win-x64.exe`);
 
-    expect(packageJson.build.asar).toBe(false);
+    expect(packageJson.build.asar).toBe(true);
     expect(packageJson.build.files).toBeInstanceOf(Array);
     expect(packageJson.build.extraResources).toBeInstanceOf(Array);
   });

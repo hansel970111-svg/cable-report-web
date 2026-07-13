@@ -14,6 +14,7 @@ export function createElectronBuilderConfig(version) {
   return {
     productName: 'Cable Report Generator',
     artifactName: 'Cable-Report-Generator-${version}-${os}-${arch}.${ext}',
+    beforeBuild: () => false,
     extraMetadata: {
       shortVersion: version,
       shortVersionWindows: version,

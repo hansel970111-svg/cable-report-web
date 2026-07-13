@@ -1,3 +1,4 @@
+import { createPackage } from '@electron/asar';
 import { spawnSync } from 'node:child_process';
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -76,30 +77,40 @@ test('desktop package verification rejects a packaged tree without the runtime v
     'Contents',
     'Resources',
   );
-  const appDir = join(resourcesDir, 'app');
+  const appSourceDir = join(workspace, 'asar-source');
+  const appAsarPath = join(resourcesDir, 'app.asar');
 
   try {
     const directories = [
-      join(appDir, 'electron'),
-      join(appDir, 'next-build', 'server'),
-      join(appDir, 'next-build', 'static'),
+      join(appSourceDir, 'electron'),
+      join(appSourceDir, 'next-build', 'standalone', 'node_modules', 'traced-runtime'),
+      join(appSourceDir, 'next-build', 'standalone', 'next-build', 'server'),
+      join(appSourceDir, 'next-build', 'standalone', 'next-build', 'static'),
       join(resourcesDir, 'assets'),
       join(resourcesDir, 'bin'),
     ];
     await Promise.all(directories.map(directory => mkdir(directory, { recursive: true })));
 
     const files = [
-      [join(appDir, 'package.json'), '{}'],
-      [join(appDir, 'next.config.mjs'), 'export default {}'],
-      [join(appDir, 'electron', 'main.cjs'), ''],
-      [join(appDir, 'next-build', 'BUILD_ID'), 'test'],
-      [join(appDir, 'next-build', 'routes-manifest.json'), '{}'],
+      [join(appSourceDir, 'package.json'), '{}'],
+      [join(appSourceDir, 'next.config.mjs'), 'export default {}'],
+      [join(appSourceDir, 'electron', 'main.cjs'), ''],
+      [join(appSourceDir, 'electron', 'preload.cjs'), ''],
+      [join(appSourceDir, 'electron', 'standalone-runtime.cjs'), ''],
+      [join(appSourceDir, 'next-build', 'standalone', 'server.js'), ''],
+      [join(appSourceDir, 'next-build', 'standalone', 'package.json'), '{}'],
+      [join(appSourceDir, 'next-build', 'standalone', 'node_modules', 'traced-runtime', 'index.js'), ''],
+      [join(appSourceDir, 'next-build', 'standalone', 'next-build', 'BUILD_ID'), 'test'],
+      [join(appSourceDir, 'next-build', 'standalone', 'next-build', 'routes-manifest.json'), '{}'],
+      [join(appSourceDir, 'next-build', 'standalone', 'next-build', 'server', 'route.js'), ''],
+      [join(appSourceDir, 'next-build', 'standalone', 'next-build', 'static', 'chunk.js'), ''],
       [join(resourcesDir, 'bin', 'pdf_worker'), ''],
       [join(resourcesDir, 'assets', 'M138-DE46-OOB-Cat5e.pdf'), ''],
       [join(resourcesDir, 'assets', 'M138-DE46-D-P-cross-LC.pdf'), ''],
       [join(resourcesDir, 'assets', 'M138-DE46-P-A-MPO.pdf'), ''],
     ];
     await Promise.all(files.map(([filePath, contents]) => writeFile(filePath, contents)));
+    await createPackage(appSourceDir, appAsarPath);
 
     const result = spawnSync(
       process.execPath,
@@ -112,10 +123,13 @@ test('desktop package verification rejects a packaged tree without the runtime v
     );
 
     expect(result.status).toBe(1);
-    expect(result.stderr).toContain('Missing CalVer runtime module');
+    expect(result.stderr).toContain(
+      'ASAR archive is missing required entry: scripts/versioning.mjs',
+    );
 
-    await mkdir(join(appDir, 'scripts'));
-    await writeFile(join(appDir, 'scripts', 'versioning.mjs'), 'export {};');
+    await mkdir(join(appSourceDir, 'scripts'));
+    await writeFile(join(appSourceDir, 'scripts', 'versioning.mjs'), 'export {};');
+    await createPackage(appSourceDir, appAsarPath);
     const completeResult = spawnSync(
       process.execPath,
       ['scripts/verify-desktop-package.mjs', 'mac'],
