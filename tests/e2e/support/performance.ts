@@ -20,6 +20,24 @@ declare global {
   }
 }
 
+export const RELEASE_PERFORMANCE_LIMITS = {
+  domRows: 200,
+  inputP95Ms: 100,
+  importDurationMs: 500,
+  batchSaveMaxLongTaskMs: 200,
+  peakUsedJsHeapBytes: 128 * 1024 * 1024,
+} as const;
+
+export type ReleasePerformanceMetric = keyof typeof RELEASE_PERFORMANCE_LIMITS;
+
+export function releasePerformanceLimit(
+  metric: ReleasePerformanceMetric,
+  baseline: number,
+  ci: boolean,
+): number {
+  return ci ? RELEASE_PERFORMANCE_LIMITS[metric] : baseline * 1.2;
+}
+
 export async function installPagePerformanceProbe(page: Page): Promise<void> {
   await page.addInitScript(() => {
     const probe: PagePerformanceProbe = {

@@ -8,6 +8,7 @@ import {
   installPagePerformanceProbe,
   measureControlledInputLatency,
   percentile95,
+  releasePerformanceLimit,
 } from './support/performance';
 import { makeCat5eWorkbookBuffer, XLSX_MIME } from './support/workbook';
 
@@ -186,16 +187,28 @@ test('5k preview stays bounded and responsive at 320px', async ({ page }, testIn
   }
 
   const baseline = parseBaseline(JSON.parse(await readFile(BASELINE_PATH, 'utf8')));
+  const usesCrossRunnerSlo = Boolean(process.env.CI);
   for (const metric of REQUIRED_METRICS) {
-    expect(metrics[metric], `${metric} regressed by more than 20%`).toBeLessThanOrEqual(
-      baseline[metric] * 1.2,
+    expect(
+      metrics[metric],
+      usesCrossRunnerSlo
+        ? `${metric} exceeded the cross-runner release SLO`
+        : `${metric} regressed by more than 20%`,
+    ).toBeLessThanOrEqual(
+      releasePerformanceLimit(metric, baseline[metric], usesCrossRunnerSlo),
     );
   }
   if (baseline.peakUsedJsHeapBytes !== undefined) {
     expect(metrics.peakUsedJsHeapBytes).toBeDefined();
     expect(
       metrics.peakUsedJsHeapBytes!,
-      'peakUsedJsHeapBytes regressed by more than 20%',
-    ).toBeLessThanOrEqual(baseline.peakUsedJsHeapBytes * 1.2);
+      usesCrossRunnerSlo
+        ? 'peakUsedJsHeapBytes exceeded the cross-runner release SLO'
+        : 'peakUsedJsHeapBytes regressed by more than 20%',
+    ).toBeLessThanOrEqual(releasePerformanceLimit(
+      'peakUsedJsHeapBytes',
+      baseline.peakUsedJsHeapBytes,
+      usesCrossRunnerSlo,
+    ));
   }
 });

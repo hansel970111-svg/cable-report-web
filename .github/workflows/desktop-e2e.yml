@@ -77,7 +77,7 @@ jobs:
           corepack pnpm@9.15.9 ts-check
 
       - name: Run unit tests with machine report
-        run: node scripts/run-evidence-command.mjs --name unit --platform ${{ matrix.platform }} --artifact artifacts/acceptance/unit.json -- pnpm exec vitest run --reporter=json --outputFile=artifacts/acceptance/unit.json
+        run: node scripts/run-evidence-command.mjs --name unit --platform ${{ matrix.platform }} --artifact artifacts/acceptance/unit.json -- pnpm exec vitest run --reporter=default --reporter=json --outputFile.json=artifacts/acceptance/unit.json
 
       - name: Run Python tests with machine report
         run: node scripts/run-evidence-command.mjs --name python --platform ${{ matrix.platform }} --artifact artifacts/acceptance/python.xml -- python -m pytest -q --junitxml=artifacts/acceptance/python.xml

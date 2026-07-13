@@ -45,6 +45,9 @@ test('CI matrix and frozen runtimes retain the release contract', async () => {
   expect(source).not.toMatch(/^\s*run: pnpm /m);
   expect(source).toContain('python -m pip install --require-hashes --only-binary=:all: -r requirements-dev.lock');
   expect(source).toContain('corepack pnpm@9.15.9 exec playwright install chromium');
+  expect(source).toContain(
+    'pnpm exec vitest run --reporter=default --reporter=json --outputFile.json=artifacts/acceptance/unit.json',
+  );
   expect(source).toContain('node scripts/write-acceptance-evidence.mjs mac');
   expect(source).toContain('node scripts/write-acceptance-evidence.mjs win');
   expect(source.match(/node scripts\/run-evidence-command\.mjs/g)).toHaveLength(9);
