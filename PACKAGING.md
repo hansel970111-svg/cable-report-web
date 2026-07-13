@@ -20,11 +20,12 @@ python -m pip install --require-hashes --only-binary=:all: -r requirements-dev.l
 pnpm exec playwright install chromium
 ```
 
-Windows 如果 `python` 不可用，可改用：
+Windows 完整发布流程要求 `python` 命令本身解析到 Python 3.12.13。若安装了多个版本，
+请先激活 3.12 虚拟环境或调整 `PATH`，并验证：
 
 ```powershell
-$env:PYTHON_CMD = "C:\path\to\python3.12.exe"
-node ./scripts/run-python.mjs -m pip install --require-hashes --only-binary=:all: -r requirements-dev.lock
+python --version
+python -m pip install --require-hashes --only-binary=:all: -r requirements-dev.lock
 ```
 
 ## 本机调试桌面版
