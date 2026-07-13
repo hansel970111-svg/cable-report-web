@@ -145,6 +145,32 @@ function readPackageName(packageDir, linkPath) {
   return packageJson.name;
 }
 
+function isApprovedExternalPackageLink(
+  nodeModulesDir,
+  externalNodeModulesRoot,
+  linkPath,
+  targetPath,
+  targetStats,
+) {
+  if (
+    externalNodeModulesRoot === null ||
+    !isInsideDirectory(externalNodeModulesRoot, targetPath)
+  ) {
+    return false;
+  }
+
+  const logicalName = logicalPackageName(nodeModulesDir, linkPath);
+  if (logicalName === null || !targetStats.isDirectory()) return false;
+
+  const declaredName = readPackageName(targetPath, linkPath);
+  if (declaredName !== logicalName) {
+    throw new Error(
+      `Unsupported standalone dependency alias: ${logicalName} -> ${declaredName} at ${linkPath}`,
+    );
+  }
+  return true;
+}
+
 function planRootPackages(nodeModulesDir, plans) {
   const packages = new Map();
   for (const plan of plans) {
@@ -216,6 +242,16 @@ export function materializeStandaloneSymlinks(standaloneDir) {
     throw new Error(`Missing standalone dependency directory: ${nodeModulesDir}`);
   }
 
+  let externalNodeModulesRoot = null;
+  try {
+    const candidate = path.join(workspace, 'node_modules');
+    if (fs.statSync(candidate).isDirectory()) {
+      externalNodeModulesRoot = fs.realpathSync(candidate);
+    }
+  } catch {
+    // A standalone-only fixture has no approved external dependency store.
+  }
+
   const symlinks = collectSymlinks(nodeModulesDir).sort();
   const plans = symlinks.map(linkPath => {
     let targetPath;
@@ -224,12 +260,22 @@ export function materializeStandaloneSymlinks(standaloneDir) {
     } catch {
       throw new Error(`Dangling standalone dependency symlink: ${linkPath}`);
     }
-    if (!isInsideDirectory(nodeModulesRoot, targetPath)) {
+    const targetStats = fs.statSync(targetPath);
+    if (
+      !isInsideDirectory(nodeModulesRoot, targetPath) &&
+      !isApprovedExternalPackageLink(
+        nodeModulesDir,
+        externalNodeModulesRoot,
+        linkPath,
+        targetPath,
+        targetStats,
+      )
+    ) {
       throw new Error(
         `Out-of-tree standalone dependency symlink: ${linkPath} -> ${targetPath}`,
       );
     }
-    return { linkPath, targetPath, targetStats: fs.statSync(targetPath) };
+    return { linkPath, targetPath, targetStats };
   });
   const rootPackages = planRootPackages(nodeModulesDir, plans);
 

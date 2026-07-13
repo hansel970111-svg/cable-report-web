@@ -255,6 +255,86 @@ describe('standalone dependency materialization', () => {
     expect(result.stdout).toContain('Materialized 3 standalone dependency symlinks.');
   });
 
+  test('materializes a name-matched package from the frozen root dependency store', () => {
+    const { workspace, standalone, nodeModules } = createStandaloneFixture();
+    const externalPackage = path.join(
+      workspace,
+      'node_modules',
+      '.pnpm',
+      '@next+env@1.0.0',
+      'node_modules',
+      '@next',
+      'env',
+    );
+    const consumerPackage = path.join(
+      nodeModules,
+      '.pnpm',
+      'next@1.0.0',
+      'node_modules',
+      'next',
+    );
+    const nestedLink = path.join(consumerPackage, 'node_modules', '@next', 'env');
+    mkdirSync(externalPackage, { recursive: true });
+    mkdirSync(path.dirname(nestedLink), { recursive: true });
+    writeFileSync(
+      path.join(externalPackage, 'package.json'),
+      '{"name":"@next/env","main":"index.js"}\n',
+    );
+    writeFileSync(path.join(externalPackage, 'index.js'), 'module.exports = "env";\n');
+    symlinkSync(
+      path.relative(path.dirname(nestedLink), externalPackage),
+      nestedLink,
+      'dir',
+    );
+
+    const result = runScript(
+      'build.mjs',
+      ['--materialize-standalone-runtime', standalone],
+      workspace,
+    );
+
+    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+    expect(collectSymlinks(nodeModules)).toEqual([]);
+    expect(readFileSync(path.join(nestedLink, 'index.js'), 'utf8')).toContain('env');
+    expect(
+      readFileSync(path.join(nodeModules, '@next', 'env', 'package.json'), 'utf8'),
+    ).toContain('"@next/env"');
+    expect(result.stdout).toContain('Materialized 4 standalone dependency symlinks.');
+  });
+
+  test('rejects a package alias from the external dependency store', () => {
+    const { workspace, standalone, nodeModules } = createStandaloneFixture();
+    const externalPackage = path.join(workspace, 'node_modules', 'spoofed');
+    const nestedLink = path.join(
+      nodeModules,
+      '.pnpm',
+      'next@1.0.0',
+      'node_modules',
+      'next',
+      'node_modules',
+      '@next',
+      'env',
+    );
+    mkdirSync(externalPackage, { recursive: true });
+    mkdirSync(path.dirname(nestedLink), { recursive: true });
+    writeFileSync(path.join(externalPackage, 'package.json'), '{"name":"spoofed"}\n');
+    symlinkSync(
+      path.relative(path.dirname(nestedLink), externalPackage),
+      nestedLink,
+      'dir',
+    );
+
+    const result = runScript(
+      'build.mjs',
+      ['--materialize-standalone-runtime', standalone],
+      workspace,
+    );
+
+    expect(result.status).not.toBe(0);
+    expect(`${result.stdout}\n${result.stderr}`).toMatch(/alias/i);
+    expect(collectSymlinks(nodeModules).length).toBeGreaterThan(0);
+  });
+
   test.each([
     ['dangling', '.pnpm/missing@1.0.0/node_modules/missing', /Dangling/],
     ['out-of-tree', '../../../outside-package', /Out-of-tree/],
