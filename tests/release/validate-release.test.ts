@@ -1,11 +1,22 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import {
+  mkdir, mkdtemp, readFile, rm, writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 const roots: string[] = [];
 const validatorScript = resolve('scripts/validate-release-version.mjs');
+const projectRoot = resolve('.');
+const consumerFiles = [
+  'electron-builder.config.mjs',
+  'electron/main.cjs',
+  'next.config.mjs',
+  'scripts/versioning.mjs',
+  'src/features/report-editor/report-editor.tsx',
+  'src/lib/app-version.ts',
+];
 
 function git(cwd: string, args: string[], env?: Record<string, string | undefined>) {
   return execFileSync('git', args, {
@@ -19,8 +30,21 @@ function git(cwd: string, args: string[], env?: Record<string, string | undefine
 async function writePackage(work: string, version: string) {
   await writeFile(
     join(work, 'package.json'),
-    `${JSON.stringify({ name: 'fixture', version, private: true }, null, 2)}\n`,
+    `${JSON.stringify({
+      name: 'fixture',
+      version,
+      private: true,
+      build: { extends: './electron-builder.config.mjs' },
+    }, null, 2)}\n`,
   );
+}
+
+async function installConsumerFiles(work: string) {
+  await Promise.all(consumerFiles.map(async relativePath => {
+    const destination = join(work, relativePath);
+    await mkdir(dirname(destination), { recursive: true });
+    await writeFile(destination, await readFile(join(projectRoot, relativePath), 'utf8'));
+  }));
 }
 
 async function fixture() {
@@ -33,6 +57,7 @@ async function fixture() {
   git(work, ['config', 'user.name', 'Release Test']);
   git(work, ['config', 'user.email', 'release@example.test']);
   await writePackage(work, '0.1.1');
+  await installConsumerFiles(work);
   git(work, ['add', 'package.json']);
   git(work, ['commit', '-m', 'initial']);
   git(work, ['tag', '-a', 'v0.1.1', '-m', 'historical']);
@@ -95,13 +120,22 @@ describe('validate-release command with real Git tags', () => {
     const artifacts = artifactEvidence('2026.710.2');
     await expect(validate(work, { artifacts, prepared: true }))
       .resolves.toMatchObject({
+        artifactValidationPending: false,
         mode: 'prepared',
         version: '2026.710.2',
         artifactsValidated: true,
+        consumerConfigurationsValidated: true,
       });
 
     const artifactsPath = join(work, 'prepared-artifacts.json');
     await writeFile(artifactsPath, `${JSON.stringify(artifacts, null, 2)}\n`);
+    const pendingStdout = execFileSync(process.execPath, [validatorScript, '--prepared'], {
+      cwd: work,
+      encoding: 'utf8',
+    });
+    expect(pendingStdout).toContain(
+      'Validated prepared prerequisites and configured consumers for 2026.710.2; artifact validation pending.',
+    );
     const stdout = execFileSync(process.execPath, [
       validatorScript,
       '--prepared',
@@ -111,7 +145,9 @@ describe('validate-release command with real Git tags', () => {
       cwd: work,
       encoding: 'utf8',
     });
-    expect(stdout).toContain('Validated prepared release version 2026.710.2.');
+    expect(stdout).toContain(
+      'Validated prepared prerequisites, configured consumers, and artifacts for 2026.710.2.',
+    );
   });
 
   it('explicitly defers consumer evidence only for an atomic pre-write candidate check', async () => {
@@ -163,10 +199,12 @@ describe('validate-release command with real Git tags', () => {
     annotatedTag(work, '2026.710.1', '2026-07-10T23:30:00+02:00');
 
     await expect(validate(work, { artifacts: artifactEvidence('2026.710.1') })).resolves.toMatchObject({
+      artifactValidationPending: false,
       mode: 'tag',
       tag: 'v2026.710.1',
       version: '2026.710.1',
       artifactsValidated: true,
+      consumerConfigurationsValidated: true,
     });
   });
 
@@ -214,12 +252,16 @@ describe('validate-release command with real Git tags', () => {
     })).rejects.toMatchObject({ code: 'VERSION_NOT_IN_ARTIFACT' });
   });
 
-  it('fails closed when formal tag validation lacks complete non-empty artifact evidence', async () => {
+  it('keeps formal pre-build validation usable while failing closed on incomplete artifact evidence', async () => {
     const { work } = await fixture();
     await commitVersion(work, '2026.710.1');
     annotatedTag(work, '2026.710.1');
 
-    await expect(validate(work)).rejects.toMatchObject({ code: 'VERSION_NOT_IN_ARTIFACT' });
+    await expect(validate(work)).resolves.toMatchObject({
+      artifactValidationPending: true,
+      artifactsValidated: false,
+      consumerConfigurationsValidated: true,
+    });
     await expect(validate(work, { artifacts: {} }))
       .rejects.toMatchObject({ code: 'VERSION_NOT_IN_ARTIFACT' });
     await expect(validate(work, { artifacts: { uiVersion: '2026.710.1' } }))
@@ -250,10 +292,17 @@ describe('validate-release command with real Git tags', () => {
     });
     const valid = runCli(['--artifacts', validPath]);
     expect(valid.status).toBe(0);
-    expect(valid.stdout).toContain(`Validated tag release version ${version}.`);
+    expect(valid.stdout).toContain(
+      `Validated tag prerequisites, configured consumers, and artifacts for ${version}.`,
+    );
+
+    const configuredOnly = runCli([]);
+    expect(configuredOnly.status).toBe(0);
+    expect(configuredOnly.stdout).toContain(
+      `Validated tag prerequisites and configured consumers for ${version}; artifact validation pending.`,
+    );
 
     for (const args of [
-      [],
       ['--artifacts', malformedPath],
       ['--artifacts', incompletePath],
       ['--artifacts', driftingPath],
@@ -276,13 +325,21 @@ describe('validate-release command with real Git tags', () => {
     await expect(validate(work, { artifacts: collision }))
       .rejects.toMatchObject({ code: 'VERSION_NOT_IN_ARTIFACT' });
     await expect(validate(work, { artifacts: artifactEvidence('2026.710.1') }))
-      .resolves.toMatchObject({ artifactsValidated: true });
+      .resolves.toMatchObject({
+        artifactsValidated: true,
+        consumerConfigurationsValidated: true,
+      });
   });
 
   it('keeps historical 0.1.1 valid only as a tagged migration baseline', async () => {
     const { work } = await fixture();
     await expect(validate(work, { artifacts: artifactEvidence('0.1.1') }))
-      .resolves.toMatchObject({ version: '0.1.1', tag: 'v0.1.1', artifactsValidated: true });
+      .resolves.toMatchObject({
+        version: '0.1.1',
+        tag: 'v0.1.1',
+        artifactsValidated: true,
+        consumerConfigurationsValidated: true,
+      });
     await expect(validate(work, { prepared: true }))
       .rejects.toMatchObject({ code: 'INVALID_CURRENT_VERSION' });
   });

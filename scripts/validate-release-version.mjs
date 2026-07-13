@@ -238,19 +238,19 @@ export async function validateReleaseVersion(options = {}) {
     if (highest && compareAppVersions(version, highest) <= 0) {
       releaseError('CURRENT_VERSION_NOT_LATEST', `Prepared version ${version} is not above ${highest}.`);
     }
-    const artifactsValidated = artifacts === undefined
-      ? false
-      : validateArtifacts(version, artifacts, true);
-    const consumerConfigurationsValidated = artifacts === undefined
-      && !deferConsumerValidation;
+    const consumerConfigurationsValidated = !deferConsumerValidation;
     const consumerEvidence = consumerConfigurationsValidated
       ? await validateConfiguredConsumers(cwd, version)
       : undefined;
+    const artifactsValidated = artifacts === undefined
+      ? false
+      : validateArtifacts(version, artifacts, true);
     return {
       mode: 'prepared',
       version,
       highestPublishedVersion: highest,
       artifactsValidated,
+      artifactValidationPending: artifacts === undefined,
       consumerConfigurationsValidated,
       consumerEvidence,
       consumerValidationPending: artifacts === undefined && deferConsumerValidation,
@@ -290,19 +290,18 @@ export async function validateReleaseVersion(options = {}) {
     }
   }
 
+  const consumerEvidence = await validateConfiguredConsumers(cwd, version);
+  const consumerConfigurationsValidated = true;
   const artifactsValidated = artifacts === undefined
     ? false
     : validateArtifacts(version, artifacts, true);
-  const consumerConfigurationsValidated = artifacts === undefined;
-  const consumerEvidence = consumerConfigurationsValidated
-    ? await validateConfiguredConsumers(cwd, version)
-    : undefined;
   return {
     mode: 'tag',
     version,
     tag: expectedTag,
     highestPublishedVersion: highest,
     artifactsValidated,
+    artifactValidationPending: artifacts === undefined,
     consumerConfigurationsValidated,
     consumerEvidence,
   };
@@ -364,7 +363,18 @@ async function main() {
     ? undefined
     : await readArtifactEvidence(cwd, artifactsPath);
   const result = await validateReleaseVersion({ artifacts, cwd, prepared });
-  process.stdout.write(`Validated ${result.mode} release version ${result.version}.\n`);
+  const prerequisites = result.mode === 'tag'
+    ? 'tag prerequisites'
+    : 'prepared prerequisites';
+  if (result.artifactsValidated) {
+    process.stdout.write(
+      `Validated ${prerequisites}, configured consumers, and artifacts for ${result.version}.\n`,
+    );
+    return;
+  }
+  process.stdout.write(
+    `Validated ${prerequisites} and configured consumers for ${result.version}; artifact validation pending.\n`,
+  );
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

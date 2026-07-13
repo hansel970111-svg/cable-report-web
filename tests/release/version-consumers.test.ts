@@ -136,6 +136,34 @@ function releaseGitRunner(version: string, publishedTags = `v${version}`) {
   };
 }
 
+function artifactEvidence(version: string) {
+  return {
+    uiVersion: version,
+    electronVersion: version,
+    macShortVersion: version,
+    macBundleVersion: '2607.13.2',
+    windowsVersion: version,
+    artifactNames: [
+      `Cable-Report-Generator-${version}-mac-x64.dmg`,
+      `Cable-Report-Generator-${version}-win-x64.exe`,
+    ],
+  };
+}
+
+async function mutateSource(root: string, relativePath: string, mutate: (source: string) => string) {
+  const path = join(root, relativePath);
+  await writeFile(path, mutate(await readFile(path, 'utf8')));
+}
+
+async function overridePackageBuild(root: string, override: Record<string, unknown>) {
+  const path = join(root, 'package.json');
+  const packageJson = JSON.parse(await readFile(path, 'utf8')) as {
+    build: Record<string, unknown>;
+  };
+  packageJson.build = { ...packageJson.build, ...override };
+  await writeFile(path, `${JSON.stringify(packageJson, null, 2)}\n`);
+}
+
 afterEach(async () => {
   vi.unstubAllEnvs();
   await Promise.all(temporaryRoots.splice(0).map(root => (
@@ -287,6 +315,109 @@ describe('single-source application version consumers', () => {
     await writeFile(
       nextConfigPath,
       nextConfig.replace('CABLE_REPORT_APP_VERSION', 'CABLE_REPORT_DRIFT_VERSION'),
+    );
+
+    await expect(validateReleaseVersion({
+      cwd: fixtureRoot,
+      runner: releaseGitRunner(version),
+    })).rejects.toMatchObject({ code: 'VERSION_NOT_IN_ARTIFACT' });
+  });
+
+  it('validates configured consumers and supplied artifacts cumulatively in both modes', async () => {
+    const version = '2026.713.2';
+    const fixtureRoot = await writeConsumerFixture(version);
+    const { validateReleaseVersion } = await import(
+      '../../scripts/validate-release-version.mjs'
+    );
+    const artifacts = artifactEvidence(version);
+
+    await expect(validateReleaseVersion({
+      artifacts,
+      cwd: fixtureRoot,
+      runner: releaseGitRunner(version),
+    })).resolves.toMatchObject({
+      artifactValidationPending: false,
+      artifactsValidated: true,
+      consumerConfigurationsValidated: true,
+      mode: 'tag',
+    });
+    await expect(validateReleaseVersion({
+      artifacts,
+      cwd: fixtureRoot,
+      prepared: true,
+      runner: releaseGitRunner(version, 'v0.1.1'),
+    })).resolves.toMatchObject({
+      artifactValidationPending: false,
+      artifactsValidated: true,
+      consumerConfigurationsValidated: true,
+      mode: 'prepared',
+    });
+  });
+
+  it.each([
+    ['Next', async (root: string) => mutateSource(
+      root,
+      'next.config.mjs',
+      source => source.replace('CABLE_REPORT_APP_VERSION', 'CABLE_REPORT_DRIFT_VERSION'),
+    )],
+    ['About', async (root: string) => mutateSource(
+      root,
+      'electron/main.cjs',
+      source => source.replace(
+        'applicationVersion: app.getVersion()',
+        "applicationVersion: 'drifted'",
+      ),
+    )],
+    ['Builder', async (root: string) => mutateSource(
+      root,
+      'electron-builder.config.mjs',
+      source => source.replace(
+        'Cable-Report-Generator-${version}-${os}-${arch}.${ext}',
+        'Drifted-${version}-${os}-${arch}.${ext}',
+      ),
+    )],
+  ])('rejects valid-looking artifacts when %s configuration drifts', async (_consumer, drift) => {
+    const version = '2026.713.2';
+    const fixtureRoot = await writeConsumerFixture(version);
+    await drift(fixtureRoot);
+    const { validateReleaseVersion } = await import(
+      '../../scripts/validate-release-version.mjs'
+    );
+
+    await expect(validateReleaseVersion({
+      artifacts: artifactEvidence(version),
+      cwd: fixtureRoot,
+      runner: releaseGitRunner(version),
+    })).rejects.toMatchObject({ code: 'VERSION_NOT_IN_ARTIFACT' });
+  });
+
+  it.each([
+    ['artifactName', { artifactName: 'Override-${version}.${ext}' }],
+    ['mac bundleVersion', { mac: { bundleVersion: '9999.1.1' } }],
+  ])('rejects an effective package-level %s override', async (_field, override) => {
+    const version = '2026.713.2';
+    const fixtureRoot = await writeConsumerFixture(version);
+    await overridePackageBuild(fixtureRoot, override);
+    const { validateReleaseVersion } = await import(
+      '../../scripts/validate-release-version.mjs'
+    );
+
+    await expect(validateReleaseVersion({
+      cwd: fixtureRoot,
+      runner: releaseGitRunner(version),
+    })).rejects.toMatchObject({ code: 'VERSION_NOT_IN_ARTIFACT' });
+  });
+
+  it('rejects a hidden hard-coded version in the Electron Builder config source', async () => {
+    const version = '2026.713.2';
+    const fixtureRoot = await writeConsumerFixture(version);
+    await mutateSource(
+      fixtureRoot,
+      'electron-builder.config.mjs',
+      source => `${source}\nconst staleVersionMarker = '2026.713.2';\n`,
+    );
+    const { validateReleaseVersion } = await import(
+      '../../scripts/validate-release-version.mjs'
     );
 
     await expect(validateReleaseVersion({

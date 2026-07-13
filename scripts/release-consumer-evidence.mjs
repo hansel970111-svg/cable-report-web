@@ -1,10 +1,16 @@
 import { readFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { parseCalVer, toMacBundleVersion } from './versioning.mjs';
 
 const ARTIFACT_NAME_PATTERN = 'Cable-Report-Generator-${version}-${os}-${arch}.${ext}';
+const require = createRequire(import.meta.url);
+const builderRequire = createRequire(require.resolve('electron-builder'));
+const { getConfig: loadEffectiveBuilderConfig } = builderRequire(
+  'app-builder-lib/out/util/config/config.js',
+);
 let importSequence = 0;
 
 export class VersionConsumerEvidenceError extends Error {
@@ -55,17 +61,20 @@ function renderArtifactName(pattern, values) {
 }
 
 function assertSourceWiring(sources) {
+  const appVersion = sources['src/lib/app-version.ts'];
+  const editor = sources['src/features/report-editor/report-editor.tsx'];
+  const electronMain = sources['electron/main.cjs'];
   if (!/export const APP_VERSION[^=]*=\s*process\.env\.CABLE_REPORT_APP_VERSION/u
-    .test(sources.appVersion)) {
+    .test(appVersion)) {
     fail('The renderer version module is not wired to the immutable Next build constant.');
   }
-  if (!/import\s*\{\s*APP_VERSION\s*\}.*@\/lib\/app-version/u.test(sources.editor)
+  if (!/import\s*\{\s*APP_VERSION\s*\}.*@\/lib\/app-version/u.test(editor)
       || !/<footer[^>]*>[\s\S]*\u7248\u672c\s*\{APP_VERSION\}[\s\S]*<\/footer>/u
-        .test(sources.editor)) {
+        .test(editor)) {
     fail('ReportEditor does not render the configured application version footer.');
   }
   if (!/app\.setAboutPanelOptions\(\{[\s\S]*applicationName:\s*app\.getName\(\)[\s\S]*applicationVersion:\s*app\.getVersion\(\)[\s\S]*version:\s*app\.getVersion\(\)[\s\S]*\}\)/u
-    .test(sources.electronMain)) {
+    .test(electronMain)) {
     fail('Electron About metadata is not derived from app package metadata.');
   }
 
@@ -96,11 +105,11 @@ export async function collectVersionConsumerEvidence({ cwd, expectedVersion }) {
   }
 
   let nextConfig;
-  let builderConfig;
+  let effectiveBuilderConfig;
   try {
-    [nextConfig, builderConfig] = await Promise.all([
+    [nextConfig, effectiveBuilderConfig] = await Promise.all([
       importFresh(join(cwd, 'next.config.mjs')),
-      importFresh(join(cwd, 'electron-builder.config.mjs')),
+      loadEffectiveBuilderConfig(cwd, null, null),
     ]);
   } catch (error) {
     fail(
@@ -110,7 +119,6 @@ export async function collectVersionConsumerEvidence({ cwd, expectedVersion }) {
     );
   }
   const effectiveNextConfig = nextConfig.default;
-  const effectiveBuilderConfig = builderConfig.default;
 
   assertEqual(
     effectiveNextConfig?.env?.CABLE_REPORT_APP_VERSION,
@@ -152,6 +160,10 @@ export async function collectVersionConsumerEvidence({ cwd, expectedVersion }) {
   );
 
   const sources = {
+    'electron-builder.config.mjs': await readRequiredSource(
+      cwd,
+      'electron-builder.config.mjs',
+    ),
     'electron/main.cjs': await readRequiredSource(cwd, 'electron/main.cjs'),
     'next.config.mjs': await readRequiredSource(cwd, 'next.config.mjs'),
     'src/features/report-editor/report-editor.tsx': await readRequiredSource(
@@ -160,12 +172,7 @@ export async function collectVersionConsumerEvidence({ cwd, expectedVersion }) {
     ),
     'src/lib/app-version.ts': await readRequiredSource(cwd, 'src/lib/app-version.ts'),
   };
-  assertSourceWiring({
-    appVersion: sources['src/lib/app-version.ts'],
-    editor: sources['src/features/report-editor/report-editor.tsx'],
-    electronMain: sources['electron/main.cjs'],
-    nextConfig: sources['next.config.mjs'],
-  });
+  assertSourceWiring(sources);
 
   return Object.freeze({
     artifactNamePattern: ARTIFACT_NAME_PATTERN,
