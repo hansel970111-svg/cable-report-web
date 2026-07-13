@@ -36,6 +36,19 @@ function runPnpm(args) {
   run(commandName('corepack'), ['pnpm', ...args]);
 }
 
+function currentGitHead() {
+  const result = spawnSync('git', ['rev-parse', 'HEAD'], {
+    cwd: workspace,
+    encoding: 'utf8',
+    shell: false,
+  });
+  const head = result.stdout?.trim();
+  if (result.error || result.status !== 0 || !/^[0-9a-f]{40}$/i.test(head || '')) {
+    throw new Error(`Unable to bind build output to Git HEAD: ${result.stderr || result.error || head}`);
+  }
+  return head;
+}
+
 function copyDirIfExists(sourceDir, targetDir, label) {
   if (!fs.existsSync(sourceDir)) return;
 
@@ -299,6 +312,10 @@ function prepareStandaloneRuntime() {
     path.join(standaloneDir, 'public'),
     'public assets'
   );
+
+  const head = currentGitHead();
+  fs.writeFileSync(path.join(standaloneDir, '.cable-build-commit'), `${head}\n`, 'utf8');
+  console.log(`Bound standalone runtime to Git commit ${head}.`);
 }
 
 if (process.argv[2] === '--materialize-standalone-runtime') {

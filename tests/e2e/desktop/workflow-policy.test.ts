@@ -28,17 +28,38 @@ test('CI matrix and frozen runtimes retain the release contract', async () => {
   const source = await readFile('.github/workflows/desktop-e2e.yml', 'utf8');
   const browserConfig = await readFile('playwright.config.ts', 'utf8');
 
-  expect(source).toContain('os: [macos-latest, windows-latest]');
+  expect(source).toContain('os: macos-latest');
+  expect(source).toContain('platform: mac');
+  expect(source).toContain('os: windows-latest');
+  expect(source).toContain('platform: win');
   expect(source).toContain('node-version: "24.14.0"');
   expect(source).toContain('python-version: "3.12.13"');
   expect(source).toContain('corepack prepare pnpm@9.15.9 --activate');
   expect(source).toContain('pnpm install --frozen-lockfile');
   expect(source).toContain('python -m pip install --require-hashes --only-binary=:all: -r requirements-dev.lock');
   expect(source).toContain('pnpm exec playwright install chromium');
+  expect(source).toContain('node scripts/write-acceptance-evidence.mjs mac');
+  expect(source).toContain('node scripts/write-acceptance-evidence.mjs win');
+  expect(source.match(/node scripts\/run-evidence-command\.mjs/g)).toHaveLength(9);
   expect(source).toContain('permissions:\n  contents: read');
   expect(source).not.toMatch(/create-release|softprops|gh release/i);
   expect(browserConfig).toContain("testMatch: '**/*.spec.ts'");
   expect(browserConfig).toContain("testIgnore: 'desktop/**'");
+});
+
+test('package and acceptance evidence are bound to the current Git commit', async () => {
+  const [build, packageVerifier, acceptance] = await Promise.all([
+    readFile('scripts/build.mjs', 'utf8'),
+    readFile('scripts/verify-desktop-package.mjs', 'utf8'),
+    readFile('scripts/verify-acceptance.mjs', 'utf8'),
+  ]);
+
+  expect(build).toContain("'.cable-build-commit'");
+  expect(packageVerifier).toContain("'next-build/standalone/.cable-build-commit'");
+  expect(packageVerifier).toContain('does not match current HEAD');
+  expect(acceptance).toContain('verifyAcceptanceManifest');
+  expect(acceptance).toContain("[corepack, ['pnpm', 'lint']]");
+  expect(acceptance).toContain("[corepack, ['pnpm', 'ts-check']]");
 });
 
 test('release documentation uses the actual frozen toolchain and dev lock', async () => {

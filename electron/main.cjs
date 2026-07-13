@@ -26,6 +26,13 @@ const { createUpdateChecker } = require('./update-check.cjs');
 const { loadVersioningModule } = require('./versioning-loader.cjs');
 const { loadPackagedStandalone } = require('./standalone-runtime.cjs');
 
+process.on('unhandledRejection', reason => {
+  console.error('[CABLE_FATAL_UNHANDLED_REJECTION]', reason);
+});
+process.on('uncaughtExceptionMonitor', error => {
+  console.error('[CABLE_FATAL_UNCAUGHT_EXCEPTION]', error);
+});
+
 if (!process.env.NEXT_TELEMETRY_DISABLED) {
   process.env.NEXT_TELEMETRY_DISABLED = '1';
 }
@@ -33,6 +40,10 @@ if (!process.env.NEXT_TELEMETRY_DISABLED) {
 let mainWindow = null;
 let nextServer = null;
 let unregisterSavePdfHandler = null;
+let shutdownStarted = false;
+let shutdownComplete = false;
+
+const pdfJobShutdownKey = Symbol.for('cable-report.pdf-job-shutdown');
 
 const desktopSessionToken = createDesktopSessionToken();
 process.env.CABLE_DESKTOP_TOKEN = desktopSessionToken;
@@ -361,6 +372,30 @@ function registerNativeSaveBridge() {
   });
 }
 
+async function shutdownPdfJobs() {
+  const shutdown = Reflect.get(globalThis, pdfJobShutdownKey);
+  if (typeof shutdown === 'function') await shutdown();
+}
+
+async function closeNextServer() {
+  const server = nextServer;
+  nextServer = null;
+  if (!server) return;
+  await new Promise((resolve, reject) => {
+    server.close(error => {
+      if (error) reject(error);
+      else resolve();
+    });
+  });
+}
+
+async function shutdownApplication() {
+  unregisterSavePdfHandler?.();
+  unregisterSavePdfHandler = null;
+  await shutdownPdfJobs();
+  await closeNextServer();
+}
+
 function createMainWindow(url) {
   mainWindow = new BrowserWindow({
     width: 1280,
@@ -442,11 +477,17 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
-app.on('before-quit', () => {
-  unregisterSavePdfHandler?.();
-  unregisterSavePdfHandler = null;
-  if (nextServer) {
-    nextServer.close();
-    nextServer = null;
-  }
+app.on('before-quit', event => {
+  if (shutdownComplete) return;
+  event.preventDefault();
+  if (shutdownStarted) return;
+  shutdownStarted = true;
+  void shutdownApplication()
+    .catch(error => {
+      console.error('[CABLE_SHUTDOWN_FAILED]', error);
+    })
+    .finally(() => {
+      shutdownComplete = true;
+      app.quit();
+    });
 });

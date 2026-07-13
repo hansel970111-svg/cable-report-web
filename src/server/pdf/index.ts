@@ -27,6 +27,9 @@ export const pdfJobController = new PdfJobController({
   timeoutMs: desktopE2eTimeoutMs(),
 });
 
+const pdfJobShutdownKey = Symbol.for('cable-report.pdf-job-shutdown');
+Reflect.set(globalThis, pdfJobShutdownKey, () => pdfJobController.shutdown());
+
 export const MAX_REPORT_BODY_BYTES = 25 * 1024 * 1024;
 
 export type GenerateReportRouteDependencies = {

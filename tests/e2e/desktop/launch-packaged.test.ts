@@ -64,5 +64,9 @@ test('main-process stderr validation catches only release-fatal diagnostics', ()
     /unhandled/i,
   );
   expect(() => validateMainProcessStderr('uncaught exception: boom')).toThrow(/uncaught/i);
+  expect(() => validateMainProcessStderr('[CABLE_FATAL_UNHANDLED_REJECTION] Error: boom'))
+    .toThrow(/fatal/i);
+  expect(() => validateMainProcessStderr('[CABLE_FATAL_UNCAUGHT_EXCEPTION] Error: boom'))
+    .toThrow(/fatal/i);
   expect(() => validateMainProcessStderr('Error: 本地服务启动超时')).toThrow(/启动/);
 });

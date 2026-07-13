@@ -34,14 +34,29 @@ export { expect };
 
 export async function setSaveDialogResult(
   desktop: PackagedDesktop,
-  result: { canceled: boolean; filePath?: string },
+  result: { canceled: boolean; filePath?: string; delayMs?: number },
 ): Promise<void> {
   await desktop.app.evaluate(async ({ dialog }, nextResult) => {
-    dialog.showSaveDialog = async () => ({
-      canceled: nextResult.canceled,
-      filePath: nextResult.filePath ?? '',
-    });
+    const state = globalThis as unknown as { __cableE2eSaveDialogCalls: number };
+    state.__cableE2eSaveDialogCalls = 0;
+    dialog.showSaveDialog = async () => {
+      state.__cableE2eSaveDialogCalls += 1;
+      if ((nextResult.delayMs ?? 0) > 0) {
+        await new Promise(resolve => setTimeout(resolve, nextResult.delayMs));
+      }
+      return {
+        canceled: nextResult.canceled,
+        filePath: nextResult.filePath ?? '',
+      };
+    };
   }, result);
+}
+
+export async function saveDialogCallCount(desktop: PackagedDesktop): Promise<number> {
+  return desktop.app.evaluate(async () => {
+    const state = globalThis as unknown as { __cableE2eSaveDialogCalls?: number };
+    return state.__cableE2eSaveDialogCalls ?? 0;
+  });
 }
 
 export async function downloadEntries(): Promise<Set<string>> {

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 import { expect, test } from './fixtures';
-import { descendantProcesses } from './launch-packaged';
+import { descendantProcesses, processExists } from './launch-packaged';
 
 const RELEASES_URL = 'https://github.com/hansel970111-svg/cable-report-web/releases/latest';
 
@@ -131,6 +131,47 @@ test.describe('packaged timeout cleanup', () => {
     await expect.poll(() => descendantProcesses(desktop.mainPid).filter(processInfo => (
       /(?:^|[/\\])pdf_worker(?:\.exe)?(?:\s|$)/i.test(processInfo.command)
     )).length).toBe(0);
+    await expect.poll(async () => (
+      (await readdir(tmpdir())).filter(name => (
+        name.startsWith('cable-report-') && !desktop.taskDirectoriesBefore.has(name)
+      ))
+    )).toEqual([]);
+  });
+});
+
+test.describe('packaged quit cleanup', () => {
+  test.use({
+    desktopEnvironment: {
+      CABLE_DESKTOP_E2E_HANG_WORKER: '1',
+    },
+  });
+
+  test('quitting with a hanging pdf_worker aborts it and cleans task data', async ({ desktop }) => {
+    await desktop.window.getByLabel('项目号 (Site)').fill('DE46');
+    await desktop.window.getByLabel('线缆类型').selectOption('Cat 5e');
+    await desktop.window.getByLabel('Excel 布线表').setInputFiles(
+      path.join(process.env.COZE_WORKSPACE_PATH || process.cwd(), 'tests/fixtures/excel/cat5e-oob.xlsx'),
+    );
+    await desktop.window.getByRole('button', { name: '加载并导入' }).click();
+    await expect(desktop.window.getByText('1 条线缆记录')).toBeVisible();
+    await desktop.window.getByRole('button', { name: '生成测试报告' }).click();
+
+    let workerPids: number[] = [];
+    await expect.poll(() => {
+      workerPids = descendantProcesses(desktop.mainPid)
+        .filter(processInfo => /(?:^|[/\\])pdf_worker(?:\.exe)?(?:\s|$)/i.test(processInfo.command))
+        .map(processInfo => processInfo.pid);
+      return workerPids.length;
+    }).toBe(1);
+    await expect.poll(async () => (
+      (await readdir(tmpdir())).filter(name => (
+        name.startsWith('cable-report-') && !desktop.taskDirectoriesBefore.has(name)
+      )).length
+    )).toBe(1);
+
+    await desktop.app.close();
+
+    await expect.poll(() => workerPids.filter(processExists)).toEqual([]);
     await expect.poll(async () => (
       (await readdir(tmpdir())).filter(name => (
         name.startsWith('cable-report-') && !desktop.taskDirectoriesBefore.has(name)

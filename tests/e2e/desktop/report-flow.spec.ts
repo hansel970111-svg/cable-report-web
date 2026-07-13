@@ -8,6 +8,7 @@ import {
   addedEntries,
   downloadEntries,
   expect,
+  saveDialogCallCount,
   setSaveDialogResult,
   test,
 } from './fixtures';
@@ -94,8 +95,17 @@ function verifyPdfWithPyMuPDF(
   const result = spawnSync(
     python,
     ['-c', source, pdfPath, reportCase.editedLabel],
-    { encoding: 'utf8', shell: false, windowsHide: true },
+    {
+      encoding: 'utf8',
+      shell: false,
+      windowsHide: true,
+      timeout: 30_000,
+      killSignal: 'SIGKILL',
+    },
   );
+  if ((result.error as NodeJS.ErrnoException | undefined)?.code === 'ETIMEDOUT') {
+    throw new Error('PyMuPDF verification timed out after 30000 ms');
+  }
   expect(result.status, result.stderr).toBe(0);
   expect(JSON.parse(result.stdout)).toEqual({
     pages: reportCase.expectedPages,
@@ -157,9 +167,18 @@ async function attachCaseEvidence(
 test('native Save As cancellation returns to ready without false success', async ({ desktop }) => {
   const reportCase = REPORT_CASES[0];
   await importFixture(desktop.window, reportCase);
-  await setSaveDialogResult(desktop, { canceled: true });
+  await setSaveDialogResult(desktop, { canceled: true, delayMs: 1_000 });
+  const generationPromise = desktop.window.waitForResponse(response => (
+    new URL(response.url()).pathname === '/api/generate-report'
+    && response.request().method() === 'POST'
+  ));
   await desktop.window.getByRole('button', { name: '生成测试报告' }).click();
+  expect((await generationPromise).status()).toBe(200);
+  await expect.poll(() => saveDialogCallCount(desktop)).toBe(1);
+  await expect(desktop.window.getByRole('status', { name: '工作流状态' }))
+    .toContainText('正在保存 PDF');
   await expect(desktop.window.getByRole('button', { name: '生成测试报告' })).toBeEnabled();
   await expect(desktop.window.getByRole('status', { name: '工作流状态' })).toHaveCount(0);
+  await expect(desktop.window.getByText('已取消保存。')).toBeVisible();
   await expect(desktop.window.getByText(/^已保存 .+\.pdf。$/)).toHaveCount(0);
 });

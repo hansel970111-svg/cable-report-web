@@ -161,7 +161,7 @@ test('Electron starts standalone code inside ASAR without changing into the arch
 test('package verifier is ASAR-native and fail-closed', () => {
   const source = readFileSync(path.join(root, 'scripts/verify-desktop-package.mjs'), 'utf8');
 
-  expect(source).toContain("import { getRawHeader, listPackage } from '@electron/asar';");
+  expect(source).toContain("import { extractFile, getRawHeader, listPackage } from '@electron/asar';");
   expect(source).toContain("path.join(resourcesDir, 'app.asar')");
   expect(source).toContain('listPackage(appAsarPath)');
   expect(source).toContain("'electron/main.cjs'");

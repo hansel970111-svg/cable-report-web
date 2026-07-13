@@ -259,6 +259,31 @@ describe('PdfJobController ownership and cleanup', () => {
     await expectClean(root, target);
   });
 
+  test('shutdown aborts the active worker and waits for private-directory cleanup', async () => {
+    const root = await temporaryRoot();
+    const started = deferred<AbortSignal>();
+    const worker = fakeWorker(async request => {
+      started.resolve(request.signal);
+      return new Promise<never>((_resolve, reject) => {
+        request.signal.addEventListener('abort', () => reject(new Error('shutdown')), {
+          once: true,
+        });
+      });
+    });
+    const target = controller(root, worker, { timeoutMs: 60_000 });
+    const running = target.run({
+      jobId: 'job-shutdown', draft: draft(), signal: new AbortController().signal,
+    });
+    const workerSignal = await started.promise;
+
+    await target.shutdown();
+
+    expect(workerSignal.aborted).toBe(true);
+    await expect(running).rejects.toMatchObject({ code: 'REPORT_CANCELLED' });
+    await expectClean(root, target);
+    await expect(target.shutdown()).resolves.toBeUndefined();
+  });
+
   test('an already-aborted request never calls the worker', async () => {
     const root = await temporaryRoot();
     const caller = new AbortController();

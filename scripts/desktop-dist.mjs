@@ -59,6 +59,8 @@ if (requestedTarget === 'mac' && process.platform !== 'darwin') {
 runNodeScript('build.mjs');
 runNodeScript('build-python-workers.mjs');
 
+fs.rmSync(path.join(workspace, 'release'), { recursive: true, force: true });
+
 const builder = electronBuilderBin();
 const targetArg = requestedTarget === 'mac'
   ? '--mac'

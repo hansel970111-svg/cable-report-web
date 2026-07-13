@@ -96,6 +96,11 @@ test('Electron window source retains the mandatory isolation controls', async ()
   expect(source).toContain(
     "if (app.isPackaged && process.env.CABLE_DESKTOP_E2E !== '1')",
   );
+  expect(source).toContain('[CABLE_FATAL_UNHANDLED_REJECTION]');
+  expect(source).toContain('[CABLE_FATAL_UNCAUGHT_EXCEPTION]');
+  expect(source).toContain("Symbol.for('cable-report.pdf-job-shutdown')");
+  expect(source).toContain('event.preventDefault()');
+  expect(source).toContain('await shutdownPdfJobs()');
 
   const originAssignment = source.indexOf('process.env.CABLE_DESKTOP_ORIGIN = origin');
   const standaloneInitialization = source.indexOf('require(standaloneServerPath)');

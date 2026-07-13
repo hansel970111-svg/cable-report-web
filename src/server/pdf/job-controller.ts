@@ -100,6 +100,8 @@ function isSafeSuggestedName(value: string): boolean {
 
 export class PdfJobController {
   private busy = false;
+  private activeStop: (() => void) | null = null;
+  private activeCompletion: Promise<void> | null = null;
   private readonly worker: PdfWorker;
   private readonly templatePathFor: (cableType: CableType) => string;
   private readonly suggestedNameFor: (draft: ReportDraft, now: Date) => string;
@@ -133,6 +135,12 @@ export class PdfJobController {
     return this.busy;
   }
 
+  async shutdown(): Promise<void> {
+    const completion = this.activeCompletion;
+    this.activeStop?.();
+    await completion;
+  }
+
   private log(
     request: PdfJobRequest,
     phase: PdfJobLogEvent['phase'],
@@ -157,9 +165,11 @@ export class PdfJobController {
 
   private normalizeFailure(
     error: unknown,
-    stopReason: 'cancelled' | 'timeout' | undefined,
+    stopReason: 'cancelled' | 'timeout' | 'shutdown' | undefined,
   ): PdfJobError {
-    if (stopReason === 'cancelled') return pdfJobError('REPORT_CANCELLED', false);
+    if (stopReason === 'cancelled' || stopReason === 'shutdown') {
+      return pdfJobError('REPORT_CANCELLED', false);
+    }
     if (stopReason === 'timeout') return pdfJobError('REPORT_TIMEOUT', true);
     if (error instanceof PdfJobError) {
       return pdfJobError(error.code, error.retryable, error.exitCode);
@@ -269,20 +279,28 @@ export class PdfJobController {
     this.log(request, 'started', startedAt, null, null);
 
     let directory: string | undefined;
-    let stopReason: 'cancelled' | 'timeout' | undefined;
+    let stopReason: 'cancelled' | 'timeout' | 'shutdown' | undefined;
     const combined = new AbortController();
-    const stop = (reason: 'cancelled' | 'timeout') => {
+    const stop = (reason: 'cancelled' | 'timeout' | 'shutdown') => {
       if (stopReason !== undefined) return;
       stopReason = reason;
       combined.abort();
     };
+    let resolveCompletion!: () => void;
+    const completion = new Promise<void>(resolve => {
+      resolveCompletion = resolve;
+    });
+    this.activeStop = () => stop('shutdown');
+    this.activeCompletion = completion;
     const onCallerAbort = () => stop('cancelled');
     request.signal.addEventListener('abort', onCallerAbort, { once: true });
     if (request.signal.aborted) onCallerAbort();
     const timeoutId = setTimeout(() => stop('timeout'), this.timeoutMs);
 
     const throwIfStopped = () => {
-      if (stopReason === 'cancelled') throw pdfJobError('REPORT_CANCELLED', false);
+      if (stopReason === 'cancelled' || stopReason === 'shutdown') {
+        throw pdfJobError('REPORT_CANCELLED', false);
+      }
       if (stopReason === 'timeout') throw pdfJobError('REPORT_TIMEOUT', true);
     };
 
@@ -346,6 +364,11 @@ export class PdfJobController {
         failure ??= pdfJobError('PDF_PROCESS_FAILED', true);
       } finally {
         this.busy = false;
+        if (this.activeCompletion === completion) {
+          this.activeStop = null;
+          this.activeCompletion = null;
+        }
+        resolveCompletion();
       }
     }
 

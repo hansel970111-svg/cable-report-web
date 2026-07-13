@@ -13,12 +13,15 @@ import {
 const APPLICATION_NAME = 'Cable Report Generator';
 const OWNED_PREFIX = 'cable-report-e2e-';
 const FATAL_STDERR = [
+  /\[CABLE_FATAL_UNHANDLED_REJECTION\]/,
+  /\[CABLE_FATAL_UNCAUGHT_EXCEPTION\]/,
   /unhandled(?:promiserejection| rejection)/i,
   /uncaught exception/i,
   /(?:next(?:\.js)?\s+)?(?:server\s+)?(?:startup|start)[^\n]*(?:error|failed)/i,
   /本地服务启动超时/,
   /启动失败/,
 ] as const;
+const PROCESS_PROBE_TIMEOUT_MS = 15_000;
 
 export type ProcessSnapshot = {
   pid: number;
@@ -127,9 +130,18 @@ function processTable(platform: NodeJS.Platform): ProcessSnapshot[] {
         '-Command',
         'Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,Name | ConvertTo-Json -Compress',
       ],
-      { encoding: 'utf8', shell: false, windowsHide: true },
+      {
+        encoding: 'utf8',
+        shell: false,
+        windowsHide: true,
+        timeout: PROCESS_PROBE_TIMEOUT_MS,
+        killSignal: 'SIGKILL',
+      },
     );
     if (result.error || result.status !== 0) {
+      if ((result.error as NodeJS.ErrnoException | undefined)?.code === 'ETIMEDOUT') {
+        throw new Error(`Windows process-tree probe timed out after ${PROCESS_PROBE_TIMEOUT_MS} ms`);
+      }
       throw new Error(`Unable to inspect Windows process tree: ${result.stderr || result.error}`);
     }
     const value = JSON.parse(result.stdout || '[]') as Record<string, unknown> | Record<string, unknown>[];
@@ -144,8 +156,13 @@ function processTable(platform: NodeJS.Platform): ProcessSnapshot[] {
   const result = spawnSync('ps', ['-axo', 'pid=,ppid=,command='], {
     encoding: 'utf8',
     shell: false,
+    timeout: PROCESS_PROBE_TIMEOUT_MS,
+    killSignal: 'SIGKILL',
   });
   if (result.error || result.status !== 0) {
+    if ((result.error as NodeJS.ErrnoException | undefined)?.code === 'ETIMEDOUT') {
+      throw new Error(`Unix process-tree probe timed out after ${PROCESS_PROBE_TIMEOUT_MS} ms`);
+    }
     throw new Error(`Unable to inspect process tree: ${result.stderr || result.error}`);
   }
   return parseUnixProcesses(result.stdout);
@@ -171,7 +188,7 @@ export function descendantProcesses(
   return descendants;
 }
 
-function processExists(pid: number): boolean {
+export function processExists(pid: number): boolean {
   try {
     process.kill(pid, 0);
     return true;

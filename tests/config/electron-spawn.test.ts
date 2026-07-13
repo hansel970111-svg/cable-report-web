@@ -81,6 +81,16 @@ test('desktop package verification rejects a packaged tree without the runtime v
   const appAsarPath = join(resourcesDir, 'app.asar');
 
   try {
+    expect(spawnSync('git', ['init'], { cwd: workspace }).status).toBe(0);
+    expect(spawnSync('git', ['config', 'user.email', 'fixture@example.test'], { cwd: workspace }).status).toBe(0);
+    expect(spawnSync('git', ['config', 'user.name', 'Fixture'], { cwd: workspace }).status).toBe(0);
+    await writeFile(join(workspace, 'tracked.txt'), 'fixture');
+    expect(spawnSync('git', ['add', 'tracked.txt'], { cwd: workspace }).status).toBe(0);
+    expect(spawnSync('git', ['commit', '-m', 'fixture'], { cwd: workspace }).status).toBe(0);
+    const fixtureHead = spawnSync('git', ['rev-parse', 'HEAD'], {
+      cwd: workspace,
+      encoding: 'utf8',
+    }).stdout.trim();
     const directories = [
       join(appSourceDir, 'electron'),
       join(appSourceDir, 'next-build', 'standalone', 'node_modules', 'traced-runtime'),
@@ -99,6 +109,7 @@ test('desktop package verification rejects a packaged tree without the runtime v
       [join(appSourceDir, 'electron', 'standalone-runtime.cjs'), ''],
       [join(appSourceDir, 'next-build', 'standalone', 'server.js'), ''],
       [join(appSourceDir, 'next-build', 'standalone', 'package.json'), '{}'],
+      [join(appSourceDir, 'next-build', 'standalone', '.cable-build-commit'), `${fixtureHead}\n`],
       [join(appSourceDir, 'next-build', 'standalone', 'node_modules', 'traced-runtime', 'index.js'), ''],
       [join(appSourceDir, 'next-build', 'standalone', 'next-build', 'BUILD_ID'), 'test'],
       [join(appSourceDir, 'next-build', 'standalone', 'next-build', 'routes-manifest.json'), '{}'],

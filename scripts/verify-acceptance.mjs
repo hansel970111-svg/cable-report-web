@@ -4,6 +4,8 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
+import { verifyAcceptanceManifest } from './acceptance-evidence.mjs';
+
 const REQUIRED_DESKTOP_STORIES = [
   'packaged Cat5e import edit generate native save',
   'packaged LC import edit generate native save',
@@ -13,6 +15,7 @@ const REQUIRED_DESKTOP_STORIES = [
   'packaged production modules contain no updater download install or execute path',
   'cancel terminates a deterministic test-only hanging pdf_worker and cleans task data',
   'timeout terminates the hanging pdf_worker and exposes REPORT_TIMEOUT',
+  'quitting with a hanging pdf_worker aborts it and cleans task data',
 ];
 const GOLDEN_CASES = [
   'cat5e-minimal',
@@ -69,7 +72,7 @@ export function playwrightEvidence(report, expectedTitles) {
 }
 
 export function assertCiPlatformEvidence(evidence, expectedPlatform, expectedCommit) {
-  if (evidence?.schemaVersion !== 1) throw new Error('CI evidence schemaVersion must be 1');
+  if (evidence?.schemaVersion !== 2) throw new Error('CI evidence schemaVersion must be 2');
   if (evidence.platform !== expectedPlatform) {
     throw new Error(`CI evidence platform must be ${expectedPlatform}`);
   }
@@ -78,6 +81,16 @@ export function assertCiPlatformEvidence(evidence, expectedPlatform, expectedCom
   if (evidence.workflow !== 'desktop-e2e') throw new Error('CI evidence workflow must be desktop-e2e');
   if (!Number.isSafeInteger(evidence.runId) || evidence.runId <= 0) {
     throw new Error('CI evidence runId must be a positive integer');
+  }
+  if (!Number.isSafeInteger(evidence.runAttempt) || evidence.runAttempt <= 0) {
+    throw new Error('CI evidence runAttempt must be a positive integer');
+  }
+  if (evidence.repository !== 'hansel970111-svg/cable-report-web') {
+    throw new Error('CI evidence repository is not trusted');
+  }
+  const workflowPrefix = `${evidence.repository}/.github/workflows/desktop-e2e.yml@`;
+  if (typeof evidence.workflowRef !== 'string' || !evidence.workflowRef.startsWith(workflowPrefix)) {
+    throw new Error('CI evidence workflowRef is not trusted');
   }
   if (!Array.isArray(evidence.installerNames) || evidence.installerNames.length < 1) {
     throw new Error('CI evidence must list installer artifacts');
@@ -110,18 +123,13 @@ export function parseArguments(argv) {
     const argument = argv[index];
     if (argument === '--') continue;
     if (argument === '--platform') options.platform = argv[++index];
-    else if (argument === '--require-ci-platform') options.requireCiPlatform = argv[++index];
-    else if (argument === '--ci-report') options.ciReport = argv[++index];
+    else if (argument === '--require-ci-platform' || argument === '--ci-report') {
+      throw new Error('Cross-platform status must be verified with the GitHub API, not a local JSON report');
+    }
     else if (argument === '--emit-ci-report') options.emitCiReport = argv[++index];
     else throw new Error(`Unknown acceptance argument: ${argument}`);
   }
   if (!['mac', 'win'].includes(options.platform)) throw new Error('--platform must be mac or win');
-  if (options.requireCiPlatform && !['mac', 'win'].includes(options.requireCiPlatform)) {
-    throw new Error('--require-ci-platform must be mac or win');
-  }
-  if (options.requireCiPlatform === options.platform) {
-    throw new Error('--require-ci-platform must name the other platform');
-  }
   return options;
 }
 
@@ -148,6 +156,27 @@ function run(command, args, workspace) {
     );
   }
   return result.stdout;
+}
+
+function qualityCommandsEvidence(workspace) {
+  const corepack = process.platform === 'win32' ? 'corepack.cmd' : 'corepack';
+  const python = process.env.PYTHON_CMD || (process.platform === 'win32' ? 'python.exe' : 'python3');
+  const commands = [
+    [process.execPath, ['scripts/verify-dependency-policy.mjs']],
+    [process.execPath, ['scripts/verify-runtime-surface.mjs']],
+    [python, ['scripts/verify_python_locks.py']],
+    [corepack, ['pnpm', 'lint']],
+    [corepack, ['pnpm', 'ts-check']],
+  ];
+  try {
+    for (const [command, args] of commands) run(command, args, workspace);
+    return {
+      passed: true,
+      detail: 'dependency/runtime/Python locks, lint, and TypeScript passed on current checkout',
+    };
+  } catch (error) {
+    return { passed: false, detail: error.message };
+  }
 }
 
 function unitEvidence(report) {
@@ -182,17 +211,57 @@ export function formulaEvidence(report) {
   };
 }
 
-function pythonEvidence(xml) {
-  const failures = [...xml.matchAll(/\bfailures="(\d+)"/g)]
-    .reduce((total, match) => total + Number(match[1]), 0);
-  const errors = [...xml.matchAll(/\berrors="(\d+)"/g)]
-    .reduce((total, match) => total + Number(match[1]), 0);
-  const missingGoldens = GOLDEN_CASES.filter(name => !xml.includes(name));
+function xmlAttributes(source) {
+  const attributes = new Map();
+  for (const match of source.matchAll(/([A-Za-z_:][\w:.-]*)="([^"]*)"/g)) {
+    attributes.set(match[1], match[2]);
+  }
+  return attributes;
+}
+
+function integerAttribute(attributes, name) {
+  const value = attributes.get(name);
+  return value !== undefined && /^\d+$/.test(value) ? Number(value) : Number.NaN;
+}
+
+export function pythonEvidence(xml) {
+  const document = String(xml);
+  const rootMatch = document.match(/<testsuites\b([^>]*)>/)
+    ?? document.match(/<testsuite\b([^>]*)>/);
+  if (!rootMatch) return { passed: false, detail: 'Python JUnit report has no test suite' };
+
+  const root = xmlAttributes(rootMatch[1]);
+  const tests = integerAttribute(root, 'tests');
+  const failures = integerAttribute(root, 'failures');
+  const errors = integerAttribute(root, 'errors');
+  const skipped = integerAttribute(root, 'skipped');
+  const countersValid = Number.isSafeInteger(tests) && tests >= 100
+    && failures === 0 && errors === 0 && skipped === 0;
+  const forbiddenOutcome = /<(?:failure|error|skipped)\b/i.test(document);
+
+  const names = [];
+  const failedCases = [];
+  for (const match of document.matchAll(/<testcase\b([^>]*?)(?:\/>|>([\s\S]*?)<\/testcase>)/g)) {
+    const name = xmlAttributes(match[1]).get('name');
+    if (!name) continue;
+    names.push(name);
+    if (/<(?:failure|error|skipped)\b/i.test(match[2] || '')) failedCases.push(name);
+  }
+  const expectedNames = GOLDEN_CASES.map(name => `test_pdf_matches_approved_golden[${name}]`);
+  const missingGoldens = expectedNames.filter(name => names.filter(value => value === name).length !== 1);
+  const duplicates = names.length !== new Set(names).size;
   return {
-    passed: failures === 0 && errors === 0 && missingGoldens.length === 0,
-    detail: missingGoldens.length > 0
-      ? `missing golden cases: ${missingGoldens.join(', ')}`
-      : `six golden cases present; ${failures} failures and ${errors} errors`,
+    passed: countersValid && !forbiddenOutcome && !duplicates
+      && failedCases.length === 0 && missingGoldens.length === 0,
+    detail: !countersValid
+      ? `invalid JUnit counters: tests=${tests}, failures=${failures}, errors=${errors}, skipped=${skipped}`
+      : forbiddenOutcome || failedCases.length > 0
+        ? 'JUnit report contains a failed, errored, or skipped test'
+        : duplicates
+          ? 'JUnit report contains duplicate testcase names'
+          : missingGoldens.length > 0
+            ? `missing uniquely passed golden cases: ${missingGoldens.join(', ')}`
+            : `${tests} Python tests passed with six unique golden cases and no skips`,
   };
 }
 
@@ -282,17 +351,19 @@ export function verifyAcceptance({ workspace, options }) {
   const tracked = run('git', ['ls-files'], workspace).split(/\r?\n/);
   const legacyMissing = LEGACY_ROUTES.every(file => !tracked.includes(file));
   const head = run('git', ['rev-parse', 'HEAD'], workspace).trim();
-  let platformName = 'local-platform-gate';
-  let platformDetail = `${options.platform} local packaged E2E is green; opposite platform is not claimed`;
-  let platformPassed = desktop.passed;
-  if (options.requireCiPlatform) {
-    const reportPath = options.ciReport
-      || `artifacts/acceptance/ci-${options.requireCiPlatform}.json`;
-    const ciEvidence = readJson(workspace, reportPath);
-    assertCiPlatformEvidence(ciEvidence, options.requireCiPlatform, head);
-    platformName = 'cross-platform-jobs';
-    platformDetail = `${options.platform} local and ${options.requireCiPlatform} CI are green for ${head}`;
-  }
+  const manifest = (() => {
+    try {
+      const value = readJson(workspace, `artifacts/acceptance/manifest-${options.platform}.json`);
+      verifyAcceptanceManifest({ workspace, manifest: value, platform: options.platform, head });
+      return { passed: true, detail: `all reports, package, and installers match ${head}` };
+    } catch (error) {
+      return { passed: false, detail: error.message };
+    }
+  })();
+  const qualityCommands = qualityCommandsEvidence(workspace);
+  const platformName = 'local-platform-gate';
+  const platformDetail = `${options.platform} local packaged E2E is green; opposite platform is not claimed`;
+  const platformPassed = desktop.passed;
 
   const criteria = [
     { id: 1, name: 'formula-tests', ...formulas },
@@ -304,8 +375,9 @@ export function verifyAcceptance({ workspace, options }) {
     {
       id: 7,
       name: 'quality-gates',
-      passed: unit.passed && python.passed && browser.passed && packageStructure.passed,
-      detail: 'unit, Python, browser, build/package structure reports are green',
+      passed: unit.passed && python.passed && browser.passed && packageStructure.passed
+        && manifest.passed && qualityCommands.passed,
+      detail: `${qualityCommands.detail}; ${manifest.detail}`,
     },
     { id: 8, name: platformName, passed: platformPassed, detail: platformDetail },
     {
@@ -332,12 +404,15 @@ function writeCiEvidence(filePath, options, result) {
   }
   const runId = Number(process.env.GITHUB_RUN_ID);
   const evidence = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     platform: options.platform,
     conclusion: 'success',
     commit: result.head,
     workflow: 'desktop-e2e',
     runId,
+    runAttempt: Number(process.env.GITHUB_RUN_ATTEMPT),
+    repository: process.env.GITHUB_REPOSITORY,
+    workflowRef: process.env.GITHUB_WORKFLOW_REF,
     installerNames: result.installerNames,
   };
   assertCiPlatformEvidence(evidence, options.platform, result.head);
@@ -364,9 +439,7 @@ function main() {
     if (failed.length > 0) process.exit(1);
     if (options.emitCiReport) writeCiEvidence(options.emitCiReport, options, result);
     console.log(`[verify-acceptance] Local acceptance is green for ${options.platform}.`);
-    if (!options.requireCiPlatform) {
-      console.log('[verify-acceptance] Opposite-platform CI is unverified and is not claimed green.');
-    }
+    console.log('[verify-acceptance] Opposite-platform CI is unverified and is not claimed green.');
   } catch (error) {
     console.error(`[verify-acceptance] ${error instanceof Error ? error.message : error}`);
     process.exit(1);

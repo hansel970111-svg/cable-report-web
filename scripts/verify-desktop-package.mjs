@@ -1,4 +1,5 @@
-import { getRawHeader, listPackage } from '@electron/asar';
+import { extractFile, getRawHeader, listPackage } from '@electron/asar';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
@@ -140,6 +141,7 @@ const requiredEntries = [
   'next-build/standalone/package.json',
   'next-build/standalone/next-build/BUILD_ID',
   'next-build/standalone/next-build/routes-manifest.json',
+  'next-build/standalone/.cable-build-commit',
 ];
 for (const requiredEntry of requiredEntries) {
   if (!entrySet.has(requiredEntry)) {
@@ -155,6 +157,28 @@ const requiredTrees = [
 for (const requiredTree of requiredTrees) {
   if (!entries.some(entry => entry === requiredTree || entry.startsWith(`${requiredTree}/`))) {
     fail(`ASAR archive is missing required tree: ${requiredTree}`);
+  }
+}
+
+if (fs.existsSync(appAsarPath) && entrySet.has('next-build/standalone/.cable-build-commit')) {
+  const git = spawnSync('git', ['rev-parse', 'HEAD'], {
+    cwd: workspace,
+    encoding: 'utf8',
+    shell: false,
+  });
+  const head = git.stdout?.trim();
+  let packagedHead = '';
+  try {
+    packagedHead = extractFile(appAsarPath, 'next-build/standalone/.cable-build-commit')
+      .toString('utf8')
+      .trim();
+  } catch (error) {
+    fail(`Unable to read packaged build commit: ${error instanceof Error ? error.message : error}`);
+  }
+  if (git.error || git.status !== 0 || !/^[0-9a-f]{40}$/i.test(head || '')) {
+    fail(`Unable to resolve current Git HEAD: ${git.stderr || git.error || head}`);
+  } else if (packagedHead !== head) {
+    fail(`Packaged build commit ${packagedHead || '(empty)'} does not match current HEAD ${head}`);
   }
 }
 
