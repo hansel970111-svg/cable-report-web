@@ -147,6 +147,28 @@ describe('prepare-release command with a real bare origin', () => {
     expect(await packageText(work)).toBe(before);
   });
 
+  it('maps a signal-terminated fetch to TAG_FETCH_FAILED and preserves package bytes', async () => {
+    const { work } = await fixture();
+    const before = await packageText(work);
+    const runner = (command: string, args: string[], options: Record<string, unknown>) => {
+      if (command === 'git' && args[0] === 'fetch') {
+        return {
+          status: null,
+          signal: 'SIGTERM',
+          stdout: '',
+          stderr: '',
+        };
+      }
+      return spawnSync(command, args, options);
+    };
+
+    await expect(prepare(work, { runner })).rejects.toMatchObject({
+      code: 'TAG_FETCH_FAILED',
+      message: expect.stringContaining('SIGTERM'),
+    });
+    expect(await packageText(work)).toBe(before);
+  });
+
   it('refetches before writing and rejects a real remote release race without changing package bytes', async () => {
     const { origin, root, work } = await fixture();
     const race = await pendingRemoteRelease(origin, root, '2026.710.1');
@@ -414,6 +436,22 @@ describe('prepare-release command with a real bare origin', () => {
     await expect(prepare(work, { runPostChecks: true, checkRunner }))
       .rejects.toThrow('postcheck exploded');
     expect(seenVersions).toEqual(['2026.710.1']);
+    expect(await packageText(work)).toBe(before);
+    expect(await temporaryReleaseFiles(work)).toEqual([]);
+  });
+
+  it('rolls back when a postcheck is terminated by a signal', async () => {
+    const { work } = await fixture();
+    const before = await packageText(work);
+    const checkRunner = () => ({
+      status: null,
+      signal: 'SIGTERM',
+      stdout: '',
+      stderr: '',
+    });
+
+    await expect(prepare(work, { runPostChecks: true, checkRunner }))
+      .rejects.toThrow(/SIGTERM/);
     expect(await packageText(work)).toBe(before);
     expect(await temporaryReleaseFiles(work)).toEqual([]);
   });

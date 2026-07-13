@@ -46,11 +46,23 @@ function command(runner, commandName, args, cwd) {
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   if (result.error) throw result.error;
-  if ((result.status ?? 0) !== 0) {
+  const succeeded = Number.isInteger(result.status)
+    && result.status === 0
+    && result.signal == null;
+  if (!succeeded) {
     const stderr = Buffer.isBuffer(result.stderr)
       ? result.stderr.toString('utf8')
       : String(result.stderr ?? '');
-    throw new Error(stderr.trim() || `${commandName} ${args.join(' ')} failed`);
+    const commandText = `${commandName} ${args.join(' ')}`;
+    let failure;
+    if (result.signal != null) {
+      failure = `${commandText} terminated by signal ${String(result.signal)}`;
+    } else if (Number.isInteger(result.status)) {
+      failure = `${commandText} failed with exit status ${result.status}`;
+    } else {
+      failure = `${commandText} failed without an exit status`;
+    }
+    throw new Error(stderr.trim() ? `${failure}: ${stderr.trim()}` : failure);
   }
 }
 

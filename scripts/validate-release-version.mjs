@@ -70,14 +70,28 @@ export function createGit(cwd, runner = spawnSync) {
       ...options,
     });
     if (result.error) throw result.error;
-    const status = result.status ?? 0;
-    if (status !== 0 && !options.allowFailure) {
-      const error = new Error(outputText(result.stderr).trim() || `git ${args.join(' ')} failed`);
+    const status = result.status;
+    const succeeded = Number.isInteger(status) && status === 0 && result.signal == null;
+    const abnormalTermination = !Number.isInteger(status) || result.signal != null;
+    if (!succeeded && (abnormalTermination || !options.allowFailure)) {
+      const commandText = `git ${args.join(' ')}`;
+      let failure;
+      if (result.signal != null) {
+        failure = `${commandText} terminated by signal ${outputText(result.signal)}`;
+      } else if (Number.isInteger(status)) {
+        failure = `${commandText} failed with exit status ${status}`;
+      } else {
+        failure = `${commandText} failed without an exit status`;
+      }
+      const stderr = outputText(result.stderr).trim();
+      const error = new Error(stderr ? `${failure}: ${stderr}` : failure);
       error.status = status;
-      error.stderr = outputText(result.stderr);
+      error.signal = result.signal;
+      error.stderr = stderr;
       throw error;
     }
     return {
+      signal: result.signal,
       status,
       stdout: outputText(result.stdout).trim(),
       stderr: outputText(result.stderr).trim(),
