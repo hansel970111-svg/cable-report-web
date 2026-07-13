@@ -169,7 +169,10 @@ if (fs.existsSync(appAsarPath) && entrySet.has('next-build/standalone/.cable-bui
   const head = git.stdout?.trim();
   let packagedHead = '';
   try {
-    packagedHead = extractFile(appAsarPath, 'next-build/standalone/.cable-build-commit')
+    const buildCommitArchivePath = 'next-build/standalone/.cable-build-commit'
+      .split('/')
+      .join(path.sep);
+    packagedHead = extractFile(appAsarPath, buildCommitArchivePath)
       .toString('utf8')
       .trim();
   } catch (error) {

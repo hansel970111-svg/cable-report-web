@@ -67,6 +67,8 @@ test('package and acceptance evidence are bound to the current Git commit', asyn
 
   expect(build).toContain("'.cable-build-commit'");
   expect(packageVerifier).toContain("'next-build/standalone/.cable-build-commit'");
+  expect(packageVerifier).toContain(".split('/')");
+  expect(packageVerifier).toContain('.join(path.sep)');
   expect(packageVerifier).toContain('does not match current HEAD');
   expect(acceptance).toContain('verifyAcceptanceManifest');
   expect(acceptance).toContain("commandInvocation('pnpm', ['lint'], platform)");
