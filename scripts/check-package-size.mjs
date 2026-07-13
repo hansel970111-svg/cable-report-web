@@ -5,30 +5,37 @@ import process from 'node:process';
 export const BASELINE_APP_BYTES = 857_735_168;
 export const MAX_APP_BYTES = 643_301_376;
 
-const productName = 'Cable Report Generator';
+function findMacAppDirs(workspaceRoot) {
+  const releaseDir = path.join(workspaceRoot, 'release');
+  if (!fs.existsSync(releaseDir)) return [];
 
-function existingDirectory(candidates) {
-  return candidates.find(candidate => {
-    try {
-      return fs.statSync(candidate).isDirectory();
-    } catch {
-      return false;
+  const candidates = [];
+  for (const releaseEntry of fs.readdirSync(releaseDir, { withFileTypes: true })) {
+    if (!releaseEntry.isDirectory() || !/^mac(?:-|$)/.test(releaseEntry.name)) continue;
+    const unpackedDir = path.join(releaseDir, releaseEntry.name);
+    for (const appName of fs.readdirSync(unpackedDir).sort()) {
+      if (!appName.endsWith('.app')) continue;
+      const appDir = path.join(unpackedDir, appName);
+      try {
+        if (fs.statSync(appDir).isDirectory()) candidates.push(appDir);
+      } catch {
+        // A disappearing candidate is not an actual package.
+      }
     }
-  }) || candidates[0];
+  }
+  return candidates.sort();
 }
 
-function findMacAppDir(workspace) {
-  const unpackedDir = existingDirectory([
-    path.join(workspace, 'release', 'mac'),
-    path.join(workspace, 'release', 'mac-arm64'),
-    path.join(workspace, 'release', 'mac-x64'),
-    path.join(workspace, 'release', 'mac-universal'),
-  ]);
-  const preferred = path.join(unpackedDir, `${productName}.app`);
-  if (fs.existsSync(preferred)) return preferred;
-  if (!fs.existsSync(unpackedDir)) return preferred;
-  const appName = fs.readdirSync(unpackedDir).find(name => name.endsWith('.app'));
-  return appName ? path.join(unpackedDir, appName) : preferred;
+function requireSingleMacAppDir(workspaceRoot) {
+  const candidates = findMacAppDirs(workspaceRoot);
+  if (candidates.length === 1) return candidates[0];
+
+  console.error(
+    `[check-package-size] Expected exactly one macOS .app candidate; ` +
+    `found ${candidates.length}.`,
+  );
+  for (const candidate of candidates) console.error(`[check-package-size] - ${candidate}`);
+  process.exit(1);
 }
 
 function measureTree(root) {
@@ -65,7 +72,7 @@ const workspace = process.env.COZE_WORKSPACE_PATH || process.cwd();
 const platform = process.argv[2] || (process.platform === 'win32' ? 'win' : 'mac');
 const appRoot = platform === 'win'
   ? path.join(workspace, 'release', 'win-unpacked')
-  : findMacAppDir(workspace);
+  : requireSingleMacAppDir(workspace);
 
 if (!fs.existsSync(appRoot) || !fs.statSync(appRoot).isDirectory()) {
   console.error(`[check-package-size] Missing unpacked ${platform} application: ${appRoot}`);

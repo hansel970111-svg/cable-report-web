@@ -43,9 +43,7 @@ function platformOutputReason(entry) {
   const basename = segments.at(-1) || '';
   const format = String(entry.format || entry.fileType || entry.type || '');
 
-  if (normalized === protectedUntrackedPath && entry.tracked === false) {
-    return 'protected untracked input';
-  }
+  if (normalized === protectedUntrackedPath) return 'protected input';
   if (entry.tracked === false) return 'untracked input';
   if (segments.some(segment => segment.endsWith('.app'))) return 'macOS app output';
   if (/\.exe$/i.test(basename)) return 'Windows executable output';

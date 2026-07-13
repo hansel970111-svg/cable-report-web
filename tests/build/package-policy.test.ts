@@ -110,6 +110,24 @@ test('packaged runtime keeps application and external resource roots separate', 
   expect(candidates).not.toContain('app.asar.unpacked');
 });
 
+test('packaged runtime routes normalized single-string resource paths externally', () => {
+  process.env.COZE_WORKSPACE_PATH = '/Applications/Cable.app/Contents/Resources/app.asar';
+  process.env.CABLE_RESOURCES_PATH = '/Applications/Cable.app/Contents/Resources';
+
+  expect(getAppPathCandidates('assets/M138-DE46-P-A-MPO.pdf')).toEqual([
+    '/Applications/Cable.app/Contents/Resources/assets/M138-DE46-P-A-MPO.pdf',
+  ]);
+  expect(getAppPathCandidates('bin/pdf_worker')).toEqual([
+    '/Applications/Cable.app/Contents/Resources/bin/pdf_worker',
+  ]);
+  expect(getAppPathCandidates('resources/bin/pdf_worker')).toEqual([
+    '/Applications/Cable.app/Contents/Resources/bin/pdf_worker',
+  ]);
+
+  const absolutePath = path.resolve('/tmp/cable-template.pdf');
+  expect(getAppPathCandidates(absolutePath)).toEqual([absolutePath]);
+});
+
 test('development runtime uses the project root for code and resources', () => {
   process.env.COZE_WORKSPACE_PATH = '/workspace/cable-report';
   process.env.CABLE_RESOURCES_PATH = '/workspace/cable-report';
@@ -315,6 +333,53 @@ test('package-size policy exports exact budgets and hard-fails oversized mac app
   expect(result.stdout).toContain('Ten largest paths');
 });
 
+describe('macOS package candidate selection', () => {
+  function createMultipleMacAppFixture(): {
+    workspace: string;
+    macApp: string;
+    armApp: string;
+  } {
+    const workspace = fixture('multiple-mac-apps-');
+    const macApp = path.join(
+      workspace,
+      'release',
+      'mac',
+      'Cable Report Generator.app',
+    );
+    const armApp = path.join(
+      workspace,
+      'release',
+      'mac-arm64',
+      'Cable Report Generator.app',
+    );
+    mkdirSync(path.join(macApp, 'Contents'), { recursive: true });
+    mkdirSync(path.join(armApp, 'Contents'), { recursive: true });
+    return { workspace, macApp, armApp };
+  }
+
+  test('desktop verifier rejects multiple macOS app candidates', () => {
+    const { workspace, macApp, armApp } = createMultipleMacAppFixture();
+
+    const result = runScript('verify-desktop-package.mjs', ['mac'], workspace);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('Expected exactly one macOS .app candidate');
+    expect(result.stderr).toContain(macApp);
+    expect(result.stderr).toContain(armApp);
+  });
+
+  test('package-size check rejects multiple macOS app candidates', () => {
+    const { workspace, macApp, armApp } = createMultipleMacAppFixture();
+
+    const result = runScript('check-package-size.mjs', ['mac'], workspace);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('Expected exactly one macOS .app candidate');
+    expect(result.stderr).toContain(macApp);
+    expect(result.stderr).toContain(armApp);
+  });
+});
+
 describe('build-input policy', () => {
   function createBuildInputFixture(): string {
     const workspace = fixture('build-inputs-');
@@ -388,6 +453,35 @@ describe('build-input policy', () => {
     expect(result.status).toBe(1);
     expect(result.stderr).toContain('forbidden manifest entry');
     expect(result.stderr).toContain('worker-bin/pdf_worker');
+  });
+
+  test('rejects the protected path from an explicit manifest string', () => {
+    const workspace = createBuildInputFixture();
+    const manifest = path.join(workspace, 'context-manifest.json');
+    writeFileSync(
+      manifest,
+      JSON.stringify(['src/app/api/upload-excel/route 2.ts']),
+    );
+
+    const result = runScript('verify-build-inputs.mjs', ['--manifest', manifest], workspace);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('protected input');
+    expect(result.stderr).toContain('src/app/api/upload-excel/route 2.ts');
+  });
+
+  test('rejects the protected path from package build files', () => {
+    const workspace = createBuildInputFixture();
+    const packagePath = path.join(workspace, 'package.json');
+    const packageJson = JSON.parse(readFileSync(packagePath, 'utf8'));
+    packageJson.build.files.push('src/app/api/upload-excel/route 2.ts');
+    writeFileSync(packagePath, JSON.stringify(packageJson));
+
+    const result = runScript('verify-build-inputs.mjs', [], workspace);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('protected input');
+    expect(result.stderr).toContain('src/app/api/upload-excel/route 2.ts');
   });
 });
 

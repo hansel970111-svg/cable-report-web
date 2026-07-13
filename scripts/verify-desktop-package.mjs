@@ -5,7 +5,6 @@ import process from 'node:process';
 
 const workspace = process.env.COZE_WORKSPACE_PATH || process.cwd();
 const platform = process.argv[2] || (process.platform === 'win32' ? 'win' : 'mac');
-const productName = 'Cable Report Generator';
 const templateNames = [
   'M138-DE46-D-P-cross-LC.pdf',
   'M138-DE46-OOB-Cat5e.pdf',
@@ -18,22 +17,37 @@ function fail(message) {
   console.error(`[verify-desktop-package] ${message}`);
 }
 
-function existingDirectory(candidates) {
-  return candidates.find(candidate => {
-    try {
-      return fs.statSync(candidate).isDirectory();
-    } catch {
-      return false;
+function findMacAppDirs(workspaceRoot) {
+  const releaseDir = path.join(workspaceRoot, 'release');
+  if (!fs.existsSync(releaseDir)) return [];
+
+  const candidates = [];
+  for (const releaseEntry of fs.readdirSync(releaseDir, { withFileTypes: true })) {
+    if (!releaseEntry.isDirectory() || !/^mac(?:-|$)/.test(releaseEntry.name)) continue;
+    const unpackedDir = path.join(releaseDir, releaseEntry.name);
+    for (const appName of fs.readdirSync(unpackedDir).sort()) {
+      if (!appName.endsWith('.app')) continue;
+      const appDir = path.join(unpackedDir, appName);
+      try {
+        if (fs.statSync(appDir).isDirectory()) candidates.push(appDir);
+      } catch {
+        // A disappearing candidate is not an actual package.
+      }
     }
-  }) || candidates[0];
+  }
+  return candidates.sort();
 }
 
-function findMacAppDir(unpackedDir) {
-  const preferred = path.join(unpackedDir, `${productName}.app`);
-  if (fs.existsSync(preferred)) return preferred;
-  if (!fs.existsSync(unpackedDir)) return preferred;
-  const appName = fs.readdirSync(unpackedDir).find(name => name.endsWith('.app'));
-  return appName ? path.join(unpackedDir, appName) : preferred;
+function requireSingleMacAppDir(workspaceRoot) {
+  const candidates = findMacAppDirs(workspaceRoot);
+  if (candidates.length === 1) return candidates[0];
+
+  console.error(
+    `[verify-desktop-package] Expected exactly one macOS .app candidate; ` +
+    `found ${candidates.length}.`,
+  );
+  for (const candidate of candidates) console.error(`[verify-desktop-package] - ${candidate}`);
+  process.exit(1);
 }
 
 function requireFile(filePath, description) {
@@ -82,15 +96,8 @@ function collectArchiveLinks(node, prefix = '') {
   return links;
 }
 
-const unpackedDir = platform === 'win'
-  ? path.join(workspace, 'release', 'win-unpacked')
-  : existingDirectory([
-      path.join(workspace, 'release', 'mac'),
-      path.join(workspace, 'release', 'mac-arm64'),
-      path.join(workspace, 'release', 'mac-x64'),
-      path.join(workspace, 'release', 'mac-universal'),
-    ]);
-const macAppDir = platform === 'win' ? null : findMacAppDir(unpackedDir);
+const unpackedDir = path.join(workspace, 'release', 'win-unpacked');
+const macAppDir = platform === 'win' ? null : requireSingleMacAppDir(workspace);
 const resourcesDir = platform === 'win'
   ? path.join(unpackedDir, 'resources')
   : path.join(macAppDir, 'Contents', 'Resources');

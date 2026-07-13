@@ -27,14 +27,17 @@ export function getAppPathCandidates(...segments: string[]): string[] {
   const relativePath = path.join(...segments);
   if (path.isAbsolute(relativePath)) return [relativePath];
 
-  const firstSegment = segments[0];
+  const normalizedSegments = relativePath.split(path.sep);
+  const firstSegment = normalizedSegments[0];
   if (
     firstSegment === 'assets' ||
     firstSegment === 'bin' ||
     firstSegment === 'worker-bin' ||
     firstSegment === 'resources'
   ) {
-    const resourceSegments = firstSegment === 'resources' ? segments.slice(1) : segments;
+    const resourceSegments = firstSegment === 'resources'
+      ? normalizedSegments.slice(1)
+      : normalizedSegments;
     return [path.join(getResourcesRoot(), ...resourceSegments)];
   }
 
