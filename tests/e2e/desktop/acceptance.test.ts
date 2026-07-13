@@ -105,9 +105,12 @@ test('Python JUnit evidence rejects skipped, duplicate, empty, and collection-er
     `<testcase classname="tests.python.test_pdf_golden" `
     + `name="test_pdf_matches_approved_golden[${name}]" time="0.1" />`
   )).join('');
+  const otherCases = Array.from({ length: 185 }, (_, index) => (
+    `<testcase classname="tests.python.other" name="test_other_${index}" time="0.1" />`
+  )).join('');
   const valid = '<testsuites name="pytest tests">'
     + `<testsuite name="pytest" tests="191" failures="0" errors="0" skipped="0">`
-    + `${testcases}</testsuite></testsuites>`;
+    + `${testcases}${otherCases}</testsuite></testsuites>`;
 
   expect(pythonEvidence(valid)).toMatchObject({ passed: true });
   expect(pythonEvidence(valid.replace('skipped="0"', 'skipped="1"')))
@@ -117,6 +120,10 @@ test('Python JUnit evidence rejects skipped, duplicate, empty, and collection-er
   expect(pythonEvidence('<testsuites tests="0" failures="0" errors="0" skipped="0" />'))
     .toMatchObject({ passed: false });
   expect(pythonEvidence(valid.replace('</testsuite>', '<error message="collection failed"/></testsuite>')))
+    .toMatchObject({ passed: false });
+  expect(pythonEvidence(valid.replace('tests="191"', 'tests="192"')))
+    .toMatchObject({ passed: false });
+  expect(pythonEvidence(valid.replace('name="test_other_0"', '')))
     .toMatchObject({ passed: false });
 });
 

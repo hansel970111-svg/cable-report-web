@@ -370,6 +370,7 @@ export const useStore = create<Store>((set) => ({
 corepack prepare pnpm@9.15.9 --activate
 pnpm install --frozen-lockfile
 python -m pip install --require-hashes --only-binary=:all: -r requirements-dev.lock
+pnpm exec playwright install chromium
 mkdir -p artifacts/acceptance
 node scripts/verify-dependency-policy.mjs
 python scripts/verify_python_locks.py

@@ -14,6 +14,7 @@
 corepack prepare pnpm@9.15.9 --activate
 pnpm install --frozen-lockfile
 python -m pip install --require-hashes --only-binary=:all: -r requirements-dev.lock
+pnpm exec playwright install chromium
 ```
 
 如果电脑上同时装了多个 Python，可以显式指定 3.12：

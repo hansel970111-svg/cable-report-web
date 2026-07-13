@@ -250,27 +250,36 @@ export function pythonEvidence(xml) {
 
   const names = [];
   const failedCases = [];
+  let testcaseCount = 0;
+  let unnamedTestcase = false;
   for (const match of document.matchAll(/<testcase\b([^>]*?)(?:\/>|>([\s\S]*?)<\/testcase>)/g)) {
+    testcaseCount += 1;
     const name = xmlAttributes(match[1]).get('name');
-    if (!name) continue;
+    if (!name) {
+      unnamedTestcase = true;
+      continue;
+    }
     names.push(name);
     if (/<(?:failure|error|skipped)\b/i.test(match[2] || '')) failedCases.push(name);
   }
   const expectedNames = GOLDEN_CASES.map(name => `test_pdf_matches_approved_golden[${name}]`);
   const missingGoldens = expectedNames.filter(name => names.filter(value => value === name).length !== 1);
   const duplicates = names.length !== new Set(names).size;
+  const completeInventory = !unnamedTestcase && testcaseCount === tests && names.length === tests;
   return {
-    passed: countersValid && !forbiddenOutcome && !duplicates
+    passed: countersValid && completeInventory && !forbiddenOutcome && !duplicates
       && failedCases.length === 0 && missingGoldens.length === 0,
     detail: !countersValid
       ? `invalid JUnit counters: tests=${tests}, failures=${failures}, errors=${errors}, skipped=${skipped}`
-      : forbiddenOutcome || failedCases.length > 0
+      : !completeInventory
+        ? `JUnit testcase inventory mismatch: declared=${tests}, parsed=${testcaseCount}, named=${names.length}`
+        : forbiddenOutcome || failedCases.length > 0
         ? 'JUnit report contains a failed, errored, or skipped test'
-        : duplicates
-          ? 'JUnit report contains duplicate testcase names'
-          : missingGoldens.length > 0
-            ? `missing uniquely passed golden cases: ${missingGoldens.join(', ')}`
-            : `${tests} Python tests passed with six unique golden cases and no skips`,
+          : duplicates
+            ? 'JUnit report contains duplicate testcase names'
+            : missingGoldens.length > 0
+              ? `missing uniquely passed golden cases: ${missingGoldens.join(', ')}`
+              : `${tests} Python tests passed with six unique golden cases and no skips`,
   };
 }
 

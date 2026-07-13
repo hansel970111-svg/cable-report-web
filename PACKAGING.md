@@ -17,6 +17,7 @@
 corepack prepare pnpm@9.15.9 --activate
 pnpm install --frozen-lockfile
 python -m pip install --require-hashes --only-binary=:all: -r requirements-dev.lock
+pnpm exec playwright install chromium
 ```
 
 Windows 如果 `python` 不可用，可改用：
