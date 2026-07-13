@@ -60,6 +60,8 @@ test('package and acceptance evidence are bound to the current Git commit', asyn
   expect(acceptance).toContain('verifyAcceptanceManifest');
   expect(acceptance).toContain("[corepack, ['pnpm', 'lint']]");
   expect(acceptance).toContain("[corepack, ['pnpm', 'ts-check']]");
+  const evidenceRunner = await readFile('scripts/run-evidence-command.mjs', 'utf8');
+  expect(evidenceRunner).toContain("args: ['pnpm@9.15.9', ...args]");
 });
 
 test('release documentation uses the actual frozen toolchain and dev lock', async () => {

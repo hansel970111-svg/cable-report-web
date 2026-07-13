@@ -45,14 +45,22 @@ function safeArtifact(workspace, relativePath) {
   return absolutePath;
 }
 
-function commandName(value) {
-  if (process.platform !== 'win32') return value;
-  if (value === 'pnpm' || value === 'corepack') return `${value}.cmd`;
-  return value;
+function commandInvocation(command, args) {
+  if (command === 'pnpm') {
+    return {
+      command: process.platform === 'win32' ? 'corepack.cmd' : 'corepack',
+      args: ['pnpm@9.15.9', ...args],
+    };
+  }
+  if (process.platform === 'win32' && command === 'corepack') {
+    return { command: 'corepack.cmd', args };
+  }
+  return { command, args };
 }
 
 function run(command, args, workspace, capture) {
-  const result = spawnSync(commandName(command), args, {
+  const invocation = commandInvocation(command, args);
+  const result = spawnSync(invocation.command, invocation.args, {
     cwd: workspace,
     env: process.env,
     encoding: capture ? 'utf8' : undefined,
