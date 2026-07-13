@@ -35,7 +35,11 @@ export function resolvePdfEditorCommand(): WorkerCommand {
   if (packagedWorker) {
     return {
       command: packagedWorker,
-      argsPrefix: ['pdf_editor'],
+      argsPrefix:
+        process.env.CABLE_DESKTOP_E2E === '1'
+        && process.env.CABLE_DESKTOP_E2E_HANG_WORKER === '1'
+          ? ['__cable_report_e2e_hang__']
+          : ['pdf_editor'],
       env,
     };
   }

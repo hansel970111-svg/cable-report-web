@@ -67,7 +67,7 @@ test('Windows build uses the same Node, pnpm, and frozen lock baseline', async (
   expect(documentation).toContain('pnpm@9.15.9');
   expect(documentation).toContain('install --frozen-lockfile');
   expect(documentation).toContain(
-    'pip install --require-hashes --only-binary=:all: -r requirements.lock',
+    'pip install --require-hashes --only-binary=:all: -r requirements-dev.lock',
   );
 });
 
@@ -120,7 +120,7 @@ test('packaging documentation only installs the trusted Python lock', async () =
   const packaging = await readFile('PACKAGING.md', 'utf8');
   expect(packaging).toContain('Python 3.12');
   expect(packaging).toContain(
-    'pip install --require-hashes --only-binary=:all: -r requirements.lock',
+    'pip install --require-hashes --only-binary=:all: -r requirements-dev.lock',
   );
   expect(packaging).not.toContain('pip install -r requirements.txt');
 });

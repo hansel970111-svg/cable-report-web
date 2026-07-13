@@ -338,13 +338,13 @@ export const useStore = create<Store>((set) => ({
 
 ## 技术栈
 
-- **框架**: Next.js 16.1.1 (App Router)
+- **框架**: Next.js 16.2.10 (App Router)
 - **UI 组件**: shadcn/ui (基于 Radix UI)
 - **样式**: Tailwind CSS v4
 - **表单**: React Hook Form + Zod
 - **图标**: Lucide React
 - **字体**: Geist Sans & Geist Mono
-- **包管理器**: pnpm 9+
+- **包管理器**: pnpm 9.15.9
 - **TypeScript**: 5.x
 
 ## 参考文档
@@ -361,3 +361,28 @@ export const useStore = create<Store>((set) => ({
 3. **遵循 Next.js App Router 规范**，正确区分服务端/客户端组件
 4. **使用 TypeScript** 进行类型安全开发
 5. **使用 `@/` 路径别名** 导入模块（已配置）
+
+## 发布验证
+
+发布环境固定为 Node.js 24.14.0、pnpm 9.15.9 和 Python 3.12.13。从干净检出开始执行：
+
+```bash
+corepack prepare pnpm@9.15.9 --activate
+pnpm install --frozen-lockfile
+python -m pip install --require-hashes --only-binary=:all: -r requirements-dev.lock
+pnpm check:fast
+pnpm test:python
+pnpm test:e2e:browser -- --workers=1
+pnpm desktop:dist:mac
+pnpm test:e2e:mac
+pnpm verify:acceptance -- --platform mac
+```
+
+Windows 必须在 Windows 主机上用 `pnpm desktop:dist:win`、`pnpm test:e2e:win` 和
+`pnpm verify:acceptance -- --platform win` 完成同等验证。不能用 macOS 交叉构建代替 Windows 实包测试。
+
+输入上限为 25 MiB Excel、10,000 条记录，Vertical Cabling 单行 QTY 最多 5,000。
+PDF worker 最长运行 10 分钟，输出 PDF 最多 256 MiB。桌面版必须通过原生 Save As
+选择路径，不会再向 Downloads 生成副本。
+
+`pnpm start:browser` 使用显式 `--browser-dev` 回退，只允许本机开发和测试；禁止用于生产或发布验收。

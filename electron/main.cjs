@@ -153,22 +153,6 @@ function getJson(url) {
   });
 }
 
-function getPreferredAsset(release) {
-  const assets = Array.isArray(release?.assets) ? release.assets : [];
-  const candidates = process.platform === 'darwin'
-    ? ['.dmg', 'mac', '.zip']
-    : process.platform === 'win32'
-    ? ['.exe', 'windows', 'win']
-    : [];
-
-  for (const keyword of candidates) {
-    const asset = assets.find(item => String(item?.name || '').toLowerCase().includes(keyword));
-    if (asset?.browser_download_url) return asset.browser_download_url;
-  }
-
-  return release?.html_url || RELEASES_URL;
-}
-
 function showMessageBox(options) {
   return mainWindow
     ? dialog.showMessageBox(mainWindow, options)
@@ -186,7 +170,7 @@ const checkForUpdates = createUpdateChecker({
     message: '当前已经是最新版本',
     detail: `当前版本：${currentVersion}\n最新版本：${latestTag}`,
   }),
-  onUpdateAvailable: async ({ currentVersion, latestTag, release }) => {
+  onUpdateAvailable: async ({ currentVersion, latestTag }) => {
     const result = await showMessageBox({
       type: 'info',
       title: '发现新版本',
@@ -198,7 +182,7 @@ const checkForUpdates = createUpdateChecker({
     });
 
     if (result.response === 0) {
-      openApprovedExternal(getPreferredAsset(release));
+      openApprovedExternal(RELEASES_URL);
     }
   },
   onManualError: async error => {
@@ -438,7 +422,7 @@ app.whenReady().then(async () => {
     setupApplicationMenu();
     const url = await startNextServer();
     createMainWindow(url);
-    if (app.isPackaged) {
+    if (app.isPackaged && process.env.CABLE_DESKTOP_E2E !== '1') {
       setTimeout(() => checkForUpdates(), 3000);
     }
   } catch (error) {

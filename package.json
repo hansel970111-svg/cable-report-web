@@ -19,11 +19,15 @@
     "start:browser": "node scripts/start.mjs --browser-dev",
     "ts-check": "tsc -p tsconfig.json",
     "test:e2e:browser": "playwright test --project=chromium",
+    "test:e2e:desktop": "playwright test -c playwright.desktop.config.ts",
+    "test:e2e:mac": "playwright test -c playwright.desktop.config.ts --project=desktop-mac",
+    "test:e2e:win": "playwright test -c playwright.desktop.config.ts --project=desktop-win",
     "test:perf": "playwright test tests/e2e/report-editor-performance.spec.ts --project=chromium --workers=1",
     "test:unit": "vitest run",
     "test:python": "node scripts/run-python.mjs -m pytest -q",
     "test": "corepack pnpm test:unit && corepack pnpm test:python",
     "check:fast": "corepack pnpm lint && corepack pnpm ts-check && corepack pnpm test:unit",
+    "verify:acceptance": "node scripts/verify-acceptance.mjs",
     "verify:runtime-surface": "node scripts/verify-runtime-surface.mjs"
   },
   "dependencies": {

@@ -1,8 +1,7 @@
 const { randomBytes: defaultRandomBytes } = require('node:crypto');
 
 const GITHUB_HOSTNAME = 'github.com';
-const REPOSITORY_PATH = '/hansel970111-svg/cable-report-web';
-const RELEASES_PATH = `${REPOSITORY_PATH}/releases`;
+const RELEASES_PATH = '/hansel970111-svg/cable-report-web/releases/latest';
 
 function createDesktopSessionToken(randomBytes = defaultRandomBytes) {
   return randomBytes(32).toString('base64url');
@@ -33,15 +32,13 @@ function classifyNavigation(targetUrl, appOrigin) {
     return { kind: 'internal' };
   }
 
-  const approvedRepositoryPath =
-    target.pathname === REPOSITORY_PATH || target.pathname === `${REPOSITORY_PATH}/`;
-  const approvedReleasePath =
-    target.pathname === RELEASES_PATH || target.pathname.startsWith(`${RELEASES_PATH}/`);
-
   if (
     target.protocol === 'https:' &&
     target.hostname === GITHUB_HOSTNAME &&
-    (approvedRepositoryPath || approvedReleasePath)
+    target.port === '' &&
+    target.pathname === RELEASES_PATH &&
+    target.search === '' &&
+    target.hash === ''
   ) {
     return { kind: 'external', url: target.href };
   }

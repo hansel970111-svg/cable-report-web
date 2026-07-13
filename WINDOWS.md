@@ -11,17 +11,16 @@
 在项目目录打开 PowerShell，执行：
 
 ```powershell
-corepack enable
 corepack prepare pnpm@9.15.9 --activate
-corepack pnpm install --frozen-lockfile
-node ./scripts/run-python.mjs -m pip install --require-hashes --only-binary=:all: -r requirements.lock
+pnpm install --frozen-lockfile
+python -m pip install --require-hashes --only-binary=:all: -r requirements-dev.lock
 ```
 
 如果电脑上同时装了多个 Python，可以显式指定 3.12：
 
 ```powershell
 $env:PYTHON_CMD = "C:\path\to\python3.12.exe"
-node ./scripts/run-python.mjs -m pip install --require-hashes --only-binary=:all: -r requirements.lock
+node ./scripts/run-python.mjs -m pip install --require-hashes --only-binary=:all: -r requirements-dev.lock
 ```
 
 ## 开发启动
@@ -46,13 +45,28 @@ corepack pnpm start
 ## 构建 Windows 桌面 EXE
 
 ```powershell
-corepack pnpm desktop:dist:win
+pnpm check:fast
+pnpm test:python
+pnpm test:e2e:browser -- --workers=1
+pnpm desktop:dist:win
+node scripts/verify-desktop-package.mjs win
+node scripts/check-package-size.mjs win
+pnpm test:e2e:win
+pnpm verify:acceptance -- --platform win
 ```
 
-构建完成后，安装包和便携版会在 `release` 目录中。
+构建完成后，NSIS 安装包会在 `release` 目录中。
+
+## 发布验收限制
+
+- Node.js 必须为 24.14.0，pnpm 必须为 9.15.9，Python 必须为 3.12.13。
+- Excel 最大 25 MiB，最多 10,000 条记录；单行 QTY 最大 5,000。
+- PDF worker 超时为 10 分钟，PDF 最大 256 MiB。
+- 生成后必须通过 Windows 原生 Save As 保存。取消不得显示假成功；成功只写选定文件，不在 Downloads 写副本。
+- `--browser-dev` 只能用于本机回环开发，不是生产启动或发布验收方式。
 
 ## 常见问题
 
 - 如果提示找不到 `python`，请安装 Python 3.12，并勾选 “Add python.exe to PATH”，或使用 `py -3.12`。
 - 如果提示找不到 `pnpm`，先执行 `corepack enable`，再用 `corepack pnpm ...`。
-- 生成的 PDF 会同时作为浏览器下载返回，并尝试保存一份到当前 Windows 用户的 `Downloads` 文件夹。
+- 正式产物必须由 Windows CI 的 `pnpm test:e2e:win` 验证，macOS 上的交叉构建不算 Windows 验收。

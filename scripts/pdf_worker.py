@@ -2,6 +2,7 @@
 """Shared PDF worker entry point for packaged desktop builds."""
 import os
 import sys
+import time
 
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -10,6 +11,14 @@ if SCRIPT_DIR not in sys.path:
 
 from pdf_engine.cli import main as run_editor
 from pdf_engine.protocol import emit_result
+
+
+_E2E_HANG_MODE = "__cable_report_e2e_hang__"
+
+
+def _hang_until_terminated():
+    while True:
+        time.sleep(60)
 
 
 def main(argv=None):
@@ -23,6 +32,14 @@ def main(argv=None):
 
     mode = args[0]
     worker_args = args[1:]
+
+    if (
+        mode == _E2E_HANG_MODE
+        and os.environ.get("CABLE_DESKTOP_E2E") == "1"
+        and os.environ.get("CABLE_DESKTOP_E2E_HANG_WORKER") == "1"
+    ):
+        _hang_until_terminated()
+        return 0
 
     if mode in {"pdf_editor", "editor"}:
         return run_editor(worker_args)

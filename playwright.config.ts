@@ -5,6 +5,8 @@ const baseURL = `http://127.0.0.1:${port}`;
 
 export default defineConfig({
   testDir: './tests/e2e',
+  testMatch: '**/*.spec.ts',
+  testIgnore: 'desktop/**',
   timeout: 120_000,
   retries: process.env.PERF_UPDATE_BASELINE === '1'
     ? 0

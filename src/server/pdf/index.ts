@@ -11,10 +11,20 @@ export * from './job-controller';
 export * from './worker';
 export * from './worker-command';
 
+export function desktopE2eTimeoutMs(
+  environment: Readonly<Record<string, string | undefined>> = process.env,
+): number | undefined {
+  return environment.CABLE_DESKTOP_E2E === '1'
+    && environment.CABLE_DESKTOP_E2E_TIMEOUT === '1'
+    ? 3_000
+    : undefined;
+}
+
 export const pdfJobController = new PdfJobController({
   worker: createPdfWorker(),
   templatePathFor: cableType => resolveAppPath(templateAssetFor(cableType)),
   suggestedNameFor: suggestedPdfName,
+  timeoutMs: desktopE2eTimeoutMs(),
 });
 
 export const MAX_REPORT_BODY_BYTES = 25 * 1024 * 1024;

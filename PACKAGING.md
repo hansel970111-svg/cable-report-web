@@ -14,23 +14,22 @@
 - Python 3.12.13
 
 ```bash
-corepack enable
 corepack prepare pnpm@9.15.9 --activate
-corepack pnpm install --frozen-lockfile
-node ./scripts/run-python.mjs -m pip install --require-hashes --only-binary=:all: -r requirements.lock
+pnpm install --frozen-lockfile
+python -m pip install --require-hashes --only-binary=:all: -r requirements-dev.lock
 ```
 
 Windows 如果 `python` 不可用，可改用：
 
 ```powershell
 $env:PYTHON_CMD = "C:\path\to\python3.12.exe"
-node ./scripts/run-python.mjs -m pip install --require-hashes --only-binary=:all: -r requirements.lock
+node ./scripts/run-python.mjs -m pip install --require-hashes --only-binary=:all: -r requirements-dev.lock
 ```
 
 ## 本机调试桌面版
 
 ```bash
-corepack pnpm desktop:dev
+pnpm desktop:dev
 ```
 
 ## 构建 macOS 版本
@@ -38,7 +37,14 @@ corepack pnpm desktop:dev
 必须在 macOS 上执行：
 
 ```bash
-corepack pnpm desktop:dist:mac
+pnpm check:fast
+pnpm test:python
+pnpm test:e2e:browser -- --workers=1
+pnpm desktop:dist:mac
+node scripts/verify-desktop-package.mjs mac
+node scripts/check-package-size.mjs mac
+pnpm test:e2e:mac
+pnpm verify:acceptance -- --platform mac
 ```
 
 产物在 `release/` 目录。
@@ -48,14 +54,29 @@ corepack pnpm desktop:dist:mac
 建议在 Windows 上执行：
 
 ```powershell
-corepack pnpm desktop:dist:win
+pnpm check:fast
+pnpm test:python
+pnpm test:e2e:browser -- --workers=1
+pnpm desktop:dist:win
+node scripts/verify-desktop-package.mjs win
+node scripts/check-package-size.mjs win
+pnpm test:e2e:win
+pnpm verify:acceptance -- --platform win
 ```
 
-产物在 `release\` 目录，包含安装版和便携版。
+产物在 `release\` 目录，包含 NSIS 安装程序。
+
+## 验收限制
+
+- Excel 最大 25 MiB，一次最多 10,000 条记录。
+- Vertical Cabling 单行 QTY 最大 5,000。
+- PDF worker 超时为 10 分钟，PDF 最大 256 MiB。
+- 桌面版仅使用原生 Save As；取消时回到就绪，成功时只写用户选中的路径。
+- `--browser-dev` 只是回环地址上的开发回退，不参与桌面发布验收。
 
 ## 用 GitHub 自动构建 Windows 版本
 
-项目已配置 GitHub Actions：`Build Windows EXE`。
+项目已配置 GitHub Actions：`Desktop packaged E2E`。
 
 推送到 `main` 后会自动在 Windows 机器上构建；也可以在 GitHub 仓库的 `Actions` 页面手动运行。
 
@@ -63,12 +84,12 @@ corepack pnpm desktop:dist:win
 
 1. 打开 GitHub 仓库。
 2. 进入 `Actions`。
-3. 点击最新的 `Build Windows EXE` 运行记录。
+3. 点击最新的 `Desktop packaged E2E` 运行记录。
 4. 在页面底部 `Artifacts` 下载 `Cable-Report-Generator-Windows`。
 5. 解压后把 `.exe` 发给 Windows 用户。
 
 ## 重要说明
 
 - macOS 和 Windows 的 Python worker 需要分别在对应系统上构建，不能直接共用。
-- 如果要发给普通用户，建议给 Windows 发 `portable exe` 或安装包，给 macOS 发 `.dmg`。
+- 只有 macOS 和 Windows 两个实包任务都通过后，才能将安装包用于正式发布。
 - 未做代码签名时，Windows SmartScreen 和 macOS Gatekeeper 可能会提示未知开发者；正式分发时需要代码签名证书。

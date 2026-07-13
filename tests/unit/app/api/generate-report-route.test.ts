@@ -3,6 +3,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import type { ReportDraft } from '@/domain/report/model';
 import {
   createGenerateReportHandler,
+  desktopE2eTimeoutMs,
   MAX_REPORT_BODY_BYTES,
 } from '@/server/pdf';
 import { POST as productionPost } from '@/app/api/generate-report/route';
@@ -11,6 +12,16 @@ import { PdfJobError } from '@/server/pdf/errors';
 
 const ORIGIN = 'http://127.0.0.1:51234';
 const TOKEN = 'A'.repeat(43);
+
+test('short report timeout is available only behind both exact desktop E2E guards', () => {
+  expect(desktopE2eTimeoutMs({})).toBeUndefined();
+  expect(desktopE2eTimeoutMs({ CABLE_DESKTOP_E2E: '1' })).toBeUndefined();
+  expect(desktopE2eTimeoutMs({ CABLE_DESKTOP_E2E_TIMEOUT: '1' })).toBeUndefined();
+  expect(desktopE2eTimeoutMs({
+    CABLE_DESKTOP_E2E: '1',
+    CABLE_DESKTOP_E2E_TIMEOUT: '1',
+  })).toBe(3_000);
+});
 
 function record() {
   return {

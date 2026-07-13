@@ -43,11 +43,8 @@ describe('navigation allowlist', () => {
   });
 
   test.each([
-    `${repositoryRoot}/`,
-    `${repositoryRoot}/releases`,
     `${repositoryRoot}/releases/latest`,
-    `${repositoryRoot}/releases/download/v1/report.exe`,
-  ])('allows the approved GitHub repository destination %s', (url) => {
+  ])('allows only the approved GitHub Releases destination %s', (url) => {
     expect(security.classifyNavigation(url, appOrigin)).toEqual({
       kind: 'external',
       url,
@@ -62,6 +59,12 @@ describe('navigation allowlist', () => {
     'https://github.com.evil.example/hansel970111-svg/cable-report-web/',
     'https://github.com./hansel970111-svg/cable-report-web/',
     'https://github.com/another/repository/',
+    `${repositoryRoot}/`,
+    `${repositoryRoot}/releases`,
+    `${repositoryRoot}/releases/v1.0.0`,
+    `${repositoryRoot}/releases/download/v1/report.exe`,
+    `${repositoryRoot}/releases/latest?source=desktop`,
+    `${repositoryRoot}/releases/latest#download`,
     'https://github.com/hansel970111-svg/cable-report-web/issues',
     'https://github.com@evil.example/hansel970111-svg/cable-report-web/releases',
     'http://127.0.0.1.evil.example:51234/',
@@ -88,6 +91,11 @@ test('Electron window source retains the mandatory isolation controls', async ()
   expect(source).toContain('senderFrame === mainWindow.webContents.mainFrame');
   expect(source).not.toContain('shell.openExternal(targetUrl)');
   expect(source.match(/shell\.openExternal\(/g)).toHaveLength(1);
+  expect(source).not.toContain('getPreferredAsset');
+  expect(source).not.toMatch(/autoUpdater|downloadUpdate|quitAndInstall|installUpdate|execFile|spawn\(/);
+  expect(source).toContain(
+    "if (app.isPackaged && process.env.CABLE_DESKTOP_E2E !== '1')",
+  );
 
   const originAssignment = source.indexOf('process.env.CABLE_DESKTOP_ORIGIN = origin');
   const standaloneInitialization = source.indexOf('require(standaloneServerPath)');

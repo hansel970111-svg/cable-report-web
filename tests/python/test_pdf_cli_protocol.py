@@ -16,6 +16,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 from pdf_engine.cli import run_editor_cli  # noqa: E402
 from pdf_engine.protocol import emit_result  # noqa: E402
+import pdf_worker  # noqa: E402
 
 
 def _write_pdf(path: Path, pages: int = 1) -> None:
@@ -41,6 +42,37 @@ def _run_cli(argv, editor):
     stderr = StringIO()
     exit_code = run_editor_cli(argv, editor, stdout=stdout, stderr=stderr)
     return exit_code, _decode_single_result(stdout.getvalue()), stderr.getvalue()
+
+
+def test_hanging_worker_mode_is_disabled_without_both_e2e_guards(monkeypatch, capsys):
+    monkeypatch.delenv("CABLE_DESKTOP_E2E", raising=False)
+    monkeypatch.delenv("CABLE_DESKTOP_E2E_HANG_WORKER", raising=False)
+    called = False
+
+    def fake_hang():
+        nonlocal called
+        called = True
+
+    monkeypatch.setattr(pdf_worker, "_hang_until_terminated", fake_hang)
+
+    assert pdf_worker.main(["__cable_report_e2e_hang__"]) == 2
+    assert called is False
+    assert json.loads(capsys.readouterr().out)["code"] == "PDF_WORKER_MODE_INVALID"
+
+
+def test_hanging_worker_mode_requires_and_accepts_both_e2e_guards(monkeypatch):
+    monkeypatch.setenv("CABLE_DESKTOP_E2E", "1")
+    monkeypatch.setenv("CABLE_DESKTOP_E2E_HANG_WORKER", "1")
+    called = False
+
+    def fake_hang():
+        nonlocal called
+        called = True
+
+    monkeypatch.setattr(pdf_worker, "_hang_until_terminated", fake_hang)
+
+    assert pdf_worker.main(["__cable_report_e2e_hang__"]) == 0
+    assert called is True
 
 
 def test_emit_result_writes_one_compact_utf8_json_line():
