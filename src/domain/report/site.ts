@@ -1,4 +1,4 @@
-const TEMPLATE_SITE_PATTERN = /^[DEMPS0-9: -]*$/;
+const TEMPLATE_SITE_PATTERN = /^[A-Z0-9: -]*$/;
 
 export const normalizeSite = (input: string): string => input.trim().toUpperCase();
 export const isValidSite = (input: string): boolean =>

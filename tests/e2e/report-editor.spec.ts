@@ -37,7 +37,7 @@ test('imports, edits, deletes, and generates a report in browser mode', async ({
   await expect(page.getByRole('heading', { name: '线缆测试报告编辑器' })).toBeVisible();
   await expect(page.getByRole('status', { name: '运行模式' })).toHaveText('浏览器开发模式');
 
-  await page.getByLabel('项目号 (Site)').fill('DE46-E2E');
+  await page.getByLabel('项目号 (Site)').fill('YYBX-OE38-00027');
   await page.getByLabel('线缆类型').selectOption('Cat 5e');
   await page.getByLabel('Excel 布线表').setInputFiles({
     name: 'cat5e-three-rows.xlsx',
@@ -85,7 +85,7 @@ test('imports, edits, deletes, and generates a report in browser mode', async ({
 
   expect(generatedRequests).toHaveLength(1);
   const [generatedPayload] = generatedRequests;
-  expect(generatedPayload.site).toBe('DE46-E2E');
+  expect(generatedPayload.site).toBe('YYBX-OE38-00027');
   expect(generatedPayload.cableType).toBe('Cat 5e');
   expect(generatedPayload.records).toHaveLength(2);
   expect(generatedPayload.records[0]?.cableLabel).toBe('#EDITED-001');

@@ -82,8 +82,9 @@ function excelFile(name = 'cables.xlsx') {
 async function selectAndImport(
   user: ReturnType<typeof userEvent.setup>,
   file = excelFile(),
+  site = 'M138-DE46',
 ) {
-  await user.type(screen.getByLabelText('项目号 (Site)'), 'M138-DE46');
+  await user.type(screen.getByLabelText('项目号 (Site)'), site);
   await user.upload(screen.getByLabelText('Excel 布线表'), file);
   await user.click(screen.getByRole('button', { name: '加载并导入' }));
 }
@@ -95,6 +96,16 @@ afterEach(() => {
 });
 
 describe('ReportEditor import flow', () => {
+  it('enables report generation for a real operational Site identifier', async () => {
+    const user = userEvent.setup();
+    render(<ReportEditor services={makeServices()} />);
+
+    await selectAndImport(user, excelFile(), 'YYBX-OE38-00027');
+    await screen.findByRole('table');
+
+    expect(screen.getByRole('button', { name: '生成测试报告' })).toBeEnabled();
+  });
+
   it('keeps the preview absent until a complete 5,000-row import commits', async () => {
     const user = userEvent.setup();
     const pending = deferred<ImportExcelResult>();
