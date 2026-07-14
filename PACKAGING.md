@@ -1,9 +1,9 @@
 # 桌面版打包说明
 
-本项目的桌面版使用 Electron 打包：
+本项目的桌面版使用 Electron 打包。正式发布平台仅为 Windows x64：
 
-- Windows 输出 `.exe`
-- macOS 输出 `.app` / `.dmg`
+- Windows 输出并发布 `.exe`、`.exe.blockmap` 和 `latest.yml`
+- macOS `.app` / `.dmg` / `.zip` 仅用于内部兼容性测试，不得上传到 Release 或提供给用户
 - Python PDF 处理脚本会先用 PyInstaller 打成平台对应的本地可执行文件
 
 ## 准备环境
@@ -33,7 +33,7 @@ python -m pip install --require-hashes --only-binary=:all: -r requirements-dev.l
 corepack pnpm@9.15.9 desktop:dev
 ```
 
-## 构建 macOS 版本
+## 内部验证 macOS 包（不发布）
 
 必须在 macOS 上执行：
 
@@ -43,15 +43,16 @@ node scripts/run-evidence-command.mjs --name unit --platform mac --artifact arti
 node scripts/run-evidence-command.mjs --name python --platform mac --artifact artifacts/acceptance/python.xml -- python -m pytest -q --junitxml=artifacts/acceptance/python.xml
 PLAYWRIGHT_JSON_OUTPUT_FILE=artifacts/acceptance/browser.json PLAYWRIGHT_PORT=51237 node scripts/run-evidence-command.mjs --name browser --platform mac --artifact artifacts/acceptance/browser.json -- pnpm exec playwright test --project=chromium --workers=1 --reporter=json
 node scripts/run-evidence-command.mjs --name audit --platform mac --capture artifacts/acceptance/audit-mac.json -- pnpm audit --prod --audit-level high --registry=https://registry.npmjs.org --json
-CSC_IDENTITY_AUTO_DISCOVERY=false PYTHON_CMD=python node scripts/run-evidence-command.mjs --name package --platform mac -- pnpm desktop:dist:mac
+CABLE_MAC_SIGNING_MODE=adhoc CSC_IDENTITY_AUTO_DISCOVERY=false PYTHON_CMD=python node scripts/run-evidence-command.mjs --name package --platform mac -- pnpm desktop:dist:mac
 node scripts/verify-desktop-package.mjs mac
+node scripts/verify-macos-trust.mjs
 node scripts/check-package-size.mjs mac
 PYTHON_CMD=python node scripts/run-evidence-command.mjs --name desktop --platform mac --artifact artifacts/acceptance/desktop-mac.json -- pnpm test:e2e:mac
 node scripts/write-acceptance-evidence.mjs mac
 PYTHON_CMD=python corepack pnpm@9.15.9 verify:acceptance -- --platform mac
 ```
 
-产物在 `release/` 目录。
+产物只留在 CI 工作目录中做验证，不上传为安装包，也不进入 GitHub Release。
 
 ## 构建 Windows 版本
 
@@ -105,5 +106,5 @@ corepack pnpm@9.15.9 verify:acceptance -- --platform win
 ## 重要说明
 
 - macOS 和 Windows 的 Python worker 需要分别在对应系统上构建，不能直接共用。
-- 只有 macOS 和 Windows 两个实包任务都通过后，才能将安装包用于正式发布。
-- 未做代码签名时，Windows SmartScreen 和 macOS Gatekeeper 可能会提示未知开发者；正式分发时需要代码签名证书。
+- 正式发布只使用 Windows 任务验证通过的 `.exe`、`.exe.blockmap` 和 `latest.yml`；禁止附加 macOS 产物。
+- 未做代码签名时，Windows SmartScreen 可能会提示未知开发者；正式大范围分发时建议配置 Windows 代码签名证书。

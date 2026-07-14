@@ -113,14 +113,6 @@
     "directories": {
       "output": "release"
     },
-    "publish": [
-      {
-        "provider": "github",
-        "owner": "hansel970111-svg",
-        "repo": "cable-report-web",
-        "releaseType": "release"
-      }
-    ],
     "electronUpdaterCompatibility": ">=2.16",
     "compression": "maximum",
     "asar": true,
@@ -155,9 +147,18 @@
         "dmg",
         "zip"
       ],
-      "category": "public.app-category.productivity"
+      "category": "public.app-category.productivity",
+      "publish": null
     },
     "win": {
+      "publish": [
+        {
+          "provider": "github",
+          "owner": "hansel970111-svg",
+          "repo": "cable-report-web",
+          "releaseType": "release"
+        }
+      ],
       "target": [
         {
           "target": "nsis",

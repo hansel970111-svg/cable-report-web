@@ -366,6 +366,9 @@ export const useStore = create<Store>((set) => ({
 
 发布环境固定为 Node.js 24.14.0、pnpm 9.15.9 和 Python 3.12.13。从干净检出开始执行：
 
+当前正式桌面版仅发布 Windows x64，完整发布命令和验收要求以 [WINDOWS.md](WINDOWS.md)
+为准。下面的 macOS 流程只做内部兼容性验证，生成物不得上传到 GitHub Release：
+
 ```bash
 corepack pnpm@9.15.9 install --frozen-lockfile
 python -m pip install --require-hashes --only-binary=:all: -r requirements-dev.lock
@@ -380,8 +383,9 @@ node scripts/run-evidence-command.mjs --name unit --platform mac --artifact arti
 node scripts/run-evidence-command.mjs --name python --platform mac --artifact artifacts/acceptance/python.xml -- python -m pytest -q --junitxml=artifacts/acceptance/python.xml
 PLAYWRIGHT_JSON_OUTPUT_FILE=artifacts/acceptance/browser.json PLAYWRIGHT_PORT=51237 node scripts/run-evidence-command.mjs --name browser --platform mac --artifact artifacts/acceptance/browser.json -- pnpm exec playwright test --project=chromium --workers=1 --reporter=json
 node scripts/run-evidence-command.mjs --name audit --platform mac --capture artifacts/acceptance/audit-mac.json -- pnpm audit --prod --audit-level high --registry=https://registry.npmjs.org --json
-CSC_IDENTITY_AUTO_DISCOVERY=false PYTHON_CMD=python node scripts/run-evidence-command.mjs --name package --platform mac -- pnpm desktop:dist:mac
+CABLE_MAC_SIGNING_MODE=adhoc CSC_IDENTITY_AUTO_DISCOVERY=false PYTHON_CMD=python node scripts/run-evidence-command.mjs --name package --platform mac -- pnpm desktop:dist:mac
 node scripts/verify-desktop-package.mjs mac
+node scripts/verify-macos-trust.mjs
 node scripts/check-package-size.mjs mac
 PYTHON_CMD=python node scripts/run-evidence-command.mjs --name desktop --platform mac --artifact artifacts/acceptance/desktop-mac.json -- pnpm test:e2e:mac
 node scripts/write-acceptance-evidence.mjs mac
@@ -389,8 +393,8 @@ PYTHON_CMD=python corepack pnpm@9.15.9 verify:acceptance -- --platform mac
 ```
 
 `verify:acceptance` 只可在同一提交已经通过 evidence runner、生成全部机器报告并执行
-`write-acceptance-evidence.mjs` 后运行；它会拒绝旧提交或摘要不符的报告和安装包。Windows
-必须按 [WINDOWS.md](WINDOWS.md) 的同等证据流程在 Windows 主机运行，不能用 macOS 交叉构建代替。
+`write-acceptance-evidence.mjs` 后运行；它会拒绝旧提交或摘要不符的报告和安装包。正式发布
+必须按 [WINDOWS.md](WINDOWS.md) 的证据流程在 Windows 主机运行，不能用 macOS 交叉构建代替。
 
 输入上限为 25 MiB Excel、10,000 条记录，Vertical Cabling 单行 QTY 最多 5,000。
 PDF worker 最长运行 10 分钟，输出 PDF 最多 256 MiB。桌面版必须通过原生 Save As

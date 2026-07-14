@@ -123,9 +123,6 @@ def fill_page(page, records, start_idx, page_num, is_last_data_page=False):
                 if field_name in fields:
                     redact_rects.append(fitz.Rect(fields[field_name]['bbox']))
 
-            # ()
-            clear_row_images(page, row_idx, row_idx + 1, is_mpo_template)
-
             #
             if first_empty_row < 0:
                 first_empty_row = row_idx

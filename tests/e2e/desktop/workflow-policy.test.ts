@@ -2,16 +2,15 @@ import { readFile } from 'node:fs/promises';
 
 import { expect, test } from 'vitest';
 
-test('CI uploads installers before publishing final acceptance evidence', async () => {
+test('CI publishes only the Windows installer before final acceptance evidence', async () => {
   const source = await readFile('.github/workflows/desktop-e2e.yml', 'utf8');
   const macInstaller = source.indexOf('name: Upload macOS installers');
   const winInstaller = source.indexOf('name: Upload Windows installer');
   const macEvidence = source.indexOf('name: Upload macOS acceptance evidence');
   const winEvidence = source.indexOf('name: Upload Windows acceptance evidence');
 
-  expect(macInstaller).toBeGreaterThan(-1);
+  expect(macInstaller).toBe(-1);
   expect(winInstaller).toBeGreaterThan(-1);
-  expect(macInstaller).toBeLessThan(macEvidence);
   expect(winInstaller).toBeLessThan(winEvidence);
   expect(source.slice(Math.max(macEvidence, winEvidence))).not.toMatch(/\n\s+- name:/);
 });
@@ -62,11 +61,16 @@ test('CI matrix and frozen runtimes retain the release contract', async () => {
   expect(browserConfig).toContain("testIgnore: 'desktop/**'");
   expect(browserConfig).toContain("process.env.CABLE_PLAYWRIGHT_PREBUILT === '1'");
   expect(source).toContain(
-    'run: node scripts/verify-desktop-package.mjs mac && node scripts/check-package-size.mjs mac',
+    'run: node scripts/verify-desktop-package.mjs mac && node scripts/verify-macos-trust.mjs && node scripts/check-package-size.mjs mac',
   );
   expect(source).toContain(
     'run: node scripts/verify-desktop-package.mjs win && node scripts/check-package-size.mjs win',
   );
+  expect(source).toContain('CABLE_MAC_SIGNING_MODE: adhoc');
+  expect(source).not.toContain('name: Upload macOS installers');
+  expect(source).not.toContain('CABLE_MAC_SIGNING_MODE: developer-id');
+  expect(source).not.toContain('secrets.MAC_CSC_LINK');
+  expect(source).not.toContain('secrets.APPLE_API_KEY_BASE64');
 });
 
 test('package and acceptance evidence are bound to the current Git commit', async () => {
@@ -81,6 +85,11 @@ test('package and acceptance evidence are bound to the current Git commit', asyn
   expect(packageVerifier).toContain(".split('/')");
   expect(packageVerifier).toContain('.join(path.sep)');
   expect(packageVerifier).toContain('does not match current HEAD');
+  const macTrustVerifier = await readFile('scripts/verify-macos-trust.mjs', 'utf8');
+  expect(macTrustVerifier).toContain("['--verify', '--deep', '--strict', '--verbose=4', appDir]");
+  expect(macTrustVerifier).toContain("['verify', dmgPath]");
+  expect(macTrustVerifier).not.toContain('stapler');
+  expect(macTrustVerifier).not.toContain('spctl');
   expect(acceptance).toContain('verifyAcceptanceManifest');
   expect(acceptance).toContain("commandInvocation('pnpm', ['lint'], platform)");
   expect(acceptance).toContain("commandInvocation('pnpm', ['ts-check'], platform)");

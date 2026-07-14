@@ -61,10 +61,10 @@ export function installerNames(workspace, platform) {
 }
 
 export function updateArtifactNames(workspace, platform) {
+  if (platform === 'mac') return [];
   const release = path.join(workspace, 'release');
   const names = fs.existsSync(release) ? fs.readdirSync(release).sort() : [];
-  const metadataName = platform === 'mac' ? 'latest-mac.yml' : 'latest.yml';
-  return names.filter(name => name === metadataName || /\.blockmap$/i.test(name));
+  return names.filter(name => name === 'latest.yml' || /\.blockmap$/i.test(name));
 }
 
 export function createAcceptanceManifest({ workspace, platform, head }) {
@@ -86,9 +86,12 @@ export function createAcceptanceManifest({ workspace, platform, head }) {
   if (names.length < minimumInstallers) {
     throw new Error(`Expected at least ${minimumInstallers} ${platform} installer(s)`);
   }
-  const metadataName = platform === 'mac' ? 'latest-mac.yml' : 'latest.yml';
-  if (!updaterNames.includes(metadataName) || !updaterNames.some(name => name.endsWith('.blockmap'))) {
-    throw new Error(`Expected ${platform} updater metadata and blockmap artifacts`);
+  if (
+    platform === 'win'
+    && (!updaterNames.includes('latest.yml')
+      || !updaterNames.some(name => name.endsWith('.blockmap')))
+  ) {
+    throw new Error('Expected win updater metadata and blockmap artifacts');
   }
   const relativePaths = [
     ...reports,

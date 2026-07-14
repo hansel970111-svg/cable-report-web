@@ -36,6 +36,29 @@ DEFAULT_FONT_SIZE = 8.0
 _PAGE_FONT_CACHE = set()
 _TEXTWRITER_FONT_CACHE = {}
 
+_ROW_IMAGE_FIRST_RECTS = {
+    "cat5e": (
+        fitz.Rect(13.000, 108.266, 25.000, 120.266),
+        fitz.Rect(271.000, 109.766, 283.000, 121.766),
+        fitz.Rect(386.362, 110.109, 398.362, 122.109),
+    ),
+    "mpo": (
+        fitz.Rect(13.000, 86.500, 25.000, 98.500),
+        fitz.Rect(170.777, 88.000, 182.777, 100.000),
+    ),
+}
+_ROW_IMAGE_COLUMN_CENTERS = {
+    "cat5e": (19.0, 277.0, 392.2),
+    "mpo": (19.0, 176.8),
+}
+_RESULT_ICON_FIRST_RECTS = {
+    "cat5e": _ROW_IMAGE_FIRST_RECTS["cat5e"][1],
+    "mpo": _ROW_IMAGE_FIRST_RECTS["mpo"][1],
+    "lc": fitz.Rect(162.109, 109.766, 174.109, 121.766),
+}
+_RESULT_ICON_ROW_PITCH = 15.0
+_FAIL_ICON_RED = (220 / 255, 38 / 255, 38 / 255)
+
 def save_pdf_compact(doc, output_path):
     """Save a generated report with lossless PDF cleanup/compression."""
     try:
@@ -365,38 +388,42 @@ def clear_row_images(page, start_row, end_row, is_mpo_template=False):
         end_row: ()
         is_mpo_template: MPO
     """
-    # y()
-    if is_mpo_template:
-        # MPO: 1y  87
-        row_start_y = 87
-        row_height = 15
+    template_kind = "mpo" if is_mpo_template else "cat5e"
+    clear_padding = 0.6
+    row_rects_by_column = []
 
-        # MPO
-        # x=13: "MPO"
-        # x=171: (Result)
-        image_positions = [
-            (13, 12),    # "MPO": x=13, 12
-            (171, 12),   # : x=171, 12
-        ]
-    else:
-        # Cat5e: 1y  108
-        row_start_y = 108
-        row_height = 15
+    for column_center in _ROW_IMAGE_COLUMN_CENTERS[template_kind]:
+        column_rects = []
+        seen_rects = set()
+        for image in page.get_images(full=True):
+            for image_rect in page.get_image_rects(image[0]):
+                rect = fitz.Rect(image_rect)
+                if not (10.0 <= rect.width <= 13.0 and 10.0 <= rect.height <= 13.0):
+                    continue
+                if abs((rect.x0 + rect.x1) / 2 - column_center) > 2.0:
+                    continue
+                rect_key = tuple(round(value, 3) for value in rect)
+                if rect_key in seen_rects:
+                    continue
+                seen_rects.add(rect_key)
+                column_rects.append(rect)
+        column_rects.sort(key=lambda rect: rect.y0)
+        row_rects_by_column.append(column_rects)
 
-        # x()
-        image_positions = [
-            (13, 12),   # "CU": x=13, 12
-            (271, 12),  # : x=271, 12
-            (386, 12),  # : x=386, 12
-        ]
-
-    # , redaction
     for row in range(start_row, end_row):
-        y = row_start_y + row * row_height
-        for x, width in image_positions:
-            # : yy-1, 12
-            # y-2redactiony0,
-            rect = fitz.Rect(x - 1, y - 2, x + width + 1, y + 12)
+        for column_index, column_rects in enumerate(row_rects_by_column):
+            if row < len(column_rects):
+                image_rect = column_rects[row]
+            else:
+                first_rect = _ROW_IMAGE_FIRST_RECTS[template_kind][column_index]
+                y_offset = row * _RESULT_ICON_ROW_PITCH
+                image_rect = first_rect + (0, y_offset, 0, y_offset)
+            rect = fitz.Rect(
+                image_rect.x0 - clear_padding,
+                image_rect.y0 - clear_padding,
+                image_rect.x1 + clear_padding,
+                image_rect.y1 + clear_padding,
+            )
             _draw_clear_rect(page, rect)
 
 def _iter_page_spans(page):
@@ -477,7 +504,7 @@ def _expanded_rect(bbox, x_pad=1.2, y_pad=1.0):
 
 def _row_clear_rect(row, right=500):
     baseline = row["baseline"]
-    return fitz.Rect(13, baseline - 9.5, right, baseline + 4.5)
+    return fitz.Rect(13, baseline - 9.5, right, baseline + 5.8)
 
 
 def _format_pdf_value(value):
@@ -642,15 +669,6 @@ def _cover_rect(page, rect):
     page.draw_rect(rect, color=(1, 1, 1), fill=(1, 1, 1), width=0)
 
 
-_RESULT_ICON_FIRST_RECTS = {
-    "cat5e": fitz.Rect(271.000, 109.766, 283.000, 121.766),
-    "mpo": fitz.Rect(170.777, 88.000, 182.777, 100.000),
-    "lc": fitz.Rect(162.109, 109.766, 174.109, 121.766),
-}
-_RESULT_ICON_ROW_PITCH = 15.0
-_FAIL_ICON_RED = (220 / 255, 38 / 255, 38 / 255)
-
-
 def _result_icon_rect(template_kind, row_index):
     first = _RESULT_ICON_FIRST_RECTS[template_kind]
     y_offset = row_index * _RESULT_ICON_ROW_PITCH
@@ -686,7 +704,7 @@ def _draw_fail_result_icon(page, rect):
 
 def _draw_failed_result_icons(page, records, template_kind):
     for row_index, record in enumerate(records):
-        if record.get("result") == "FAIL":
+        if str(record.get("result", "")).strip().upper() == "FAIL":
             _draw_fail_result_icon(page, _result_icon_rect(template_kind, row_index))
 
 

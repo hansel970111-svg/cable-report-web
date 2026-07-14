@@ -51,6 +51,8 @@ def _footer_printed_text():
 
 def _get_footer_logo_rect(footer_template_page):
     for image in footer_template_page.get_images(full=True):
+        if image[2:4] != (128, 33):
+            continue
         xref = image[0]
         rects = footer_template_page.get_image_rects(xref)
         footer_rects = [fitz.Rect(rect) for rect in rects if rect.y0 > 730]
@@ -61,23 +63,28 @@ def _get_footer_logo_rect(footer_template_page):
     return fitz.Rect(280.5, 819.0, 342.56, 835.0)
 
 
-def _render_footer_logo_stream(footer_template_page, logo_rect):
-    try:
-        matrix = fitz.Matrix(16, 16)
-        pix = footer_template_page.get_pixmap(matrix=matrix, clip=logo_rect, alpha=True)
-        return pix.tobytes("png")
-    except Exception:
-        return None
+def _get_existing_footer_logo_xref(page):
+    for image in page.get_images(full=True):
+        if image[2:4] != (128, 33):
+            continue
+        xref = image[0]
+        if any(rect.y0 > 730 for rect in page.get_image_rects(xref)):
+            return xref
+    return 0
 
 
-def _draw_export_logo(page, logo_rect, logo_stream):
-    if logo_stream:
-        page.insert_image(logo_rect, stream=logo_stream, keep_proportion=False)
+def _draw_export_logo(page, logo_rect, logo_xref):
+    if logo_xref:
+        page.insert_image(
+            logo_rect,
+            xref=logo_xref,
+            keep_proportion=False,
+        )
 
 
 def draw_final_footer(page, footer_template_page):
     logo_rect = _get_footer_logo_rect(footer_template_page)
-    logo_stream = _render_footer_logo_stream(footer_template_page, logo_rect)
+    logo_xref = _get_existing_footer_logo_xref(page)
     _draw_clear_rect(page, fitz.Rect(0.0, 812.0, 595.0, 842.0))
 
     insert_text_with_font(
@@ -88,7 +95,7 @@ def draw_final_footer(page, footer_template_page):
         fontsize=7.0,
         color=(0, 0, 0),
     )
-    _draw_export_logo(page, logo_rect, logo_stream)
+    _draw_export_logo(page, logo_rect, logo_xref)
     insert_text_with_font(
         page,
         fitz.Point(464.33, 825.66),
