@@ -67,6 +67,7 @@ test('CI matrix and frozen runtimes retain the release contract', async () => {
     'run: node scripts/verify-desktop-package.mjs win && node scripts/check-package-size.mjs win',
   );
   expect(source).toContain('CABLE_MAC_SIGNING_MODE: adhoc');
+  expect(source).toContain('CSC_FOR_PULL_REQUEST: "true"');
   expect(source).not.toContain('name: Upload macOS installers');
   expect(source).not.toContain('CABLE_MAC_SIGNING_MODE: developer-id');
   expect(source).not.toContain('secrets.MAC_CSC_LINK');

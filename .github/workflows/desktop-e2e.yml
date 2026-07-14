@@ -105,6 +105,7 @@ jobs:
         env:
           CABLE_MAC_SIGNING_MODE: adhoc
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
+          CSC_FOR_PULL_REQUEST: "true"
         run: node scripts/run-evidence-command.mjs --name package --platform mac -- pnpm desktop:dist:mac
 
       - name: Build Windows package
