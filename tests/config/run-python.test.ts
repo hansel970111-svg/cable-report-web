@@ -5,7 +5,10 @@ import { spawnSync } from 'node:child_process';
 
 import { expect, test } from 'vitest';
 
-import { pythonCandidates } from '../../scripts/python-runtime.mjs';
+import {
+  findCompatiblePython,
+  pythonCandidates,
+} from '../../scripts/python-runtime.mjs';
 
 const repositoryRoot = resolve(import.meta.dirname, '../..');
 const runPythonScript = join(repositoryRoot, 'scripts', 'run-python.mjs');
@@ -71,9 +74,53 @@ async function readInvocations(logPath: string): Promise<Invocation[]> {
     .map((line) => JSON.parse(line) as Invocation);
 }
 
-test.skipIf(process.platform === 'win32')(
-  'skips an old first candidate and runs the command with the next Python 3.12 candidate',
+function hostPythonCommand(): string {
+  return process.env.PYTHON_CMD || (process.platform === 'win32' ? 'python' : 'python3');
+}
+
+async function writePythonVersionOverride(directory: string, version: string): Promise<void> {
+  const [major, minor, patch] = version.split('.').map(Number);
+  await writeFile(
+    join(directory, 'sitecustomize.py'),
+    `import sys\nsys.version_info = (${major}, ${minor}, ${patch})\n`,
+    'utf8',
+  );
+}
+
+function withPythonVersionOverride(
+  directory: string,
+  values: NodeJS.ProcessEnv,
+): NodeJS.ProcessEnv {
+  return {
+    ...values,
+    PYTHONPATH: `${directory}${delimiter}${values.PYTHONPATH ?? ''}`,
+  };
+}
+
+test(
+  'skips an old first candidate and selects the next Python 3.12 candidate',
   async () => {
+    if (process.platform === 'win32') {
+      const probes: string[] = [];
+      const selection = findCompatiblePython({
+        env: { NODE_ENV: 'test' },
+        platform: 'linux',
+        spawn: ((command: string) => {
+          probes.push(command);
+          return {
+            error: undefined,
+            status: 0,
+            stderr: '',
+            stdout: command === 'python3' ? '3.11.9' : '3.12.13',
+          };
+        }) as typeof spawnSync,
+      });
+
+      expect(probes).toEqual(['python3', 'python3.12']);
+      expect(selection.python).toMatchObject({ command: 'python3.12' });
+      return;
+    }
+
     const directory = await mkdtemp(join(tmpdir(), 'run-python-fallback-'));
     const logPath = join(directory, 'invocations.jsonl');
 
@@ -111,24 +158,22 @@ test.skipIf(process.platform === 'win32')(
   },
 );
 
-test.skipIf(process.platform === 'win32')(
+test(
   'rejects an explicitly configured Python older than 3.12 before running the command',
   async () => {
     const directory = await mkdtemp(join(tmpdir(), 'run-python-old-explicit-'));
-    const logPath = join(directory, 'invocations.jsonl');
 
     try {
-      const python = await writeFakePython(directory, 'configured-python', '3.11.9');
+      await writePythonVersionOverride(directory, '3.11.9');
       const result = spawnSync(
         process.execPath,
         [runPythonScript, '--payload', 'must-not-run'],
         {
           cwd: repositoryRoot,
-          env: {
+          env: withPythonVersionOverride(directory, {
             ...process.env,
-            PYTHON_CMD: python,
-            PYTHON_TEST_LOG: logPath,
-          },
+            PYTHON_CMD: hostPythonCommand(),
+          }),
           encoding: 'utf8',
         },
       );
@@ -137,33 +182,29 @@ test.skipIf(process.platform === 'win32')(
       expect(result.stderr).toContain('PYTHON_CMD');
       expect(result.stderr).toContain('Python >=3.12,<3.13');
       expect(result.stderr).toContain('3.11.9');
-      expect(await readInvocations(logPath)).toEqual([
-        expect.objectContaining({ name: 'configured-python', kind: 'probe' }),
-      ]);
+      expect(result.stdout).not.toContain('must-not-run');
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
   },
 );
 
-test.skipIf(process.platform === 'win32')(
+test(
   'rejects Python 3.13 because the release baseline is the Python 3.12 series',
   async () => {
     const directory = await mkdtemp(join(tmpdir(), 'run-python-new-explicit-'));
-    const logPath = join(directory, 'invocations.jsonl');
 
     try {
-      const python = await writeFakePython(directory, 'configured-python', '3.13.0');
+      await writePythonVersionOverride(directory, '3.13.0');
       const result = spawnSync(
         process.execPath,
         [runPythonScript, '--payload', 'must-not-run'],
         {
           cwd: repositoryRoot,
-          env: {
+          env: withPythonVersionOverride(directory, {
             ...process.env,
-            PYTHON_CMD: python,
-            PYTHON_TEST_LOG: logPath,
-          },
+            PYTHON_CMD: hostPythonCommand(),
+          }),
           encoding: 'utf8',
         },
       );
@@ -171,33 +212,29 @@ test.skipIf(process.platform === 'win32')(
       expect(result.status).toBe(1);
       expect(result.stderr).toContain('Python >=3.12,<3.13');
       expect(result.stderr).toContain('3.13.0');
-      expect(await readInvocations(logPath)).toEqual([
-        expect.objectContaining({ name: 'configured-python', kind: 'probe' }),
-      ]);
+      expect(result.stdout).not.toContain('must-not-run');
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
   },
 );
 
-test.skipIf(process.platform === 'win32')(
+test(
   'worker packaging rejects an old PYTHON_CMD before checking PyInstaller',
   async () => {
     const directory = await mkdtemp(join(tmpdir(), 'build-python-old-explicit-'));
     const workspace = join(directory, 'workspace');
-    const logPath = join(directory, 'invocations.jsonl');
     await mkdir(workspace);
 
     try {
-      const python = await writeFakePython(directory, 'configured-python', '3.11.9');
+      await writePythonVersionOverride(directory, '3.11.9');
       const result = spawnSync(process.execPath, [buildWorkersScript], {
         cwd: repositoryRoot,
-        env: {
+        env: withPythonVersionOverride(directory, {
           ...process.env,
           COZE_WORKSPACE_PATH: workspace,
-          PYTHON_CMD: python,
-          PYTHON_TEST_LOG: logPath,
-        },
+          PYTHON_CMD: hostPythonCommand(),
+        }),
         encoding: 'utf8',
       });
 
@@ -205,9 +242,7 @@ test.skipIf(process.platform === 'win32')(
       expect(result.stderr).toContain('PYTHON_CMD');
       expect(result.stderr).toContain('Python >=3.12,<3.13');
       expect(result.stderr).toContain('3.11.9');
-      expect(await readInvocations(logPath)).toEqual([
-        expect.objectContaining({ name: 'configured-python', kind: 'probe' }),
-      ]);
+      expect(result.stderr).not.toContain('PyInstaller is required');
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
