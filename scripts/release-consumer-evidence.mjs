@@ -3,7 +3,11 @@ import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import { parseCalVer, toMacBundleVersion } from './versioning.mjs';
+import {
+  parseCalVer,
+  toMacBundleVersion,
+  toWindowsProductVersion,
+} from './versioning.mjs';
 
 const ARTIFACT_NAME_PATTERN = 'Cable-Report-Generator-${version}-${os}-${arch}.${ext}';
 const require = createRequire(import.meta.url);
@@ -155,7 +159,7 @@ export async function collectVersionConsumerEvidence({ cwd, expectedVersion }) {
   );
   assertEqual(
     effectiveBuilderConfig?.extraMetadata?.shortVersionWindows,
-    expectedVersion,
+    toWindowsProductVersion(expectedVersion),
     'Windows ProductVersion',
   );
 

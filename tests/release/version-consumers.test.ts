@@ -218,7 +218,7 @@ describe('single-source application version consumers', () => {
     });
     expect(config).not.toHaveProperty('buildVersion');
     expect(config.extraMetadata?.shortVersion).toBe(packageJson.version);
-    expect(config.extraMetadata?.shortVersionWindows).toBe(packageJson.version);
+    expect(config.extraMetadata?.shortVersionWindows).toBe(`${packageJson.version}.0`);
     expect(config.beforeBuild).toBeTypeOf('function');
     expect(await config.beforeBuild!()).toBe(false);
 
@@ -227,7 +227,7 @@ describe('single-source application version consumers', () => {
       ?? appInfo.getVersionInWeirdWindowsForm();
     expect(appInfo.version).toBe(packageJson.version);
     expect(fileVersion).toBe(packageJson.version);
-    expect(productVersion).toBe(packageJson.version);
+    expect(productVersion).toBe(`${packageJson.version}.0`);
 
     vi.stubEnv('BUILD_NUMBER', '99');
     const ciAppInfo = builderAppInfo(packageJson, config);
@@ -246,7 +246,7 @@ describe('single-source application version consumers', () => {
     expect(packageJson.build.extraResources).toBeInstanceOf(Array);
   });
 
-  it('maps CalVer only for the macOS bundle while every public consumer stays unchanged', async () => {
+  it('maps native bundle versions while every public consumer stays unchanged', async () => {
     const builderConfigModule = await importFresh('electron-builder.config.mjs');
     const createElectronBuilderConfig = builderConfigModule.createElectronBuilderConfig as
       | ((version: string) => BuilderConfiguration)
@@ -258,7 +258,8 @@ describe('single-source application version consumers', () => {
       bundleShortVersion: '2026.713.2',
       bundleVersion: '2607.13.2',
     });
-    expect(config.extraMetadata?.shortVersionWindows).toBe('2026.713.2');
+    expect(config.extraMetadata?.shortVersion).toBe('2026.713.2');
+    expect(config.extraMetadata?.shortVersionWindows).toBe('2026.713.2.0');
     expect(config).not.toHaveProperty('buildVersion');
   });
 

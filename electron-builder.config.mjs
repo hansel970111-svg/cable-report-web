@@ -1,6 +1,10 @@
 import { readFileSync } from 'node:fs';
 
-import { parseCalVer, toMacBundleVersion } from './scripts/versioning.mjs';
+import {
+  parseCalVer,
+  toMacBundleVersion,
+  toWindowsProductVersion,
+} from './scripts/versioning.mjs';
 
 const packageJson = JSON.parse(
   readFileSync(new URL('./package.json', import.meta.url), 'utf8'),
@@ -17,7 +21,7 @@ export function createElectronBuilderConfig(version) {
     beforeBuild: () => false,
     extraMetadata: {
       shortVersion: version,
-      shortVersionWindows: version,
+      shortVersionWindows: toWindowsProductVersion(version),
     },
     mac: {
       bundleShortVersion: version,

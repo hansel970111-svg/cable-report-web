@@ -9,6 +9,7 @@ import {
   nextReleaseVersion,
   parseCalVer,
   toMacBundleVersion,
+  toWindowsProductVersion,
 } from '../../scripts/versioning.mjs';
 
 const BERLIN = 'Europe/Berlin';
@@ -229,6 +230,32 @@ describe('toMacBundleVersion', () => {
       );
     },
   );
+});
+
+describe('toWindowsProductVersion', () => {
+  test.each([
+    ['0.1.1', '0.1.1.0'],
+    ['2026.714.1', '2026.714.1.0'],
+    ['65535.65535.65535', '65535.65535.65535.0'],
+  ])('maps public version %s to Windows product version %s', (version, expected) => {
+    expect(toWindowsProductVersion(version)).toBe(expected);
+  });
+
+  test.each([
+    '',
+    'v2026.714.1',
+    '2026.0714.1',
+    '2026.714',
+    '2026.714.1.0',
+    '65536.1.1',
+    '1.65536.1',
+    '1.1.65536',
+  ])('rejects invalid Windows source version %j', version => {
+    expectVersioningError(
+      () => toWindowsProductVersion(version),
+      'INVALID_APP_VERSION',
+    );
+  });
 });
 
 describe('nextReleaseVersion', () => {

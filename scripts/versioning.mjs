@@ -2,6 +2,7 @@ const APPROVED_TIME_ZONE = 'Europe/Berlin';
 const MIN_YEAR = 2000;
 const MAX_YEAR = 2099;
 const MAX_DAILY_SEQUENCE = 99;
+const MAX_WINDOWS_VERSION_COMPONENT = 65_535;
 
 export const VERSION_ERROR_CODES = Object.freeze({
   INVALID_DATE: 'INVALID_DATE',
@@ -152,6 +153,18 @@ export function toMacBundleVersion(version) {
 
   const firstPart = (parsed.year % 100) * 100 + parsed.month;
   return `${firstPart}.${parsed.day}.${parsed.sequence}`;
+}
+
+export function toWindowsProductVersion(version) {
+  const parts = parseNumericTriple(version);
+  if (!parts || parts.some(part => part > MAX_WINDOWS_VERSION_COMPONENT)) {
+    fail(
+      VERSION_ERROR_CODES.INVALID_APP_VERSION,
+      `Windows product versions require three canonical numeric parts from 0 to ${MAX_WINDOWS_VERSION_COMPONENT}`,
+    );
+  }
+
+  return `${version}.0`;
 }
 
 export function nextReleaseVersion(input = {}) {
