@@ -229,6 +229,12 @@ describe('standalone dependency materialization', () => {
 
   test('replaces root and nested file/directory links with real inputs', () => {
     const { workspace, standalone, nodeModules } = createStandaloneFixture();
+    const diagnosticsDir = path.join(nodeModules, 'next', 'dist', 'diagnostics');
+    const runtimeDir = path.join(nodeModules, 'next', 'dist', 'server');
+    mkdirSync(diagnosticsDir, { recursive: true });
+    mkdirSync(runtimeDir, { recursive: true });
+    writeFileSync(path.join(diagnosticsDir, 'build-diagnostics.js'), 'build only\n');
+    writeFileSync(path.join(runtimeDir, 'next-server.js'), 'runtime\n');
 
     const result = runScript(
       'build.mjs',
@@ -242,6 +248,8 @@ describe('standalone dependency materialization', () => {
     expect(lstatSync(path.join(nodeModules, 'next', 'runtime.js')).isFile()).toBe(true);
     expect(readFileSync(path.join(nodeModules, 'next', 'runtime.js'), 'utf8')).toContain('shared');
     expect(lstatSync(path.join(nodeModules, '@swc', 'helpers')).isDirectory()).toBe(true);
+    expect(existsSync(diagnosticsDir)).toBe(false);
+    expect(readFileSync(path.join(runtimeDir, 'next-server.js'), 'utf8')).toBe('runtime\n');
     const requireResult = spawnSync(
       process.execPath,
       [
@@ -253,6 +261,7 @@ describe('standalone dependency materialization', () => {
     );
     expect(requireResult.status, requireResult.stderr).toBe(0);
     expect(result.stdout).toContain('Materialized 3 standalone dependency symlinks.');
+    expect(result.stdout).toContain('Pruned 1 build-only standalone path(s).');
   });
 
   test('materializes a name-matched package from the frozen root dependency store', () => {

@@ -4,6 +4,9 @@ import path from 'node:path';
 import process from 'node:process';
 
 const workspace = process.env.COZE_WORKSPACE_PATH || process.cwd();
+const BUILD_ONLY_STANDALONE_PATHS = [
+  path.join('node_modules', 'next', 'dist', 'diagnostics'),
+];
 
 function commandName(name) {
   return process.platform === 'win32' ? `${name}.cmd` : name;
@@ -334,6 +337,18 @@ export function materializeStandaloneSymlinks(standaloneDir) {
   return plans.length;
 }
 
+export function pruneBuildOnlyStandalonePaths(standaloneDir) {
+  let removedCount = 0;
+  for (const relativePath of BUILD_ONLY_STANDALONE_PATHS) {
+    const candidate = path.join(standaloneDir, relativePath);
+    if (!pathEntryExists(candidate)) continue;
+
+    fs.rmSync(candidate, { recursive: true, force: true });
+    removedCount += 1;
+  }
+  return removedCount;
+}
+
 function prepareStandaloneRuntime() {
   const nextBuildDir = path.join(workspace, 'next-build');
   const standaloneDir = path.join(nextBuildDir, 'standalone');
@@ -342,6 +357,8 @@ function prepareStandaloneRuntime() {
 
   const materializedCount = materializeStandaloneSymlinks(standaloneDir);
   console.log(`Materialized ${materializedCount} standalone dependency symlinks.`);
+  const prunedCount = pruneBuildOnlyStandalonePaths(standaloneDir);
+  console.log(`Pruned ${prunedCount} build-only standalone path(s).`);
 
   for (const relativeDir of ['worker-bin', path.join('resources', 'bin')]) {
     fs.rmSync(path.join(standaloneDir, relativeDir), { recursive: true, force: true });
@@ -373,6 +390,8 @@ if (process.argv[2] === '--materialize-standalone-runtime') {
   try {
     const count = materializeStandaloneSymlinks(path.resolve(standaloneDir));
     console.log(`Materialized ${count} standalone dependency symlinks.`);
+    const prunedCount = pruneBuildOnlyStandalonePaths(path.resolve(standaloneDir));
+    console.log(`Pruned ${prunedCount} build-only standalone path(s).`);
   } catch (error) {
     console.error(error instanceof Error ? error.message : error);
     process.exit(1);
