@@ -9,6 +9,8 @@ import {
   afterEach, describe, expect, it, vi,
 } from 'vitest';
 
+import { toMacBundleVersion } from '../../scripts/versioning.mjs';
+
 type BuilderConfiguration = {
   artifactName?: string;
   asar?: boolean;
@@ -214,7 +216,7 @@ describe('single-source application version consumers', () => {
     );
     expect(config.mac).toMatchObject({
       bundleShortVersion: packageJson.version,
-      bundleVersion: packageJson.version,
+      bundleVersion: toMacBundleVersion(packageJson.version),
     });
     expect(config).not.toHaveProperty('buildVersion');
     expect(config.extraMetadata?.shortVersion).toBe(packageJson.version);
