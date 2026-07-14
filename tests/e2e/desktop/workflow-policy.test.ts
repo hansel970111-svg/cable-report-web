@@ -15,6 +15,24 @@ test('CI publishes only the Windows installer before final acceptance evidence',
   expect(source.slice(Math.max(macEvidence, winEvidence))).not.toMatch(/\n\s+- name:/);
 });
 
+test('server-side release publishing accepts only a successful tagged Windows payload', async () => {
+  const source = await readFile('.github/workflows/publish-windows-release.yml', 'utf8');
+
+  expect(source).toContain('workflow_dispatch:');
+  expect(source).not.toContain('pull_request:');
+  expect(source).not.toMatch(/^\s+push:/m);
+  expect(source).toContain('actions: read');
+  expect(source).toContain('contents: write');
+  expect(source).toContain('gh run view "$RUN_ID"');
+  expect(source).toContain("'.headBranch'");
+  expect(source).toContain('== "$TAG"');
+  expect(source).toContain('== "$(git rev-parse HEAD)"');
+  expect(source).toContain('--name Cable-Report-Generator-Windows');
+  expect(source).toContain('Verify Windows-only release payload');
+  expect(source).toContain('gh release create "$TAG"');
+  expect(source).not.toMatch(/dmg|latest-mac|Upload macOS installers/i);
+});
+
 test('machine reports and Playwright scratch output cannot dirty acceptance status', async () => {
   const gitignore = await readFile('.gitignore', 'utf8');
   expect(gitignore.split(/\r?\n/)).toEqual(expect.arrayContaining([
