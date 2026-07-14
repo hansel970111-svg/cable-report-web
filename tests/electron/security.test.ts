@@ -99,6 +99,8 @@ test('Electron window source retains the mandatory isolation controls', async ()
   expect(source).toContain("'cable-report:check-for-updates'");
   expect(source).toContain("'cable-report:download-update'");
   expect(source).toContain("'cable-report:install-update'");
+  expect(source).toContain("label: '检查更新'");
+  expect(source).not.toContain("label: '打开下载页'");
   expect(source).not.toMatch(/execFile|spawn\(/);
   expect(source).not.toContain('browser_download_url');
   expect(source).toContain("process.platform === 'win32'");

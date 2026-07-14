@@ -50,8 +50,6 @@ const desktopSessionToken = createDesktopSessionToken();
 process.env.CABLE_DESKTOP_TOKEN = desktopSessionToken;
 delete process.env.CABLE_DEV_BROWSER_MODE;
 
-const UPDATE_REPO = 'hansel970111-svg/cable-report-web';
-const RELEASES_URL = `https://github.com/${UPDATE_REPO}/releases/latest`;
 const UPDATE_STATE_CHANNEL = 'cable-report:update-state';
 const UPDATE_GET_STATE_CHANNEL = 'cable-report:get-update-state';
 const UPDATE_CHECK_CHANNEL = 'cable-report:check-for-updates';
@@ -167,10 +165,6 @@ function setupApplicationMenu() {
         {
           label: '检查更新',
           click: () => void updateManager.check(),
-        },
-        {
-          label: '打开下载页',
-          click: () => openApprovedExternal(RELEASES_URL),
         },
       ],
     },
