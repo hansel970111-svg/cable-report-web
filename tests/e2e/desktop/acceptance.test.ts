@@ -1,6 +1,8 @@
 import { expect, test } from 'vitest';
 import { createHash } from 'node:crypto';
-import { access, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import {
+  access, mkdir, mkdtemp, readFile, rm, writeFile,
+} from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -20,8 +22,28 @@ import {
   playwrightEvidence,
   pythonEvidence,
   qualityCommandInvocations,
+  REQUIRED_DESKTOP_STORIES,
   unitEvidence,
 } from '../../../scripts/verify-acceptance.mjs';
+
+test('acceptance story allowlist stays synchronized with packaged desktop specs', async () => {
+  const sources = (await Promise.all([
+    readFile('tests/e2e/desktop/report-flow.spec.ts', 'utf8'),
+    readFile('tests/e2e/desktop/security-cleanup.spec.ts', 'utf8'),
+  ])).join('\n');
+
+  for (const title of REQUIRED_DESKTOP_STORIES) {
+    const generatedCase = /^packaged (Cat5e|LC|MPO) import edit generate native save$/u.exec(title);
+    if (generatedCase) {
+      expect(sources).toContain(`name: '${generatedCase[1]}'`);
+      expect(sources).toContain(
+        'test(`packaged ${reportCase.name} import edit generate native save`',
+      );
+      continue;
+    }
+    expect(sources).toContain(`'${title}'`);
+  }
+});
 
 test('pnpm argument separator is ignored by the acceptance CLI', () => {
   expect(parseArguments(['--', '--platform', 'mac'])).toMatchObject({ platform: 'mac' });

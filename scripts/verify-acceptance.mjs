@@ -7,13 +7,13 @@ import { fileURLToPath } from 'node:url';
 import { verifyAcceptanceManifest } from './acceptance-evidence.mjs';
 import { commandInvocation } from './run-evidence-command.mjs';
 
-const REQUIRED_DESKTOP_STORIES = [
+export const REQUIRED_DESKTOP_STORIES = [
   'packaged Cat5e import edit generate native save',
   'packaged LC import edit generate native save',
   'packaged MPO import edit generate native save',
   'native Save As cancellation returns to ready without false success',
   'packaged renderer API and external navigation stay inside the allowlist',
-  'packaged production modules contain no updater download install or execute path',
+  'packaged production modules expose only the fixed verified updater path',
   'cancel terminates a deterministic test-only hanging pdf_worker and cleans task data',
   'timeout terminates the hanging pdf_worker and exposes REPORT_TIMEOUT',
   'quitting with a hanging pdf_worker aborts it and cleans task data',
