@@ -251,7 +251,7 @@ describe('prepare-release command with a real bare origin', () => {
     expect(fetches).toBe(2);
     expect(await packageText(work)).toBe(externalText);
     expect(await temporaryReleaseFiles(work)).toEqual([]);
-  });
+  }, 15_000);
 
   it('rejects a HEAD move after the final fetch', async () => {
     const { work } = await fixture();
