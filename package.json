@@ -1,6 +1,6 @@
 {
   "name": "projects",
-  "version": "2026.714.1",
+  "version": "2026.714.2",
   "private": true,
   "main": "electron/main.cjs",
   "scripts": {
