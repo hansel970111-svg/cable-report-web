@@ -105,7 +105,7 @@ afterEach(async () => {
   await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true })));
 });
 
-describe('validate-release command with real Git tags', () => {
+describe('validate-release command with real Git tags', { timeout: 30_000 }, () => {
   it('exports a programmatic entry point', async () => {
     const command = await import('../../scripts/validate-release-version.mjs');
     expect(command.validateReleaseVersion).toBeTypeOf('function');
@@ -311,7 +311,7 @@ describe('validate-release command with real Git tags', () => {
       expect(result.status).toBe(1);
       expect(result.stderr).toContain('[VERSION_NOT_IN_ARTIFACT]');
     }
-  }, 30_000);
+  });
 
   it('rejects artifact filename substring collisions but accepts complete exact evidence', async () => {
     const { work } = await fixture();
