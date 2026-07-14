@@ -63,7 +63,7 @@ test('packaged production modules expose only the fixed verified updater path', 
 
   expect(sources).toContain("require('electron-updater')");
   expect(sources).toContain('updater.downloadUpdate()');
-  expect(sources).toContain('updater.quitAndInstall(false, true)');
+  expect(sources).toContain('updater.quitAndInstall(true, true)');
   expect(sources).toContain("'cable-report:download-update'");
   expect(sources).toContain("'cable-report:install-update'");
   expect(sources).not.toMatch(/child_process|execFile|spawn\(/);

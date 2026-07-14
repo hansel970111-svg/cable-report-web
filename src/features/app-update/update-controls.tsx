@@ -36,7 +36,7 @@ function buttonLabel(state: DesktopUpdateState): string {
     case 'downloading':
       return `下载中 ${Math.round(state.percent ?? 0)}%`;
     case 'downloaded':
-      return '重启并安装';
+      return '重启并更新';
     case 'installing':
       return '正在安装…';
     case 'error':

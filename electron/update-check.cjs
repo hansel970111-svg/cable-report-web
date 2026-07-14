@@ -83,7 +83,7 @@ function createUpdateManager({
       phase: 'downloaded',
       version: event?.version || state.version,
       percent: 100,
-      message: '更新已下载，重启应用即可完成安装。',
+      message: '更新已下载，点击“重启并更新”后将自动完成更新。',
     }),
     error: error => publish({
       phase: 'error',
@@ -150,7 +150,7 @@ function createUpdateManager({
             phase: 'downloaded',
             version: state.version,
             percent: 100,
-            message: '更新已下载，重启应用即可完成安装。',
+            message: '更新已下载，点击“重启并更新”后将自动完成更新。',
           });
         }
         return state;
@@ -172,11 +172,11 @@ function createUpdateManager({
       phase: 'installing',
       version: state.version,
       percent: 100,
-      message: '正在重启并安装更新…',
+      message: '正在退出应用、后台更新并重新启动…',
     });
     try {
       await prepareToInstall();
-      updater.quitAndInstall(false, true);
+      updater.quitAndInstall(true, true);
     } catch (error) {
       return publish({
         phase: 'error',

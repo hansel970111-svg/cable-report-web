@@ -30,7 +30,7 @@ function desktopApi(initial: DesktopUpdateState) {
       currentVersion: initial.currentVersion,
       version: '2026.714.4',
       percent: 100,
-      message: '更新已下载，重启应用即可完成安装。',
+      message: '更新已下载，点击“重启并更新”后将自动完成更新。',
     } satisfies DesktopUpdateState;
     listener?.(next);
     return next;
@@ -40,7 +40,7 @@ function desktopApi(initial: DesktopUpdateState) {
     currentVersion: initial.currentVersion,
     version: '2026.714.4',
     percent: 100,
-    message: '正在重启并安装更新…',
+    message: '正在退出应用、后台更新并重新启动…',
   } satisfies DesktopUpdateState));
   return {
     getDesktopSessionToken: vi.fn(async () => 'desktop-token'),
@@ -79,10 +79,10 @@ describe('UpdateControls', () => {
 
     await user.click(screen.getByRole('button', { name: '下载 2026.714.4' }));
     expect(api.downloadUpdate).toHaveBeenCalledOnce();
-    expect(await screen.findByRole('button', { name: '重启并安装' })).toBeEnabled();
+    expect(await screen.findByRole('button', { name: '重启并更新' })).toBeEnabled();
     expect(screen.getByText(/更新已下载/)).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: '重启并安装' }));
+    await user.click(screen.getByRole('button', { name: '重启并更新' }));
     await waitFor(() => expect(api.installUpdate).toHaveBeenCalledOnce());
   });
 });

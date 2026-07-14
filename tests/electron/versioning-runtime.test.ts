@@ -179,6 +179,8 @@ describe('Electron update manager', () => {
     await expect(manager.install()).resolves.toMatchObject({ phase: 'installing' });
 
     expect(updater.autoDownload).toBe(false);
+    expect(updater.autoInstallOnAppQuit).toBe(true);
+    expect(updater.autoRunAppAfterInstall).toBe(true);
     expect(updater.allowPrerelease).toBe(false);
     expect(updater.allowDowngrade).toBe(false);
     expect(updater.disableWebInstaller).toBe(true);
@@ -187,7 +189,7 @@ describe('Electron update manager', () => {
       percent: 48,
     }));
     expect(prepareToInstall).toHaveBeenCalledOnce();
-    expect(updater.quitAndInstall).toHaveBeenCalledWith(false, true);
+    expect(updater.quitAndInstall).toHaveBeenCalledWith(true, true);
   });
 
   test('does not quit when pre-install cleanup fails', async () => {
