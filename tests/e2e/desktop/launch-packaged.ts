@@ -234,6 +234,10 @@ export async function launchPackaged(
     app.process().stderr?.on('data', chunk => stderr.push(String(chunk)));
     const window = await app.firstWindow({ timeout: 60_000 });
     await window.waitForLoadState('domcontentloaded');
+    await window.locator('[data-cable-editor-ready="true"]').waitFor({
+      state: 'attached',
+      timeout: 60_000,
+    });
     validateMainProcessStderr(stderr.join(''));
     return {
       app,

@@ -87,9 +87,10 @@ jobs:
 
       - name: Run browser performance and workflow tests
         env:
+          CABLE_PLAYWRIGHT_PREBUILT: "1"
           PLAYWRIGHT_JSON_OUTPUT_FILE: artifacts/acceptance/browser.json
           PLAYWRIGHT_PORT: "51237"
-        run: node scripts/run-evidence-command.mjs --name browser --platform ${{ matrix.platform }} --artifact artifacts/acceptance/browser.json -- pnpm exec playwright test --project=chromium --workers=1 --reporter=json
+        run: corepack pnpm@9.15.9 build && node scripts/run-evidence-command.mjs --name browser --platform ${{ matrix.platform }} --artifact artifacts/acceptance/browser.json -- pnpm exec playwright test --project=chromium --workers=1 --reporter=json
 
       - name: Audit production dependencies (macOS)
         if: runner.os == 'macOS'
@@ -113,15 +114,11 @@ jobs:
 
       - name: Verify macOS package structure and size
         if: runner.os == 'macOS'
-        run: |
-          node scripts/verify-desktop-package.mjs mac
-          node scripts/check-package-size.mjs mac
+        run: node scripts/verify-desktop-package.mjs mac && node scripts/check-package-size.mjs mac
 
       - name: Verify Windows package structure and size
         if: runner.os == 'Windows'
-        run: |
-          node scripts/verify-desktop-package.mjs win
-          node scripts/check-package-size.mjs win
+        run: node scripts/verify-desktop-package.mjs win && node scripts/check-package-size.mjs win
 
       - name: Run packaged macOS E2E
         if: runner.os == 'macOS'

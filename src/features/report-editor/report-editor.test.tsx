@@ -258,6 +258,16 @@ describe('ReportEditor keyboard and environment behavior', () => {
     const markup = renderToString(<ReportEditor services={makeServices()} />);
 
     expect(markup).not.toContain('浏览器开发模式');
+    expect(markup).toContain('data-cable-editor-ready="false"');
+  });
+
+  it('marks the editor ready only after client effects are active', async () => {
+    const { container } = render(<ReportEditor services={makeServices()} />);
+
+    await waitFor(() => {
+      expect(container.querySelector('.report-editor-shell'))
+        .toHaveAttribute('data-cable-editor-ready', 'true');
+    });
   });
 
   it('tracks browser mode dataset changes after mount without a parent rerender', async () => {

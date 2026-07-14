@@ -2,6 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 const port = Number.parseInt(process.env.PLAYWRIGHT_PORT ?? '5000', 10);
 const baseURL = `http://127.0.0.1:${port}`;
+const prebuiltBrowserServer = process.env.CABLE_PLAYWRIGHT_PREBUILT === '1';
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -16,7 +17,9 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
   webServer: {
-    command: 'corepack pnpm@9.15.9 build && corepack pnpm@9.15.9 start:browser',
+    command: prebuiltBrowserServer
+      ? 'corepack pnpm@9.15.9 start:browser'
+      : 'corepack pnpm@9.15.9 build && corepack pnpm@9.15.9 start:browser',
     url: baseURL,
     timeout: 240_000,
     reuseExistingServer: false,

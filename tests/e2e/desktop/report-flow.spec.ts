@@ -59,11 +59,13 @@ async function importFixture(page: Page, reportCase: ReportCase): Promise<void> 
   await page.getByLabel('Excel 布线表').setInputFiles(
     path.join(workspace, 'tests', 'fixtures', 'excel', reportCase.fixture),
   );
+  const importButton = page.getByRole('button', { name: '加载并导入' });
+  await expect(importButton).toBeEnabled();
   const responsePromise = page.waitForResponse(response => (
     new URL(response.url()).pathname === '/api/import-excel'
     && response.request().method() === 'POST'
   ));
-  await page.getByRole('button', { name: '加载并导入' }).click();
+  await importButton.click();
   const response = await responsePromise;
   expect(response.status()).toBe(200);
   await expect(page.getByText(`${reportCase.expectedRecords} 条线缆记录`)).toBeVisible();

@@ -46,6 +46,10 @@ test('CI matrix and frozen runtimes retain the release contract', async () => {
   expect(source).not.toMatch(/^\s*run: pnpm /m);
   expect(source).toContain('python -m pip install --require-hashes --only-binary=:all: -r requirements-dev.lock');
   expect(source).toContain('corepack pnpm@9.15.9 exec playwright install chromium');
+  expect(source).toContain('CABLE_PLAYWRIGHT_PREBUILT: "1"');
+  expect(source).toContain(
+    'run: corepack pnpm@9.15.9 build && node scripts/run-evidence-command.mjs --name browser',
+  );
   expect(source).toContain(
     'pnpm exec vitest run --reporter=default --reporter=json --outputFile.json=artifacts/acceptance/unit.json',
   );
@@ -56,6 +60,13 @@ test('CI matrix and frozen runtimes retain the release contract', async () => {
   expect(source).not.toMatch(/create-release|softprops|gh release/i);
   expect(browserConfig).toContain("testMatch: '**/*.spec.ts'");
   expect(browserConfig).toContain("testIgnore: 'desktop/**'");
+  expect(browserConfig).toContain("process.env.CABLE_PLAYWRIGHT_PREBUILT === '1'");
+  expect(source).toContain(
+    'run: node scripts/verify-desktop-package.mjs mac && node scripts/check-package-size.mjs mac',
+  );
+  expect(source).toContain(
+    'run: node scripts/verify-desktop-package.mjs win && node scripts/check-package-size.mjs win',
+  );
 });
 
 test('package and acceptance evidence are bound to the current Git commit', async () => {

@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
   type KeyboardEvent,
@@ -72,6 +73,7 @@ export function ReportEditor({ services }: ReportEditorProps) {
   const workflow = useReportWorkflow({ services });
   const draftStore = useMemo(() => createRecordDraftStore(), []);
   const [editing, setEditing] = useState(false);
+  const shellRef = useRef<HTMLDivElement>(null);
   const draft = visibleDraft(workflow.state, workflow.model.recoverableDraft);
   const records = draft?.records ?? NO_RECORDS;
   const operationInProgress = workflow.state.status === 'importing'
@@ -82,6 +84,10 @@ export function ReportEditor({ services }: ReportEditorProps) {
     browserModeSnapshot,
     serverBrowserModeSnapshot,
   );
+
+  useEffect(() => {
+    shellRef.current?.setAttribute('data-cable-editor-ready', 'true');
+  }, []);
 
   useEffect(() => {
     if (!editing) draftStore.reset(records);
@@ -113,7 +119,12 @@ export function ReportEditor({ services }: ReportEditorProps) {
   }, [editing, leaveEditing, workflow]);
 
   return (
-    <div className="report-editor-shell" onKeyDown={handleKeyDown}>
+    <div
+      ref={shellRef}
+      className="report-editor-shell"
+      data-cable-editor-ready="false"
+      onKeyDown={handleKeyDown}
+    >
       <header className="report-editor-header">
         <p className="report-editor-eyebrow">无模板预加载 · 直接导入</p>
         <h1>线缆测试报告编辑器</h1>
