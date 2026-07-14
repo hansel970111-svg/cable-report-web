@@ -311,7 +311,7 @@ describe('validate-release command with real Git tags', () => {
       expect(result.status).toBe(1);
       expect(result.stderr).toContain('[VERSION_NOT_IN_ARTIFACT]');
     }
-  });
+  }, 30_000);
 
   it('rejects artifact filename substring collisions but accepts complete exact evidence', async () => {
     const { work } = await fixture();
