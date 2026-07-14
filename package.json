@@ -38,6 +38,7 @@
     "@tanstack/react-virtual": "3.14.5",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
+    "electron-updater": "6.8.9",
     "lucide-react": "0.469.0",
     "next": "16.2.10",
     "react": "19.2.7",
@@ -49,24 +50,24 @@
     "zod": "4.4.3"
   },
   "devDependencies": {
-    "@electron/asar": "3.4.1",
     "@axe-core/playwright": "4.12.1",
+    "@electron/asar": "3.4.1",
     "@playwright/test": "1.61.1",
+    "@tailwindcss/postcss": "4.1.18",
     "@testing-library/dom": "10.4.1",
     "@testing-library/jest-dom": "6.9.1",
     "@testing-library/react": "16.3.2",
     "@testing-library/user-event": "14.6.1",
-    "@tailwindcss/postcss": "4.1.18",
     "@types/jest-axe": "3.5.9",
     "@types/node": "24.13.3",
     "@types/react": "19.2.17",
     "@types/react-dom": "19.2.3",
     "@vitest/coverage-v8": "4.1.10",
-    "eslint": "9.39.2",
-    "eslint-config-next": "16.2.10",
     "electron": "43.1.0",
     "electron-builder": "26.15.3",
     "electron-builder-squirrel-windows": "26.15.3",
+    "eslint": "9.39.2",
+    "eslint-config-next": "16.2.10",
     "jest-axe": "10.0.0",
     "jsdom": "29.1.1",
     "only-allow": "1.2.2",
@@ -112,11 +113,20 @@
     "directories": {
       "output": "release"
     },
-    "publish": null,
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "hansel970111-svg",
+        "repo": "cable-report-web",
+        "releaseType": "release"
+      }
+    ],
+    "electronUpdaterCompatibility": ">=2.16",
     "compression": "maximum",
     "asar": true,
     "files": [
       "electron/**/*",
+      "updater-runtime/**/*",
       "scripts/versioning.mjs",
       "next-build/standalone/**/*",
       "package.json",
@@ -141,7 +151,6 @@
       }
     ],
     "mac": {
-      "identity": null,
       "target": [
         "dmg",
         "zip"

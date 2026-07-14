@@ -58,6 +58,7 @@ if (requestedTarget === 'mac' && process.platform !== 'darwin') {
 
 runNodeScript('build.mjs');
 runNodeScript('build-python-workers.mjs');
+runNodeScript('build-updater-runtime.mjs');
 
 fs.rmSync(path.join(workspace, 'release'), { recursive: true, force: true });
 

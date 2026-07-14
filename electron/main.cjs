@@ -7,9 +7,11 @@ const {
   session,
   shell,
 } = require('electron');
+const electronUpdater = app.isPackaged
+  ? require('../updater-runtime/index.cjs')
+  : require('electron-updater');
 const { createServer } = require('node:http');
 const fs = require('node:fs');
-const https = require('node:https');
 const net = require('node:net');
 const path = require('node:path');
 
@@ -22,8 +24,7 @@ const {
   savePdfAtomically,
   writeAndSyncTemporary,
 } = require('./save-pdf.cjs');
-const { createUpdateChecker } = require('./update-check.cjs');
-const { loadVersioningModule } = require('./versioning-loader.cjs');
+const { createUpdateManager } = require('./update-check.cjs');
 const { loadPackagedStandalone } = require('./standalone-runtime.cjs');
 
 process.on('unhandledRejection', reason => {
@@ -51,7 +52,11 @@ delete process.env.CABLE_DEV_BROWSER_MODE;
 
 const UPDATE_REPO = 'hansel970111-svg/cable-report-web';
 const RELEASES_URL = `https://github.com/${UPDATE_REPO}/releases/latest`;
-const LATEST_RELEASE_API = `https://api.github.com/repos/${UPDATE_REPO}/releases/latest`;
+const UPDATE_STATE_CHANNEL = 'cable-report:update-state';
+const UPDATE_GET_STATE_CHANNEL = 'cable-report:get-update-state';
+const UPDATE_CHECK_CHANNEL = 'cable-report:check-for-updates';
+const UPDATE_DOWNLOAD_CHANNEL = 'cable-report:download-update';
+const UPDATE_INSTALL_CHANNEL = 'cable-report:install-update';
 
 function openApprovedExternal(targetUrl) {
   const decision = classifyNavigation(
@@ -113,102 +118,25 @@ function waitForPort(port, timeoutMs = 30000) {
   });
 }
 
-function normalizeVersion(version) {
-  return String(version || '')
-    .trim()
-    .replace(/^v/i, '');
+function emitUpdateState(state) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.webContents.send(UPDATE_STATE_CHANNEL, state);
 }
 
-function getJson(url) {
-  return new Promise((resolve, reject) => {
-    const request = https.get(
-      url,
-      {
-        headers: {
-          Accept: 'application/vnd.github+json',
-          'User-Agent': `${app.getName()}/${app.getVersion()}`,
-        },
-        timeout: 12000,
-      },
-      response => {
-        let body = '';
-
-        response.setEncoding('utf8');
-        response.on('data', chunk => {
-          body += chunk;
-        });
-        response.on('end', () => {
-          if (response.statusCode === 404) {
-            reject(new Error('暂时没有找到发布版本'));
-            return;
-          }
-
-          if (!response.statusCode || response.statusCode < 200 || response.statusCode >= 300) {
-            reject(new Error(`GitHub 返回状态 ${response.statusCode || '未知'}`));
-            return;
-          }
-
-          try {
-            resolve(JSON.parse(body));
-          } catch (error) {
-            reject(error);
-          }
-        });
-      },
-    );
-
-    request.on('timeout', () => {
-      request.destroy(new Error('检查更新超时'));
-    });
-    request.on('error', reject);
-  });
-}
-
-function showMessageBox(options) {
-  return mainWindow
-    ? dialog.showMessageBox(mainWindow, options)
-    : dialog.showMessageBox(options);
-}
-
-const checkForUpdates = createUpdateChecker({
-  loadVersioningModule,
-  fetchLatestRelease: () => getJson(LATEST_RELEASE_API),
-  getCurrentVersion: () => app.getVersion(),
-  normalizeVersion,
-  onUpToDate: ({ currentVersion, latestTag }) => showMessageBox({
-    type: 'info',
-    title: '检查更新',
-    message: '当前已经是最新版本',
-    detail: `当前版本：${currentVersion}\n最新版本：${latestTag}`,
-  }),
-  onUpdateAvailable: async ({ currentVersion, latestTag }) => {
-    const result = await showMessageBox({
-      type: 'info',
-      title: '发现新版本',
-      message: `发现新版本 ${latestTag}`,
-      detail: `当前版本：${currentVersion}\n是否打开下载页面？`,
-      buttons: ['打开下载页', '稍后'],
-      defaultId: 0,
-      cancelId: 1,
-    });
-
-    if (result.response === 0) {
-      openApprovedExternal(RELEASES_URL);
-    }
-  },
-  onManualError: async error => {
-    const result = await showMessageBox({
-      type: 'warning',
-      title: '检查更新失败',
-      message: error instanceof Error ? error.message : String(error),
-      detail: '可以手动打开 GitHub Releases 页面查看最新版。',
-      buttons: ['打开发布页', '取消'],
-      defaultId: 0,
-      cancelId: 1,
-    });
-
-    if (result.response === 0) {
-      openApprovedExternal(RELEASES_URL);
+const updateManager = createUpdateManager({
+  updater: electronUpdater.autoUpdater,
+  currentVersion: app.getVersion(),
+  supported: app.isPackaged && process.platform === 'win32',
+  emitState: emitUpdateState,
+  prepareToInstall: async () => {
+    if (shutdownComplete) return;
+    shutdownStarted = true;
+    try {
+      await shutdownApplication();
+      shutdownComplete = true;
+    } catch (error) {
+      shutdownStarted = false;
+      throw error;
     }
   },
 });
@@ -238,7 +166,7 @@ function setupApplicationMenu() {
       submenu: [
         {
           label: '检查更新',
-          click: () => checkForUpdates({ manual: true }),
+          click: () => void updateManager.check(),
         },
         {
           label: '打开下载页',
@@ -249,6 +177,19 @@ function setupApplicationMenu() {
   ];
 
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
+
+function authorizedDesktopEvent(event) {
+  const expectedOrigin = process.env.CABLE_DESKTOP_ORIGIN || '';
+  const senderFrame = event.senderFrame;
+  const senderDecision = classifyNavigation(senderFrame?.url || '', expectedOrigin);
+  return Boolean(
+    mainWindow &&
+    !mainWindow.isDestroyed() &&
+    event.sender === mainWindow.webContents &&
+    senderFrame === mainWindow.webContents.mainFrame &&
+    senderDecision.kind === 'internal'
+  );
 }
 
 function configureAboutPanel() {
@@ -336,22 +277,30 @@ function configureSessionSecurity() {
 function registerDesktopSessionBridge() {
   ipcMain.removeHandler('cable-report:get-session-token');
   ipcMain.handle('cable-report:get-session-token', event => {
-    const expectedOrigin = process.env.CABLE_DESKTOP_ORIGIN || '';
-    const senderFrame = event.senderFrame;
-    const senderDecision = classifyNavigation(senderFrame?.url || '', expectedOrigin);
-    const authorized =
-      mainWindow &&
-      !mainWindow.isDestroyed() &&
-      event.sender === mainWindow.webContents &&
-      senderFrame === mainWindow.webContents.mainFrame &&
-      senderDecision.kind === 'internal';
-
-    if (!authorized) {
+    if (!authorizedDesktopEvent(event)) {
       throw new Error('Unauthorized desktop session token request');
     }
 
     return desktopSessionToken;
   });
+}
+
+function registerUpdateBridge() {
+  const handlers = [
+    [UPDATE_GET_STATE_CHANNEL, () => updateManager.getState()],
+    [UPDATE_CHECK_CHANNEL, () => updateManager.check()],
+    [UPDATE_DOWNLOAD_CHANNEL, () => updateManager.download()],
+    [UPDATE_INSTALL_CHANNEL, () => updateManager.install()],
+  ];
+  for (const [channel, action] of handlers) {
+    ipcMain.removeHandler(channel);
+    ipcMain.handle(channel, event => {
+      if (!authorizedDesktopEvent(event)) {
+        throw new Error('Unauthorized desktop update request');
+      }
+      return action();
+    });
+  }
 }
 
 function registerNativeSaveBridge() {
@@ -440,6 +389,9 @@ function createMainWindow(url) {
 
   mainWindow.webContents.on('will-navigate', handleNavigation);
   mainWindow.webContents.on('will-redirect', handleNavigation);
+  mainWindow.webContents.once('did-finish-load', () => {
+    emitUpdateState(updateManager.getState());
+  });
 
   mainWindow.on('closed', () => {
     mainWindow = null;
@@ -453,12 +405,17 @@ app.whenReady().then(async () => {
     configureSessionSecurity();
     configureAboutPanel();
     registerDesktopSessionBridge();
+    registerUpdateBridge();
     registerNativeSaveBridge();
     setupApplicationMenu();
     const url = await startNextServer();
     createMainWindow(url);
-    if (app.isPackaged && process.env.CABLE_DESKTOP_E2E !== '1') {
-      setTimeout(() => checkForUpdates(), 3000);
+    if (
+      app.isPackaged
+      && process.platform === 'win32'
+      && process.env.CABLE_DESKTOP_E2E !== '1'
+    ) {
+      setTimeout(() => void updateManager.check(), 3000);
     }
   } catch (error) {
     console.error(error);

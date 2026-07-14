@@ -60,6 +60,13 @@ export function installerNames(workspace, platform) {
     : names.filter(name => /\.exe$/i.test(name));
 }
 
+export function updateArtifactNames(workspace, platform) {
+  const release = path.join(workspace, 'release');
+  const names = fs.existsSync(release) ? fs.readdirSync(release).sort() : [];
+  const metadataName = platform === 'mac' ? 'latest-mac.yml' : 'latest.yml';
+  return names.filter(name => name === metadataName || /\.blockmap$/i.test(name));
+}
+
 export function createAcceptanceManifest({ workspace, platform, head }) {
   if (!['mac', 'win'].includes(platform)) throw new Error('platform must be mac or win');
   if (!/^[0-9a-f]{40}$/i.test(head)) throw new Error('head must be a full Git commit SHA');
@@ -74,25 +81,32 @@ export function createAcceptanceManifest({ workspace, platform, head }) {
   const gateReceipts = gateNames.map(name => `artifacts/acceptance/gate-${name}-${platform}.json`);
   const packageAsar = packageAsarRelativePath(workspace, platform);
   const names = installerNames(workspace, platform);
+  const updaterNames = updateArtifactNames(workspace, platform);
   const minimumInstallers = platform === 'mac' ? 2 : 1;
   if (names.length < minimumInstallers) {
     throw new Error(`Expected at least ${minimumInstallers} ${platform} installer(s)`);
+  }
+  const metadataName = platform === 'mac' ? 'latest-mac.yml' : 'latest.yml';
+  if (!updaterNames.includes(metadataName) || !updaterNames.some(name => name.endsWith('.blockmap'))) {
+    throw new Error(`Expected ${platform} updater metadata and blockmap artifacts`);
   }
   const relativePaths = [
     ...reports,
     ...gateReceipts,
     packageAsar,
     ...names.map(name => `release/${name}`),
+    ...updaterNames.map(name => `release/${name}`),
   ];
   const files = Object.fromEntries(relativePaths.map(relativePath => (
     [relativePath, hashFile(workspace, relativePath)]
   )));
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     head,
     platform,
     packageAsar,
     installerNames: names,
+    updateArtifactNames: updaterNames,
     files,
   };
 }
@@ -148,7 +162,7 @@ function verifyGateReceipts(workspace, manifest, platform, head) {
 }
 
 export function verifyAcceptanceManifest({ workspace, manifest, platform, head }) {
-  if (manifest?.schemaVersion !== 1) throw new Error('acceptance manifest schemaVersion must be 1');
+  if (manifest?.schemaVersion !== 2) throw new Error('acceptance manifest schemaVersion must be 2');
   if (manifest.head !== head) throw new Error('acceptance manifest does not match current HEAD');
   if (manifest.platform !== platform) throw new Error(`acceptance manifest platform must be ${platform}`);
   if (!manifest.files || typeof manifest.files !== 'object' || Array.isArray(manifest.files)) {
@@ -160,6 +174,9 @@ export function verifyAcceptanceManifest({ workspace, manifest, platform, head }
   }
   if (JSON.stringify(manifest.installerNames) !== JSON.stringify(expected.installerNames)) {
     throw new Error('acceptance manifest installer inventory does not match');
+  }
+  if (JSON.stringify(manifest.updateArtifactNames) !== JSON.stringify(expected.updateArtifactNames)) {
+    throw new Error('acceptance manifest updater inventory does not match');
   }
   const actualPaths = Object.keys(manifest.files).sort();
   const expectedPaths = Object.keys(expected.files).sort();

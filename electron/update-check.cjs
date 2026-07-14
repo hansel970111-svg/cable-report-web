@@ -1,45 +1,205 @@
-function createUpdateChecker({
-  loadVersioningModule,
-  fetchLatestRelease,
-  getCurrentVersion,
-  normalizeVersion,
-  onUpToDate,
-  onUpdateAvailable,
-  onManualError,
+const UPDATE_PHASES = new Set([
+  'unsupported',
+  'idle',
+  'checking',
+  'up-to-date',
+  'available',
+  'downloading',
+  'downloaded',
+  'installing',
+  'error',
+]);
+
+function errorMessage(error) {
+  if (error instanceof Error && error.message.trim()) return error.message.trim();
+  const value = String(error || '').trim();
+  return value || '更新操作失败，请稍后重试。';
+}
+
+function normalizeProgress(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return 0;
+  return Math.min(100, Math.max(0, Math.round(numeric)));
+}
+
+function createUpdateManager({
+  updater,
+  currentVersion,
+  supported,
+  emitState = () => undefined,
+  prepareToInstall = async () => undefined,
+  logger = console,
 }) {
-  let checkingForUpdates = false;
+  if (!updater || typeof updater.on !== 'function') {
+    throw new TypeError('An Electron updater EventEmitter is required.');
+  }
 
-  return async function checkForUpdates({ manual = false } = {}) {
-    if (checkingForUpdates) return;
-    checkingForUpdates = true;
+  let state = supported
+    ? { phase: 'idle', currentVersion }
+    : {
+        phase: 'unsupported',
+        currentVersion,
+        message: '应用内直接更新目前支持已安装的 Windows 桌面版。',
+      };
+  let checkPromise = null;
+  let downloadPromise = null;
 
-    try {
-      const { compareAppVersions } = await loadVersioningModule();
-      const release = await fetchLatestRelease();
-      const currentVersion = getCurrentVersion();
-      const latestTag = release.tag_name || release.name || '';
-      const latestVersion = normalizeVersion(latestTag);
+  updater.autoDownload = false;
+  updater.autoInstallOnAppQuit = true;
+  updater.autoRunAppAfterInstall = true;
+  updater.allowPrerelease = false;
+  updater.allowDowngrade = false;
+  updater.disableWebInstaller = true;
+  updater.logger = logger;
 
-      if (!latestVersion) {
-        throw new Error('最新版没有有效版本号');
-      }
-
-      if (compareAppVersions(latestVersion, currentVersion) <= 0) {
-        if (manual) {
-          await onUpToDate?.({ currentVersion, latestTag });
-        }
-        return;
-      }
-
-      await onUpdateAvailable?.({ currentVersion, latestTag, release });
-    } catch (error) {
-      if (manual) {
-        await onManualError?.(error);
-      }
-    } finally {
-      checkingForUpdates = false;
+  function publish(nextState) {
+    if (!UPDATE_PHASES.has(nextState.phase)) {
+      throw new Error(`Unknown update phase: ${String(nextState.phase)}`);
     }
+    state = Object.freeze({ currentVersion, ...nextState });
+    emitState(state);
+    return state;
+  }
+
+  const listeners = {
+    'checking-for-update': () => publish({ phase: 'checking' }),
+    'update-not-available': info => publish({
+      phase: 'up-to-date',
+      version: info?.version || currentVersion,
+      message: '当前已是最新版本。',
+    }),
+    'update-available': info => publish({
+      phase: 'available',
+      version: info?.version,
+      message: `发现新版本 ${info?.version || ''}`.trim(),
+    }),
+    'download-progress': progress => publish({
+      phase: 'downloading',
+      version: state.version,
+      percent: normalizeProgress(progress?.percent),
+      message: '正在下载更新…',
+    }),
+    'update-downloaded': event => publish({
+      phase: 'downloaded',
+      version: event?.version || state.version,
+      percent: 100,
+      message: '更新已下载，重启应用即可完成安装。',
+    }),
+    error: error => publish({
+      phase: 'error',
+      version: state.version,
+      message: errorMessage(error),
+    }),
+  };
+
+  for (const [eventName, listener] of Object.entries(listeners)) {
+    updater.on(eventName, listener);
+  }
+
+  async function check() {
+    if (!supported) return state;
+    if (checkPromise) return checkPromise;
+    if (['downloading', 'downloaded', 'installing'].includes(state.phase)) return state;
+
+    publish({ phase: 'checking' });
+    checkPromise = Promise.resolve()
+      .then(() => updater.checkForUpdates())
+      .then(result => {
+        if (state.phase !== 'checking') return state;
+        const updateInfo = result?.updateInfo;
+        if (updateInfo?.version && result?.isUpdateAvailable !== false) {
+          return publish({
+            phase: 'available',
+            version: updateInfo.version,
+            message: `发现新版本 ${updateInfo.version}`,
+          });
+        }
+        return publish({
+          phase: 'up-to-date',
+          version: updateInfo?.version || currentVersion,
+          message: '当前已是最新版本。',
+        });
+      })
+      .catch(error => publish({
+        phase: 'error',
+        version: state.version,
+        message: errorMessage(error),
+      }))
+      .finally(() => {
+        checkPromise = null;
+      });
+    return checkPromise;
+  }
+
+  async function download() {
+    if (!supported) return state;
+    if (downloadPromise) return downloadPromise;
+    if (state.phase !== 'available') return state;
+
+    publish({
+      phase: 'downloading',
+      version: state.version,
+      percent: 0,
+      message: '正在下载更新…',
+    });
+    downloadPromise = Promise.resolve()
+      .then(() => updater.downloadUpdate())
+      .then(() => {
+        if (state.phase === 'downloading') {
+          return publish({
+            phase: 'downloaded',
+            version: state.version,
+            percent: 100,
+            message: '更新已下载，重启应用即可完成安装。',
+          });
+        }
+        return state;
+      })
+      .catch(error => publish({
+        phase: 'error',
+        version: state.version,
+        message: errorMessage(error),
+      }))
+      .finally(() => {
+        downloadPromise = null;
+      });
+    return downloadPromise;
+  }
+
+  async function install() {
+    if (!supported || state.phase !== 'downloaded') return state;
+    publish({
+      phase: 'installing',
+      version: state.version,
+      percent: 100,
+      message: '正在重启并安装更新…',
+    });
+    try {
+      await prepareToInstall();
+      updater.quitAndInstall(false, true);
+    } catch (error) {
+      return publish({
+        phase: 'error',
+        version: state.version,
+        message: errorMessage(error),
+      });
+    }
+    return state;
+  }
+
+  function dispose() {
+    for (const [eventName, listener] of Object.entries(listeners)) {
+      updater.removeListener(eventName, listener);
+    }
+  }
+
+  return {
+    getState: () => state,
+    check,
+    download,
+    install,
+    dispose,
   };
 }
 
-module.exports = { createUpdateChecker };
+module.exports = { createUpdateManager, normalizeProgress };

@@ -12,6 +12,7 @@ import {
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { ReportDraft } from '@/domain/report/model';
+import { UpdateControls } from '@/features/app-update/update-controls';
 import type { WorkflowState } from '@/features/report-workflow/model';
 import type { ReportWorkflowServices } from '@/features/report-workflow/services';
 import { useReportWorkflow } from '@/features/report-workflow/use-report-workflow';
@@ -217,7 +218,7 @@ export function ReportEditor({ services }: ReportEditorProps) {
       )}
 
       <footer className="mt-8 text-center text-xs text-muted-foreground">
-        版本 {APP_VERSION}
+        <UpdateControls currentVersion={APP_VERSION} />
       </footer>
     </div>
   );

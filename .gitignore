@@ -25,6 +25,7 @@ __pycache__/
 # Testing
 coverage/
 artifacts/
+updater-runtime/
 test-results/
 *.lcov
 .nyc_output

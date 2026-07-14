@@ -12,6 +12,7 @@ const eslintConfig = defineConfig([
     'build/**',
     'dist/**',
     'release/**',
+    'updater-runtime/**',
     'worker-bin/**',
     '.pyinstaller/**',
     '.superpowers/**',

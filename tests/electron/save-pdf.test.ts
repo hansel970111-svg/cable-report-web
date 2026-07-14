@@ -515,14 +515,18 @@ describe('registerSavePdfHandler', () => {
   });
 });
 
-test('preload exposes fixed token and save invokes without exposing ipcRenderer', async () => {
+test('preload exposes fixed save and update bridges without exposing ipcRenderer', async () => {
   const source = await readFile('electron/preload.cjs', 'utf8');
 
   expect(source).toContain("ipcRenderer.invoke('cable-report:get-session-token')");
   expect(source).toContain("ipcRenderer.invoke('cable-report:save-pdf', request)");
+  expect(source).toContain("ipcRenderer.invoke('cable-report:check-for-updates')");
+  expect(source).toContain("ipcRenderer.invoke('cable-report:download-update')");
+  expect(source).toContain("ipcRenderer.invoke('cable-report:install-update')");
+  expect(source).toContain('ipcRenderer.on(UPDATE_STATE_CHANNEL, listener)');
+  expect(source).toContain('ipcRenderer.removeListener(UPDATE_STATE_CHANNEL, listener)');
   expect(source).not.toMatch(/\bipcRenderer\s*:/);
   expect(source).not.toContain('ipcRenderer.send(');
-  expect(source).not.toContain('ipcRenderer.on(');
 });
 
 test('Electron type bridge imports the canonical save contract without redeclaring it', async () => {

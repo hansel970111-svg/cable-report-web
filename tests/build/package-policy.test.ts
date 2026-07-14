@@ -68,6 +68,7 @@ test('Electron Builder uses the exact minimal ASAR graph', () => {
   expect(packageJson.build.asar).toBe(true);
   expect(packageJson.build.files).toEqual([
     'electron/**/*',
+    'updater-runtime/**/*',
     'scripts/versioning.mjs',
     'next-build/standalone/**/*',
     'package.json',

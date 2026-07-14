@@ -14,6 +14,7 @@ const consumerFiles = [
   'electron/main.cjs',
   'next.config.mjs',
   'scripts/versioning.mjs',
+  'src/features/app-update/update-controls.tsx',
   'src/features/report-editor/report-editor.tsx',
   'src/lib/app-version.ts',
 ];

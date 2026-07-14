@@ -95,10 +95,14 @@ test('Electron window source retains the mandatory isolation controls', async ()
   expect(source).not.toContain('shell.openExternal(targetUrl)');
   expect(source.match(/shell\.openExternal\(/g)).toHaveLength(1);
   expect(source).not.toContain('getPreferredAsset');
-  expect(source).not.toMatch(/autoUpdater|downloadUpdate|quitAndInstall|installUpdate|execFile|spawn\(/);
-  expect(source).toContain(
-    "if (app.isPackaged && process.env.CABLE_DESKTOP_E2E !== '1')",
-  );
+  expect(source).toContain('updater: electronUpdater.autoUpdater');
+  expect(source).toContain("'cable-report:check-for-updates'");
+  expect(source).toContain("'cable-report:download-update'");
+  expect(source).toContain("'cable-report:install-update'");
+  expect(source).not.toMatch(/execFile|spawn\(/);
+  expect(source).not.toContain('browser_download_url');
+  expect(source).toContain("process.platform === 'win32'");
+  expect(source).toContain("process.env.CABLE_DESKTOP_E2E !== '1'");
   expect(source).toContain('[CABLE_FATAL_UNHANDLED_REJECTION]');
   expect(source).toContain('[CABLE_FATAL_UNCAUGHT_EXCEPTION]');
   expect(source).toContain("Symbol.for('cable-report.pdf-job-shutdown')");
@@ -111,10 +115,16 @@ test('Electron window source retains the mandatory isolation controls', async ()
   expect(originAssignment).toBeLessThan(standaloneInitialization);
 });
 
-test('preload exposes only the fixed desktop-token bridge', async () => {
+test('preload exposes only fixed desktop-token, save, and updater bridges', async () => {
   const source = await readFile('electron/preload.cjs', 'utf8');
   expect(source).toContain("contextBridge.exposeInMainWorld(");
   expect(source).toContain("ipcRenderer.invoke('cable-report:get-session-token')");
+  expect(source).toContain("ipcRenderer.invoke('cable-report:save-pdf', request)");
+  expect(source).toContain("ipcRenderer.invoke('cable-report:check-for-updates')");
+  expect(source).toContain("ipcRenderer.invoke('cable-report:download-update')");
+  expect(source).toContain("ipcRenderer.invoke('cable-report:install-update')");
   expect(source).not.toContain('ipcRenderer.send(');
-  expect(source).not.toContain('ipcRenderer.on(');
+  expect(source).toContain('ipcRenderer.on(UPDATE_STATE_CHANNEL, listener)');
+  expect(source).toContain('ipcRenderer.removeListener(UPDATE_STATE_CHANNEL, listener)');
+  expect(source.match(/ipcRenderer\.on\(/g)).toHaveLength(1);
 });

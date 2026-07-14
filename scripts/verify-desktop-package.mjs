@@ -61,6 +61,35 @@ function requireFile(filePath, description) {
   return false;
 }
 
+function requireUpdaterProviderConfig(resourcesRoot) {
+  const configPath = path.join(resourcesRoot, 'app-update.yml');
+  if (!requireFile(configPath, 'updater provider configuration')) return;
+
+  let configText = '';
+  try {
+    configText = fs.readFileSync(configPath, 'utf8');
+  } catch (error) {
+    fail(
+      `Unable to read updater provider configuration ${configPath}: ` +
+      `${error instanceof Error ? error.message : error}`,
+    );
+    return;
+  }
+
+  const requiredFields = [
+    ['provider', 'github'],
+    ['owner', 'hansel970111-svg'],
+    ['repo', 'cable-report-web'],
+    ['releaseType', 'release'],
+  ];
+  for (const [field, expected] of requiredFields) {
+    const fieldPattern = new RegExp(`^${field}:\\s*["']?${expected}["']?\\s*$`, 'm');
+    if (!fieldPattern.test(configText)) {
+      fail(`Updater provider configuration must contain ${field}: ${expected}.`);
+    }
+  }
+}
+
 function requireExactDirectory(dirPath, expectedNames, description) {
   let actualNames;
   try {
@@ -105,6 +134,7 @@ const resourcesDir = platform === 'win'
 const appAsarPath = path.join(resourcesDir, 'app.asar');
 
 requireFile(appAsarPath, 'ASAR application archive');
+requireUpdaterProviderConfig(resourcesDir);
 
 let entries = [];
 let archiveLinks = [];
@@ -135,6 +165,8 @@ const requiredEntries = [
   'next.config.mjs',
   'electron/main.cjs',
   'electron/preload.cjs',
+  'electron/update-check.cjs',
+  'updater-runtime/index.cjs',
   'electron/standalone-runtime.cjs',
   'scripts/versioning.mjs',
   'next-build/standalone/server.js',

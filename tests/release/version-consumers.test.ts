@@ -115,6 +115,7 @@ async function writeConsumerFixture(version = '2026.713.2') {
     'electron/main.cjs',
     'next.config.mjs',
     'scripts/versioning.mjs',
+    'src/features/app-update/update-controls.tsx',
     'src/features/report-editor/report-editor.tsx',
     'src/lib/app-version.ts',
   ];
@@ -186,6 +187,10 @@ describe('single-source application version consumers', () => {
       join(projectRoot, 'src/features/report-editor/report-editor.tsx'),
       'utf8',
     );
+    const updateControlsSource = await readFile(
+      join(projectRoot, 'src/features/app-update/update-controls.tsx'),
+      'utf8',
+    );
 
     expect(nextConfig.env?.CABLE_REPORT_APP_VERSION).toBe(packageJson.version);
     expect(appVersionSource).toMatch(
@@ -193,7 +198,10 @@ describe('single-source application version consumers', () => {
     );
     expect(appVersionSource).not.toMatch(/export\s+let|function\s+setAppVersion/u);
     expect(editorSource).toMatch(/import\s*\{\s*APP_VERSION\s*\}.*@\/lib\/app-version/u);
-    expect(editorSource).toMatch(/<footer[^>]*>[\s\S]*\u7248\u672c\s*\{APP_VERSION\}[\s\S]*<\/footer>/u);
+    expect(editorSource).toMatch(
+      /<footer[^>]*>[\s\S]*<UpdateControls\s+currentVersion=\{APP_VERSION\}\s*\/>[\s\S]*<\/footer>/u,
+    );
+    expect(updateControlsSource).toMatch(/\u7248\u672c\s*\{currentVersion\}/u);
     expect(editorSource).not.toMatch(/fetch\([^)]*version|ipc[^\n]*version/u);
   });
 
@@ -270,6 +278,7 @@ describe('single-source application version consumers', () => {
       'electron-builder.config.mjs',
       'electron/main.cjs',
       'next.config.mjs',
+      'src/features/app-update/update-controls.tsx',
       'src/features/report-editor/report-editor.tsx',
       'src/lib/app-version.ts',
     ];

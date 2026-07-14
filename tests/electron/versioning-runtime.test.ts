@@ -1,3 +1,4 @@
+import { EventEmitter } from 'node:events';
 import { createRequire } from 'node:module';
 
 import { describe, expect, test, vi } from 'vitest';
@@ -13,33 +14,49 @@ type VersioningLoaderModule = {
   loadVersioningModule(): Promise<VersioningModule>;
 };
 
-type Release = {
-  tag_name?: string;
-  name?: string;
+type UpdateState = {
+  phase: string;
+  currentVersion: string;
+  version?: string;
+  percent?: number;
+  message?: string;
 };
 
-type UpdateCheckCallbacks = {
-  loadVersioningModule(): Promise<VersioningModule>;
-  fetchLatestRelease(): Promise<Release>;
-  getCurrentVersion(): string;
-  normalizeVersion(version: unknown): string;
-  onUpToDate?(details: {
-    currentVersion: string;
-    latestTag: string;
-  }): Promise<void> | void;
-  onUpdateAvailable?(details: {
-    currentVersion: string;
-    latestTag: string;
-    release: Release;
-  }): Promise<void> | void;
-  onManualError?(error: unknown): Promise<void> | void;
+type UpdateManager = {
+  getState(): UpdateState;
+  check(): Promise<UpdateState>;
+  download(): Promise<UpdateState>;
+  install(): Promise<UpdateState>;
+  dispose(): void;
 };
 
-type UpdateCheckModule = {
-  createUpdateChecker(
-    callbacks: UpdateCheckCallbacks,
-  ): (options?: { manual?: boolean }) => Promise<void>;
+type UpdateManagerModule = {
+  createUpdateManager(options: {
+    updater: FakeUpdater;
+    currentVersion: string;
+    supported: boolean;
+    emitState?(state: UpdateState): void;
+    prepareToInstall?(): Promise<void>;
+    logger?: Console;
+  }): UpdateManager;
+  normalizeProgress(value: unknown): number;
 };
+
+class FakeUpdater extends EventEmitter {
+  autoDownload = true;
+  autoInstallOnAppQuit = false;
+  autoRunAppAfterInstall = false;
+  allowPrerelease = true;
+  allowDowngrade = true;
+  disableWebInstaller = false;
+  logger: Console | null = null;
+  checkForUpdates = vi.fn(async () => ({
+    isUpdateAvailable: false,
+    updateInfo: { version: '2026.714.3' },
+  }));
+  downloadUpdate = vi.fn(async () => [] as string[]);
+  quitAndInstall = vi.fn();
+}
 
 const require = createRequire(import.meta.url);
 
@@ -48,9 +65,9 @@ const {
   loadVersioningModule,
 } = require('../../electron/versioning-loader.cjs') as VersioningLoaderModule;
 
-const { createUpdateChecker } = require(
+const { createUpdateManager, normalizeProgress } = require(
   '../../electron/update-check.cjs'
-) as UpdateCheckModule;
+) as UpdateManagerModule;
 
 describe('CalVer runtime loader', () => {
   test('concurrent calls share one import promise and module', async () => {
@@ -87,94 +104,135 @@ describe('CalVer runtime loader', () => {
   });
 });
 
-function normalizeVersion(version: unknown) {
-  return String(version || '').trim().replace(/^v/i, '');
-}
+describe('Electron update manager', () => {
+  test('keeps browser and unpackaged builds unsupported without network access', async () => {
+    const updater = new FakeUpdater();
+    const manager = createUpdateManager({
+      updater,
+      currentVersion: '2026.714.3',
+      supported: false,
+    });
 
-describe('Electron update check orchestration', () => {
-  test('the checking lock prevents concurrent module loads and network requests', async () => {
-    let finishLoad: ((module: VersioningModule) => void) | undefined;
-    const loadVersioningModule = vi.fn(() => new Promise<VersioningModule>(resolve => {
-      finishLoad = resolve;
+    await expect(manager.check()).resolves.toMatchObject({ phase: 'unsupported' });
+    await expect(manager.download()).resolves.toMatchObject({ phase: 'unsupported' });
+    expect(updater.checkForUpdates).not.toHaveBeenCalled();
+    expect(updater.downloadUpdate).not.toHaveBeenCalled();
+  });
+
+  test('reports an up-to-date result and prevents duplicate concurrent checks', async () => {
+    const updater = new FakeUpdater();
+    let finish: ((value: { isUpdateAvailable: boolean; updateInfo: { version: string } }) => void) | undefined;
+    updater.checkForUpdates.mockImplementation(() => new Promise(resolve => {
+      finish = resolve;
     }));
-    const fetchLatestRelease = vi.fn(async () => ({ tag_name: 'v2026.710.1' }));
-    const checkForUpdates = createUpdateChecker({
-      loadVersioningModule,
-      fetchLatestRelease,
-      getCurrentVersion: () => '0.1.1',
-      normalizeVersion,
+    const states: UpdateState[] = [];
+    const manager = createUpdateManager({
+      updater,
+      currentVersion: '2026.714.3',
+      supported: true,
+      emitState: state => states.push(state),
     });
 
-    const first = checkForUpdates();
-    const concurrent = checkForUpdates();
-    await concurrent;
+    const first = manager.check();
+    const second = manager.check();
+    await Promise.resolve();
+    expect(updater.checkForUpdates).toHaveBeenCalledOnce();
+    finish?.({ isUpdateAvailable: false, updateInfo: { version: '2026.714.3' } });
 
-    expect(loadVersioningModule).toHaveBeenCalledTimes(1);
-    expect(fetchLatestRelease).not.toHaveBeenCalled();
-
-    finishLoad?.({ compareAppVersions: () => 1 });
-    await first;
-
-    expect(fetchLatestRelease).toHaveBeenCalledTimes(1);
+    await expect(first).resolves.toMatchObject({ phase: 'up-to-date' });
+    await expect(second).resolves.toMatchObject({ phase: 'up-to-date' });
+    expect(states.map(state => state.phase)).toEqual(['checking', 'up-to-date']);
   });
 
-  test('automatic errors stay silent while manual errors invoke the UI callback', async () => {
-    const error = new Error('network unavailable');
-    const onManualError = vi.fn();
-    const checkForUpdates = createUpdateChecker({
-      loadVersioningModule: async () => ({ compareAppVersions: () => 1 }),
-      fetchLatestRelease: vi.fn(async () => { throw error; }),
-      getCurrentVersion: () => '0.1.1',
-      normalizeVersion,
-      onManualError,
+  test('downloads with progress and installs only after cleanup succeeds', async () => {
+    const updater = new FakeUpdater();
+    updater.checkForUpdates.mockImplementation(async () => {
+      updater.emit('update-available', { version: '2026.714.4' });
+      return { isUpdateAvailable: true, updateInfo: { version: '2026.714.4' } };
+    });
+    updater.downloadUpdate.mockImplementation(async () => {
+      updater.emit('download-progress', { percent: 47.6 });
+      updater.emit('update-downloaded', { version: '2026.714.4' });
+      return ['/tmp/update.exe'];
+    });
+    const prepareToInstall = vi.fn(async () => undefined);
+    const states: UpdateState[] = [];
+    const manager = createUpdateManager({
+      updater,
+      currentVersion: '2026.714.3',
+      supported: true,
+      emitState: state => states.push(state),
+      prepareToInstall,
     });
 
-    await checkForUpdates();
-    expect(onManualError).not.toHaveBeenCalled();
+    await expect(manager.check()).resolves.toMatchObject({
+      phase: 'available',
+      version: '2026.714.4',
+    });
+    await expect(manager.download()).resolves.toMatchObject({
+      phase: 'downloaded',
+      version: '2026.714.4',
+      percent: 100,
+    });
+    await expect(manager.check()).resolves.toMatchObject({ phase: 'downloaded' });
+    expect(updater.checkForUpdates).toHaveBeenCalledOnce();
+    await expect(manager.install()).resolves.toMatchObject({ phase: 'installing' });
 
-    await checkForUpdates({ manual: true });
-    expect(onManualError).toHaveBeenCalledOnce();
-    expect(onManualError).toHaveBeenCalledWith(error);
+    expect(updater.autoDownload).toBe(false);
+    expect(updater.allowPrerelease).toBe(false);
+    expect(updater.allowDowngrade).toBe(false);
+    expect(updater.disableWebInstaller).toBe(true);
+    expect(states).toContainEqual(expect.objectContaining({
+      phase: 'downloading',
+      percent: 48,
+    }));
+    expect(prepareToInstall).toHaveBeenCalledOnce();
+    expect(updater.quitAndInstall).toHaveBeenCalledWith(false, true);
   });
 
-  test('the pure comparator routes the current version to the manual up-to-date callback', async () => {
-    const onUpToDate = vi.fn();
-    const onUpdateAvailable = vi.fn();
-    const checkForUpdates = createUpdateChecker({
-      loadVersioningModule,
-      fetchLatestRelease: async () => ({ tag_name: 'v0.1.1' }),
-      getCurrentVersion: () => '0.1.1',
-      normalizeVersion,
-      onUpToDate,
-      onUpdateAvailable,
+  test('does not quit when pre-install cleanup fails', async () => {
+    const updater = new FakeUpdater();
+    updater.checkForUpdates.mockImplementation(async () => {
+      updater.emit('update-available', { version: '2026.714.4' });
+      return { isUpdateAvailable: true, updateInfo: { version: '2026.714.4' } };
+    });
+    updater.downloadUpdate.mockImplementation(async () => {
+      updater.emit('update-downloaded', { version: '2026.714.4' });
+      return ['/tmp/update.exe'];
+    });
+    const manager = createUpdateManager({
+      updater,
+      currentVersion: '2026.714.3',
+      supported: true,
+      prepareToInstall: async () => {
+        throw new Error('cleanup failed');
+      },
     });
 
-    await checkForUpdates({ manual: true });
-
-    expect(onUpToDate).toHaveBeenCalledWith({
-      currentVersion: '0.1.1',
-      latestTag: 'v0.1.1',
+    await manager.check();
+    await manager.download();
+    await expect(manager.install()).resolves.toMatchObject({
+      phase: 'error',
+      message: 'cleanup failed',
     });
-    expect(onUpdateAvailable).not.toHaveBeenCalled();
+    expect(updater.quitAndInstall).not.toHaveBeenCalled();
   });
 
-  test('the pure comparator routes 0.1.1 to an available CalVer update', async () => {
-    const release = { tag_name: 'v2026.710.1' };
-    const onUpdateAvailable = vi.fn();
-    const checkForUpdates = createUpdateChecker({
-      loadVersioningModule,
-      fetchLatestRelease: async () => release,
-      getCurrentVersion: () => '0.1.1',
-      normalizeVersion,
-      onUpdateAvailable,
+  test('normalizes progress and exposes updater errors for a safe retry', async () => {
+    const updater = new FakeUpdater();
+    updater.checkForUpdates.mockRejectedValue(new Error('network unavailable'));
+    const manager = createUpdateManager({
+      updater,
+      currentVersion: '2026.714.3',
+      supported: true,
     });
 
-    await checkForUpdates();
-
-    expect(onUpdateAvailable).toHaveBeenCalledWith({
-      currentVersion: '0.1.1',
-      latestTag: 'v2026.710.1',
-      release,
+    await expect(manager.check()).resolves.toMatchObject({
+      phase: 'error',
+      message: 'network unavailable',
     });
+    expect(normalizeProgress(-5)).toBe(0);
+    expect(normalizeProgress(41.7)).toBe(42);
+    expect(normalizeProgress(500)).toBe(100);
   });
 });

@@ -45,18 +45,17 @@ test('desktop development rejects an invalid Electron module export', () => {
   ).toThrow('Electron package did not expose an executable path');
 });
 
-test('Electron main wires the executed loader and update orchestration without a private comparator', async () => {
+test('Electron main wires electron-updater without a private comparator or downloader', async () => {
   const source = await readFile('electron/main.cjs', 'utf8');
 
-  expect(source).toContain("require('./versioning-loader.cjs')");
   expect(source).toContain("require('./update-check.cjs')");
-  expect(source).toContain('createUpdateChecker({');
-  expect(source).toContain('loadVersioningModule,');
-  expect(source).toContain(".replace(/^v/i, '')");
+  expect(source).toContain("require('../updater-runtime/index.cjs')");
+  expect(source).toContain('createUpdateManager({');
+  expect(source).toContain('updater: electronUpdater.autoUpdater');
   expect(source).not.toMatch(/function compareVersions\s*\(/);
   expect(source).not.toMatch(/\.split\('\.'\)\.map\(/);
-  expect(source).not.toContain("import('../scripts/versioning.mjs')");
-  expect(source).not.toContain('let checkingForUpdates = false');
+  expect(source).not.toMatch(/child_process|execFile|spawn\(/);
+  expect(source).not.toContain('browser_download_url');
 });
 
 test('desktop package inputs include only the runtime version module from scripts', async () => {
@@ -93,6 +92,7 @@ test('desktop package verification rejects a packaged tree without the runtime v
     }).stdout.trim();
     const directories = [
       join(appSourceDir, 'electron'),
+      join(appSourceDir, 'updater-runtime'),
       join(appSourceDir, 'next-build', 'standalone', 'node_modules', 'traced-runtime'),
       join(appSourceDir, 'next-build', 'standalone', 'next-build', 'server'),
       join(appSourceDir, 'next-build', 'standalone', 'next-build', 'static'),
@@ -106,7 +106,9 @@ test('desktop package verification rejects a packaged tree without the runtime v
       [join(appSourceDir, 'next.config.mjs'), 'export default {}'],
       [join(appSourceDir, 'electron', 'main.cjs'), ''],
       [join(appSourceDir, 'electron', 'preload.cjs'), ''],
+      [join(appSourceDir, 'electron', 'update-check.cjs'), ''],
       [join(appSourceDir, 'electron', 'standalone-runtime.cjs'), ''],
+      [join(appSourceDir, 'updater-runtime', 'index.cjs'), ''],
       [join(appSourceDir, 'next-build', 'standalone', 'server.js'), ''],
       [join(appSourceDir, 'next-build', 'standalone', 'package.json'), '{}'],
       [join(appSourceDir, 'next-build', 'standalone', '.cable-build-commit'), `${fixtureHead}\n`],
@@ -119,6 +121,13 @@ test('desktop package verification rejects a packaged tree without the runtime v
       [join(resourcesDir, 'assets', 'M138-DE46-OOB-Cat5e.pdf'), ''],
       [join(resourcesDir, 'assets', 'M138-DE46-D-P-cross-LC.pdf'), ''],
       [join(resourcesDir, 'assets', 'M138-DE46-P-A-MPO.pdf'), ''],
+      [join(resourcesDir, 'app-update.yml'), [
+        'provider: github',
+        'owner: hansel970111-svg',
+        'repo: cable-report-web',
+        'releaseType: release',
+        '',
+      ].join('\n')],
     ];
     await Promise.all(files.map(([filePath, contents]) => writeFile(filePath, contents)));
     await createPackage(appSourceDir, appAsarPath);

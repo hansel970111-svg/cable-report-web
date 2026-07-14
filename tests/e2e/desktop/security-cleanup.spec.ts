@@ -8,6 +8,8 @@ import { descendantProcesses, processExists } from './launch-packaged';
 const RELEASES_URL = 'https://github.com/hansel970111-svg/cable-report-web/releases/latest';
 
 test('packaged renderer API and external navigation stay inside the allowlist', async ({ desktop }) => {
+  await expect(desktop.window.getByRole('button', { name: '检测更新' })).toBeVisible();
+
   const unauthenticated = await desktop.window.evaluate(() => (
     fetch('/api/import-excel', { method: 'POST' }).then(response => response.status)
   ));
@@ -47,7 +49,7 @@ test('packaged renderer API and external navigation stay inside the allowlist', 
   })).toEqual([RELEASES_URL]);
 });
 
-test('packaged production modules contain no updater download install or execute path', async ({ desktop }) => {
+test('packaged production modules expose only the fixed verified updater path', async ({ desktop }) => {
   const sources = await desktop.app.evaluate(async ({ app }) => {
     // The callback is serialized into Electron's main process, so it cannot
     // close over this test module's imports.
@@ -59,9 +61,12 @@ test('packaged production modules contain no updater download install or execute
       .join('\n');
   });
 
-  expect(sources).not.toMatch(
-    /autoUpdater|downloadUpdate|quitAndInstall|installUpdate|child_process|execFile|spawn\(/,
-  );
+  expect(sources).toContain("require('electron-updater')");
+  expect(sources).toContain('updater.downloadUpdate()');
+  expect(sources).toContain('updater.quitAndInstall(false, true)');
+  expect(sources).toContain("'cable-report:download-update'");
+  expect(sources).toContain("'cable-report:install-update'");
+  expect(sources).not.toMatch(/child_process|execFile|spawn\(/);
   expect(sources).not.toContain('browser_download_url');
   expect(sources).toContain("'/hansel970111-svg/cable-report-web/releases/latest'");
 });

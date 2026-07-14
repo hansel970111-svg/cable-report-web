@@ -156,6 +156,8 @@ jobs:
           path: |
             release/*.dmg
             release/*.zip
+            release/latest-mac.yml
+            release/*.blockmap
           if-no-files-found: error
 
       - name: Upload Windows installer
@@ -163,7 +165,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Cable-Report-Generator-Windows
-          path: release/*.exe
+          path: |
+            release/*.exe
+            release/latest.yml
+            release/*.blockmap
           if-no-files-found: error
 
       - name: Upload macOS acceptance evidence

@@ -8,6 +8,7 @@ import packageJson from '../../package.json';
 test('approved dependency baseline is exact', async () => {
   expect(packageJson.dependencies).toMatchObject({
     '@tanstack/react-virtual': '3.14.5',
+    'electron-updater': '6.8.9',
     'lucide-react': '0.469.0',
     next: '16.2.10',
     react: '19.2.7',

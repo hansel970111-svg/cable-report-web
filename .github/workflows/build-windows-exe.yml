@@ -105,4 +105,6 @@ jobs:
           name: Cable-Report-Generator-Windows
           path: |
             release/*.exe
+            release/latest.yml
+            release/*.blockmap
           if-no-files-found: error
