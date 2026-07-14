@@ -1,0 +1,98 @@
+name: Publish Windows Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Annotated CalVer tag to publish (for example v2026.714.4)
+        required: true
+        type: string
+      run_id:
+        description: Successful tagged Desktop packaged E2E run ID
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish-windows-release:
+    name: Publish verified Windows updater assets
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RUN_ID: ${{ inputs.run_id }}
+      TAG: ${{ inputs.tag }}
+
+    steps:
+      - name: Validate dispatch inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$TAG" =~ ^v[0-9]{4}\.[0-9]{1,4}\.[0-9]{1,2}$ ]]
+          [[ "$RUN_ID" =~ ^[0-9]+$ ]]
+
+      - name: Checkout tagged source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Verify successful tagged acceptance run
+        shell: bash
+        run: |
+          set -euo pipefail
+          run_json="$(gh run view "$RUN_ID" --repo "$GITHUB_REPOSITORY" --json conclusion,headBranch,headSha,event)"
+          [[ "$(jq -r '.conclusion' <<<"$run_json")" == "success" ]]
+          [[ "$(jq -r '.event' <<<"$run_json")" == "push" ]]
+          [[ "$(jq -r '.headBranch' <<<"$run_json")" == "$TAG" ]]
+          [[ "$(jq -r '.headSha' <<<"$run_json")" == "$(git rev-parse HEAD)" ]]
+
+      - name: Download verified Windows updater assets
+        shell: bash
+        run: gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" --name Cable-Report-Generator-Windows --dir release
+
+      - name: Verify Windows-only release payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${TAG#v}"
+          installer="Cable-Report-Generator-${version}-win-x64.exe"
+          mapfile -t actual < <(find release -maxdepth 1 -type f -printf '%f\n' | sort)
+          expected=("$installer" "$installer.blockmap" "latest.yml")
+          mapfile -t expected < <(printf '%s\n' "${expected[@]}" | sort)
+          [[ "${#actual[@]}" -eq "${#expected[@]}" ]]
+          [[ "${actual[*]}" == "${expected[*]}" ]]
+          VERSION="$version" INSTALLER="$installer" node --input-type=module <<'NODE'
+          import { readFileSync, statSync } from 'node:fs';
+
+          const metadata = readFileSync('release/latest.yml', 'utf8');
+          const size = statSync(`release/${process.env.INSTALLER}`).size;
+          const required = [
+            `version: ${process.env.VERSION}`,
+            `path: ${process.env.INSTALLER}`,
+            `url: ${process.env.INSTALLER}`,
+            `size: ${size}`,
+            'sha512:',
+          ];
+          for (const value of required) {
+            if (!metadata.includes(value)) throw new Error(`latest.yml is missing: ${value}`);
+          }
+          NODE
+
+      - name: Publish latest Windows release
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $TAG already exists; refusing to replace it."
+            exit 1
+          fi
+          gh release create "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --latest \
+            --title "$TAG" \
+            --generate-notes \
+            release/*
