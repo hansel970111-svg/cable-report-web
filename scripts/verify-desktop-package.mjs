@@ -1,186 +1,227 @@
+import { extractFile, getRawHeader, listPackage } from '@electron/asar';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 
 const workspace = process.env.COZE_WORKSPACE_PATH || process.cwd();
 const platform = process.argv[2] || (process.platform === 'win32' ? 'win' : 'mac');
-const productName = 'Cable Report Generator';
+const templateNames = [
+  'M138-DE46-D-P-cross-LC.pdf',
+  'M138-DE46-OOB-Cat5e.pdf',
+  'M138-DE46-P-A-MPO.pdf',
+];
+let failed = false;
 
 function fail(message) {
+  failed = true;
   console.error(`[verify-desktop-package] ${message}`);
-  process.exitCode = 1;
 }
 
-function requirePath(filePath, description) {
-  if (!fs.existsSync(filePath)) {
-    fail(`Missing ${description}: ${filePath}`);
-    return false;
+function findMacAppDirs(workspaceRoot) {
+  const releaseDir = path.join(workspaceRoot, 'release');
+  if (!fs.existsSync(releaseDir)) return [];
+
+  const candidates = [];
+  for (const releaseEntry of fs.readdirSync(releaseDir, { withFileTypes: true })) {
+    if (!releaseEntry.isDirectory() || !/^mac(?:-|$)/.test(releaseEntry.name)) continue;
+    const unpackedDir = path.join(releaseDir, releaseEntry.name);
+    for (const appName of fs.readdirSync(unpackedDir).sort()) {
+      if (!appName.endsWith('.app')) continue;
+      const appDir = path.join(unpackedDir, appName);
+      try {
+        if (fs.statSync(appDir).isDirectory()) candidates.push(appDir);
+      } catch {
+        // A disappearing candidate is not an actual package.
+      }
+    }
   }
-  return true;
+  return candidates.sort();
 }
 
-function requireDir(dirPath, description) {
-  if (!requirePath(dirPath, description)) return false;
-  if (!fs.statSync(dirPath).isDirectory()) {
-    fail(`${description} is not a directory: ${dirPath}`);
-    return false;
-  }
-  return true;
+function requireSingleMacAppDir(workspaceRoot) {
+  const candidates = findMacAppDirs(workspaceRoot);
+  if (candidates.length === 1) return candidates[0];
+
+  console.error(
+    `[verify-desktop-package] Expected exactly one macOS .app candidate; ` +
+    `found ${candidates.length}.`,
+  );
+  for (const candidate of candidates) console.error(`[verify-desktop-package] - ${candidate}`);
+  process.exit(1);
 }
 
 function requireFile(filePath, description) {
-  if (!requirePath(filePath, description)) return false;
-  if (!fs.statSync(filePath).isFile()) {
-    fail(`${description} is not a file: ${filePath}`);
-    return false;
+  try {
+    if (fs.statSync(filePath).isFile()) return true;
+  } catch {
+    // Report the fixed failure below.
   }
-  return true;
-}
-
-function requireAnyFile(filePaths, description) {
-  if (filePaths.some(filePath => fs.existsSync(filePath) && fs.statSync(filePath).isFile())) {
-    return true;
-  }
-
-  fail(`Missing ${description}. Checked: ${filePaths.join(', ')}`);
+  fail(`Missing ${description}: ${filePath}`);
   return false;
 }
 
-function firstExistingDir(paths) {
-  return paths.find(dirPath => fs.existsSync(dirPath) && fs.statSync(dirPath).isDirectory()) || paths[0];
+function requireExactDirectory(dirPath, expectedNames, description) {
+  let actualNames;
+  try {
+    if (!fs.statSync(dirPath).isDirectory()) throw new Error('not a directory');
+    actualNames = fs.readdirSync(dirPath).sort();
+  } catch {
+    fail(`Missing ${description}: ${dirPath}`);
+    return;
+  }
+
+  const expected = [...expectedNames].sort();
+  if (JSON.stringify(actualNames) !== JSON.stringify(expected)) {
+    fail(
+      `${description} must contain exactly ${expected.join(', ')}; ` +
+      `found ${actualNames.join(', ') || '(empty)'}.`,
+    );
+    return;
+  }
+
+  for (const name of expected) {
+    requireFile(path.join(dirPath, name), `${description} file ${name}`);
+  }
 }
 
-function findMacAppDir(unpackedDir) {
-  const preferred = path.join(unpackedDir, `${productName}.app`);
-  if (fs.existsSync(preferred) && fs.statSync(preferred).isDirectory()) return preferred;
-
-  if (!fs.existsSync(unpackedDir)) return preferred;
-  const appName = fs.readdirSync(unpackedDir).find(name => name.endsWith('.app'));
-  return appName ? path.join(unpackedDir, appName) : preferred;
+function collectArchiveLinks(node, prefix = '') {
+  const links = [];
+  for (const [name, entry] of Object.entries(node?.files || {})) {
+    const entryPath = prefix ? `${prefix}/${name}` : name;
+    if (typeof entry.link === 'string') {
+      links.push({ entryPath, target: entry.link });
+    }
+    if (entry.files) links.push(...collectArchiveLinks(entry, entryPath));
+  }
+  return links;
 }
 
-const unpackedDir = platform === 'win'
-  ? path.join(workspace, 'release', 'win-unpacked')
-  : firstExistingDir([
-      path.join(workspace, 'release', 'mac'),
-      path.join(workspace, 'release', 'mac-arm64'),
-      path.join(workspace, 'release', 'mac-x64'),
-      path.join(workspace, 'release', 'mac-universal'),
-    ]);
-
-const macAppDir = platform === 'win' ? null : findMacAppDir(unpackedDir);
+const unpackedDir = path.join(workspace, 'release', 'win-unpacked');
+const macAppDir = platform === 'win' ? null : requireSingleMacAppDir(workspace);
 const resourcesDir = platform === 'win'
   ? path.join(unpackedDir, 'resources')
   : path.join(macAppDir, 'Contents', 'Resources');
-const appDir = path.join(resourcesDir, 'app');
-const nextBuildDir = path.join(appDir, 'next-build');
-const standaloneDir = path.join(nextBuildDir, 'standalone');
-const standaloneNextBuildDir = path.join(standaloneDir, 'next-build');
-const appWorkerDir = path.join(appDir, 'worker-bin');
-const legacyAppWorkerDir = path.join(appDir, 'resources', 'bin');
-const externalWorkerDir = path.join(resourcesDir, 'bin');
-const workerExt = platform === 'win' ? '.exe' : '';
+const appAsarPath = path.join(resourcesDir, 'app.asar');
 
-requireDir(unpackedDir, 'unpacked desktop app directory');
-requireDir(resourcesDir, 'desktop resources directory');
-requireDir(appDir, 'packaged app directory');
-requireDir(nextBuildDir, 'Next.js production build directory');
+requireFile(appAsarPath, 'ASAR application archive');
 
-const hasStandaloneRuntime = fs.existsSync(path.join(standaloneDir, 'server.js'));
-const requiredFiles = hasStandaloneRuntime
-  ? [
-      [path.join(appDir, 'package.json'), 'packaged package.json'],
-      [path.join(appDir, 'next.config.mjs'), 'Next config'],
-      [path.join(appDir, 'electron', 'main.cjs'), 'Electron main process'],
-      [path.join(standaloneDir, 'server.js'), 'Next standalone server'],
-      [path.join(standaloneDir, 'package.json'), 'Next standalone package metadata'],
-      [path.join(standaloneDir, 'node_modules'), 'Next standalone node modules'],
-      [path.join(standaloneNextBuildDir, 'BUILD_ID'), 'Next standalone build id'],
-      [path.join(standaloneNextBuildDir, 'routes-manifest.json'), 'Next standalone routes manifest'],
-      [path.join(standaloneNextBuildDir, 'server'), 'Next standalone server output'],
-      [path.join(standaloneNextBuildDir, 'static'), 'Next standalone static output'],
-    ]
-  : [
-      [path.join(appDir, 'package.json'), 'packaged package.json'],
-      [path.join(appDir, 'next.config.mjs'), 'Next config'],
-      [path.join(appDir, 'electron', 'main.cjs'), 'Electron main process'],
-      [path.join(nextBuildDir, 'BUILD_ID'), 'Next build id'],
-      [path.join(nextBuildDir, 'routes-manifest.json'), 'Next routes manifest'],
-      [path.join(nextBuildDir, 'server'), 'Next server output'],
-      [path.join(nextBuildDir, 'static'), 'Next static output'],
-    ];
+let entries = [];
+let archiveLinks = [];
+if (fs.existsSync(appAsarPath)) {
+  try {
+    entries = listPackage(appAsarPath).map(entry => (
+      entry.replaceAll('\\', '/').replace(/^\/+/, '').replace(/\/$/, '')
+    ));
+    const { header } = await getRawHeader(appAsarPath);
+    archiveLinks = collectArchiveLinks(header);
+  } catch (error) {
+    fail(`Unable to inspect ASAR archive ${appAsarPath}: ${error instanceof Error ? error.message : error}`);
+  }
+}
+const entrySet = new Set(entries);
 
-for (const [filePath, description] of requiredFiles) {
-  const stat = fs.existsSync(filePath) ? fs.statSync(filePath) : null;
-  if (stat?.isDirectory()) {
-    requireDir(filePath, description);
-  } else {
-    requireFile(filePath, description);
+for (const { entryPath, target } of archiveLinks) {
+  if (
+    entryPath === 'next-build/standalone/node_modules' ||
+    entryPath.startsWith('next-build/standalone/node_modules/')
+  ) {
+    fail(`ASAR standalone dependency tree contains symlink: ${entryPath} -> ${target}`);
   }
 }
 
-const sharedWorkerFiles = [
-  path.join(appWorkerDir, `pdf_worker${workerExt}`),
-  path.join(legacyAppWorkerDir, `pdf_worker${workerExt}`),
-  path.join(externalWorkerDir, `pdf_worker${workerExt}`),
+const requiredEntries = [
+  'package.json',
+  'next.config.mjs',
+  'electron/main.cjs',
+  'electron/preload.cjs',
+  'electron/standalone-runtime.cjs',
+  'scripts/versioning.mjs',
+  'next-build/standalone/server.js',
+  'next-build/standalone/package.json',
+  'next-build/standalone/next-build/BUILD_ID',
+  'next-build/standalone/next-build/routes-manifest.json',
+  'next-build/standalone/.cable-build-commit',
 ];
-
-if (!sharedWorkerFiles.some(filePath => fs.existsSync(filePath) && fs.statSync(filePath).isFile())) {
-  const workerFiles = [
-    [`pdf_editor${workerExt}`, 'PDF editor worker'],
-    [`pdf_processor${workerExt}`, 'PDF processor worker'],
-  ];
-
-  for (const [fileName, description] of workerFiles) {
-    requireAnyFile([
-      path.join(appWorkerDir, fileName),
-      path.join(legacyAppWorkerDir, fileName),
-      path.join(externalWorkerDir, fileName),
-    ], description);
+for (const requiredEntry of requiredEntries) {
+  if (!entrySet.has(requiredEntry)) {
+    fail(`ASAR archive is missing required entry: ${requiredEntry}`);
   }
 }
 
-const templateFiles = [
-  ['assets/M138-DE46-OOB-Cat5e.pdf', 'Cat 5e template PDF'],
-  ['assets/M138-DE46-D-P-cross-LC.pdf', 'LC template PDF'],
-  ['assets/M138-DE46-P-A-MPO.pdf', 'MPO template PDF'],
+const requiredTrees = [
+  'next-build/standalone/node_modules',
+  'next-build/standalone/next-build/server',
+  'next-build/standalone/next-build/static',
 ];
-
-for (const [relativePath, description] of templateFiles) {
-  requireAnyFile([
-    path.join(appDir, relativePath),
-    path.join(resourcesDir, relativePath),
-  ], description);
-}
-
-const staleTsConfig = path.join(appDir, 'next.config.ts');
-if (fs.existsSync(staleTsConfig)) {
-  fail(`Packaged app still contains next.config.ts, which can trigger runtime npm lookup: ${staleTsConfig}`);
-}
-
-const forbiddenPaths = [
-  [path.join(nextBuildDir, 'cache'), 'Next.js build cache'],
-  [path.join(nextBuildDir, 'diagnostics'), 'Next.js diagnostics output'],
-  [path.join(nextBuildDir, 'types'), 'Next.js type output'],
-  [path.join(appDir, 'public', 'test_lc_fixed.pdf'), 'debug public PDF'],
-  [path.join(appDir, 'assets', 'test_lc_final.pdf'), 'debug LC PDF'],
-  [path.join(appDir, 'assets', 'FRWE366-N101_MPO.pdf'), 'generated MPO PDF'],
-  [path.join(resourcesDir, 'assets', 'test_lc_final.pdf'), 'debug LC PDF'],
-  [path.join(resourcesDir, 'assets', 'FRWE366-N101_MPO.pdf'), 'generated MPO PDF'],
-  [path.join(appDir, 'node_modules'), 'full root node_modules tree'],
-  [path.join(appDir, 'node_modules', 'electron'), 'Electron npm package'],
-  [path.join(appDir, 'node_modules', 'electron-builder'), 'Electron Builder package'],
-  [path.join(appDir, 'node_modules', 'app-builder-bin'), 'Electron Builder binary package'],
-];
-
-for (const [filePath, description] of forbiddenPaths) {
-  if (fs.existsSync(filePath)) {
-    fail(`Packaged app contains unused ${description}: ${filePath}`);
+for (const requiredTree of requiredTrees) {
+  if (!entries.some(entry => entry === requiredTree || entry.startsWith(`${requiredTree}/`))) {
+    fail(`ASAR archive is missing required tree: ${requiredTree}`);
   }
 }
 
-if (process.exitCode) {
-  process.exit(process.exitCode);
+if (fs.existsSync(appAsarPath) && entrySet.has('next-build/standalone/.cable-build-commit')) {
+  const git = spawnSync('git', ['rev-parse', 'HEAD'], {
+    cwd: workspace,
+    encoding: 'utf8',
+    shell: false,
+  });
+  const head = git.stdout?.trim();
+  let packagedHead = '';
+  try {
+    const buildCommitArchivePath = 'next-build/standalone/.cable-build-commit'
+      .split('/')
+      .join(path.sep);
+    packagedHead = extractFile(appAsarPath, buildCommitArchivePath)
+      .toString('utf8')
+      .trim();
+  } catch (error) {
+    fail(`Unable to read packaged build commit: ${error instanceof Error ? error.message : error}`);
+  }
+  if (git.error || git.status !== 0 || !/^[0-9a-f]{40}$/i.test(head || '')) {
+    fail(`Unable to resolve current Git HEAD: ${git.stderr || git.error || head}`);
+  } else if (packagedHead !== head) {
+    fail(`Packaged build commit ${packagedHead || '(empty)'} does not match current HEAD ${head}`);
+  }
 }
 
-console.log(`[verify-desktop-package] ${platform} package structure looks good.`);
+function forbiddenReason(entry) {
+  const segments = entry.split('/');
+  const basename = segments.at(-1) || '';
+  if (entry === 'node_modules' || entry.startsWith('node_modules/')) {
+    return 'root node_modules';
+  }
+  if (segments.includes('cache')) return 'cache output';
+  if (segments.includes('diagnostics')) return 'diagnostics output';
+  if (segments.includes('.pyinstaller')) return '.pyinstaller output';
+  if (segments.includes('tests') || segments.includes('__tests__')) return 'test source';
+  if (/^(?:test_|debug[-_])[^/]*\.pdf$/i.test(basename)) return 'debug PDF';
+  if (basename === 'FRWE366-N101_MPO.pdf') return 'generated debug PDF';
+  if (/^pdf_worker(?:\.exe)?$/i.test(basename)) return 'embedded PDF worker';
+  if (templateNames.includes(basename)) return 'embedded template PDF';
+  return null;
+}
+
+for (const entry of entries) {
+  const reason = forbiddenReason(entry);
+  if (reason) fail(`ASAR archive contains forbidden ${reason}: ${entry}`);
+}
+
+for (const legacyPath of [
+  path.join(resourcesDir, 'app'),
+  path.join(resourcesDir, 'app.asar.unpacked'),
+]) {
+  if (fs.existsSync(legacyPath)) {
+    fail(`Packaged resources contain a forbidden copied/unpacked app tree: ${legacyPath}`);
+  }
+}
+
+const workerName = platform === 'win' ? 'pdf_worker.exe' : 'pdf_worker';
+requireExactDirectory(path.join(resourcesDir, 'bin'), [workerName], 'external worker directory');
+requireExactDirectory(path.join(resourcesDir, 'assets'), templateNames, 'external template directory');
+
+if (failed) process.exit(1);
+console.log(
+  `[verify-desktop-package] ${platform} package structure looks good ` +
+  `(${entries.length} ASAR entries, one worker, three templates).`,
+);

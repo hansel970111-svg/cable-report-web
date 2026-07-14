@@ -1,3 +1,6 @@
+import { mathRandomSource } from '@/domain/report/random-source';
+import { generateWorkingTimes } from '@/domain/report/time-sequence';
+
 /**
  * 时间范围限制配置
  * 上午: 9:00 - 12:00
@@ -144,4 +147,13 @@ export function getDefaultStartingDateTime(): string {
   const randomSecond = Math.floor(Math.random() * 60); // 0-59
   
   return `${dayStr}-${monthStr}-${year} 09:${randomMinute.toString().padStart(2, '0')}:${randomSecond.toString().padStart(2, '0')} AM`;
+}
+
+export function generateIncreasingTimes(startTime: string, count: number): string[] {
+  return generateWorkingTimes(startTime, count, mathRandomSource);
+}
+
+/** @deprecated 使用 generateIncreasingTimes 替代 */
+export function generateDecreasingTimes(startTime: string, count: number): string[] {
+  return generateWorkingTimes(startTime, count, mathRandomSource);
 }

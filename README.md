@@ -338,13 +338,13 @@ export const useStore = create<Store>((set) => ({
 
 ## 技术栈
 
-- **框架**: Next.js 16.1.1 (App Router)
+- **框架**: Next.js 16.2.10 (App Router)
 - **UI 组件**: shadcn/ui (基于 Radix UI)
 - **样式**: Tailwind CSS v4
 - **表单**: React Hook Form + Zod
 - **图标**: Lucide React
 - **字体**: Geist Sans & Geist Mono
-- **包管理器**: pnpm 9+
+- **包管理器**: pnpm 9.15.9
 - **TypeScript**: 5.x
 
 ## 参考文档
@@ -361,3 +361,39 @@ export const useStore = create<Store>((set) => ({
 3. **遵循 Next.js App Router 规范**，正确区分服务端/客户端组件
 4. **使用 TypeScript** 进行类型安全开发
 5. **使用 `@/` 路径别名** 导入模块（已配置）
+
+## 发布验证
+
+发布环境固定为 Node.js 24.14.0、pnpm 9.15.9 和 Python 3.12.13。从干净检出开始执行：
+
+```bash
+corepack pnpm@9.15.9 install --frozen-lockfile
+python -m pip install --require-hashes --only-binary=:all: -r requirements-dev.lock
+corepack pnpm@9.15.9 exec playwright install chromium
+mkdir -p artifacts/acceptance
+node scripts/verify-dependency-policy.mjs
+python scripts/verify_python_locks.py
+corepack pnpm@9.15.9 lint
+corepack pnpm@9.15.9 ts-check
+node scripts/verify-runtime-surface.mjs
+node scripts/run-evidence-command.mjs --name unit --platform mac --artifact artifacts/acceptance/unit.json -- pnpm exec vitest run --reporter=json --outputFile=artifacts/acceptance/unit.json
+node scripts/run-evidence-command.mjs --name python --platform mac --artifact artifacts/acceptance/python.xml -- python -m pytest -q --junitxml=artifacts/acceptance/python.xml
+PLAYWRIGHT_JSON_OUTPUT_FILE=artifacts/acceptance/browser.json PLAYWRIGHT_PORT=51237 node scripts/run-evidence-command.mjs --name browser --platform mac --artifact artifacts/acceptance/browser.json -- pnpm exec playwright test --project=chromium --workers=1 --reporter=json
+node scripts/run-evidence-command.mjs --name audit --platform mac --capture artifacts/acceptance/audit-mac.json -- pnpm audit --prod --audit-level high --registry=https://registry.npmjs.org --json
+CSC_IDENTITY_AUTO_DISCOVERY=false PYTHON_CMD=python node scripts/run-evidence-command.mjs --name package --platform mac -- pnpm desktop:dist:mac
+node scripts/verify-desktop-package.mjs mac
+node scripts/check-package-size.mjs mac
+PYTHON_CMD=python node scripts/run-evidence-command.mjs --name desktop --platform mac --artifact artifacts/acceptance/desktop-mac.json -- pnpm test:e2e:mac
+node scripts/write-acceptance-evidence.mjs mac
+PYTHON_CMD=python corepack pnpm@9.15.9 verify:acceptance -- --platform mac
+```
+
+`verify:acceptance` 只可在同一提交已经通过 evidence runner、生成全部机器报告并执行
+`write-acceptance-evidence.mjs` 后运行；它会拒绝旧提交或摘要不符的报告和安装包。Windows
+必须按 [WINDOWS.md](WINDOWS.md) 的同等证据流程在 Windows 主机运行，不能用 macOS 交叉构建代替。
+
+输入上限为 25 MiB Excel、10,000 条记录，Vertical Cabling 单行 QTY 最多 5,000。
+PDF worker 最长运行 10 分钟，输出 PDF 最多 256 MiB。桌面版必须通过原生 Save As
+选择路径，不会再向 Downloads 生成副本。
+
+`pnpm start:browser` 使用显式 `--browser-dev` 回退，只允许本机开发和测试；禁止用于生产或发布验收。

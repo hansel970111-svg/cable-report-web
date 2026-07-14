@@ -2,6 +2,7 @@
 
 # Dependencies
 node_modules/
+/.pnpm/
 .pnp
 .pnp.js
 
@@ -23,6 +24,8 @@ __pycache__/
 
 # Testing
 coverage/
+artifacts/
+test-results/
 *.lcov
 .nyc_output
 
@@ -96,6 +99,7 @@ Desktop.ini
 test_*.pdf
 test_*.png
 test_*.py
+!tests/python/test_*.py
 extracted_img_*.png
 public/*.png
 public/*.pdf
@@ -113,6 +117,8 @@ assets/FRWE366-N101_MPO.pdf
 *.gz
 *.zip
 *.tar
+!vendor/
+!vendor/xlsx-0.20.3.tgz
 
 # TypeScript
 *.tsbuildinfo
@@ -122,3 +128,5 @@ assets/FRWE366-N101_MPO.pdf
 .turbo
 
 .coze-logs
+.worktrees/
+.superpowers/

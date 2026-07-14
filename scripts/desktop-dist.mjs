@@ -19,13 +19,16 @@ function run(command, args) {
     windowsHide: false,
   });
 
-  if (result.error) {
-    console.error(result.error);
+  if (result.error || result.signal || result.status === null) {
+    console.error(
+      result.error ||
+      `Command terminated without an exit status${result.signal ? ` (${result.signal})` : ''}.`
+    );
     process.exit(1);
   }
 
   if (result.status !== 0) {
-    process.exit(result.status ?? 1);
+    process.exit(result.status);
   }
 }
 
@@ -55,6 +58,8 @@ if (requestedTarget === 'mac' && process.platform !== 'darwin') {
 
 runNodeScript('build.mjs');
 runNodeScript('build-python-workers.mjs');
+
+fs.rmSync(path.join(workspace, 'release'), { recursive: true, force: true });
 
 const builder = electronBuilderBin();
 const targetArg = requestedTarget === 'mac'

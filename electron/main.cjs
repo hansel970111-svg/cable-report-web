@@ -1,9 +1,37 @@
-const { app, BrowserWindow, dialog, Menu, shell } = require('electron');
+const {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  Menu,
+  session,
+  shell,
+} = require('electron');
 const { createServer } = require('node:http');
 const fs = require('node:fs');
 const https = require('node:https');
 const net = require('node:net');
 const path = require('node:path');
+
+const {
+  classifyNavigation,
+  createDesktopSessionToken,
+} = require('./security.cjs');
+const {
+  registerSavePdfHandler,
+  savePdfAtomically,
+  writeAndSyncTemporary,
+} = require('./save-pdf.cjs');
+const { createUpdateChecker } = require('./update-check.cjs');
+const { loadVersioningModule } = require('./versioning-loader.cjs');
+const { loadPackagedStandalone } = require('./standalone-runtime.cjs');
+
+process.on('unhandledRejection', reason => {
+  console.error('[CABLE_FATAL_UNHANDLED_REJECTION]', reason);
+});
+process.on('uncaughtExceptionMonitor', error => {
+  console.error('[CABLE_FATAL_UNCAUGHT_EXCEPTION]', error);
+});
 
 if (!process.env.NEXT_TELEMETRY_DISABLED) {
   process.env.NEXT_TELEMETRY_DISABLED = '1';
@@ -11,18 +39,31 @@ if (!process.env.NEXT_TELEMETRY_DISABLED) {
 
 let mainWindow = null;
 let nextServer = null;
-let checkingForUpdates = false;
+let unregisterSavePdfHandler = null;
+let shutdownStarted = false;
+let shutdownComplete = false;
+
+const pdfJobShutdownKey = Symbol.for('cable-report.pdf-job-shutdown');
+
+const desktopSessionToken = createDesktopSessionToken();
+process.env.CABLE_DESKTOP_TOKEN = desktopSessionToken;
+delete process.env.CABLE_DEV_BROWSER_MODE;
 
 const UPDATE_REPO = 'hansel970111-svg/cable-report-web';
 const RELEASES_URL = `https://github.com/${UPDATE_REPO}/releases/latest`;
 const LATEST_RELEASE_API = `https://api.github.com/repos/${UPDATE_REPO}/releases/latest`;
 
-function getAppRoot() {
-  if (app.isPackaged) {
-    return path.join(process.resourcesPath, 'app');
-  }
+function openApprovedExternal(targetUrl) {
+  const decision = classifyNavigation(
+    targetUrl,
+    process.env.CABLE_DESKTOP_ORIGIN || '',
+  );
+  if (decision.kind !== 'external') return false;
 
-  return path.resolve(__dirname, '..');
+  void shell.openExternal(decision.url).catch(error => {
+    console.error('无法打开外部链接:', error);
+  });
+  return true;
 }
 
 function getFreePort(preferredPort) {
@@ -73,25 +114,9 @@ function waitForPort(port, timeoutMs = 30000) {
 }
 
 function normalizeVersion(version) {
-  const text = String(version || '')
+  return String(version || '')
     .trim()
-    .replace(/^v/i, '')
-    .split(/[+-]/)[0];
-  const match = text.match(/\d+(?:\.\d+)*/);
-  return match ? match[0] : '';
-}
-
-function compareVersions(left, right) {
-  const leftParts = normalizeVersion(left).split('.').map(value => Number.parseInt(value, 10) || 0);
-  const rightParts = normalizeVersion(right).split('.').map(value => Number.parseInt(value, 10) || 0);
-  const length = Math.max(leftParts.length, rightParts.length);
-
-  for (let i = 0; i < length; i++) {
-    const delta = (leftParts[i] || 0) - (rightParts[i] || 0);
-    if (delta !== 0) return delta;
-  }
-
-  return 0;
+    .replace(/^v/i, '');
 }
 
 function getJson(url) {
@@ -139,54 +164,24 @@ function getJson(url) {
   });
 }
 
-function getPreferredAsset(release) {
-  const assets = Array.isArray(release?.assets) ? release.assets : [];
-  const candidates = process.platform === 'darwin'
-    ? ['.dmg', 'mac', '.zip']
-    : process.platform === 'win32'
-    ? ['.exe', 'windows', 'win']
-    : [];
-
-  for (const keyword of candidates) {
-    const asset = assets.find(item => String(item?.name || '').toLowerCase().includes(keyword));
-    if (asset?.browser_download_url) return asset.browser_download_url;
-  }
-
-  return release?.html_url || RELEASES_URL;
-}
-
 function showMessageBox(options) {
   return mainWindow
     ? dialog.showMessageBox(mainWindow, options)
     : dialog.showMessageBox(options);
 }
 
-async function checkForUpdates({ manual = false } = {}) {
-  if (checkingForUpdates) return;
-  checkingForUpdates = true;
-
-  try {
-    const release = await getJson(LATEST_RELEASE_API);
-    const currentVersion = app.getVersion();
-    const latestTag = release.tag_name || release.name || '';
-    const latestVersion = normalizeVersion(latestTag);
-
-    if (!latestVersion) {
-      throw new Error('最新版没有有效版本号');
-    }
-
-    if (compareVersions(latestVersion, currentVersion) <= 0) {
-      if (manual) {
-        await showMessageBox({
-          type: 'info',
-          title: '检查更新',
-          message: '当前已经是最新版本',
-          detail: `当前版本：${currentVersion}\n最新版本：${latestTag}`,
-        });
-      }
-      return;
-    }
-
+const checkForUpdates = createUpdateChecker({
+  loadVersioningModule,
+  fetchLatestRelease: () => getJson(LATEST_RELEASE_API),
+  getCurrentVersion: () => app.getVersion(),
+  normalizeVersion,
+  onUpToDate: ({ currentVersion, latestTag }) => showMessageBox({
+    type: 'info',
+    title: '检查更新',
+    message: '当前已经是最新版本',
+    detail: `当前版本：${currentVersion}\n最新版本：${latestTag}`,
+  }),
+  onUpdateAvailable: async ({ currentVersion, latestTag }) => {
     const result = await showMessageBox({
       type: 'info',
       title: '发现新版本',
@@ -198,28 +193,25 @@ async function checkForUpdates({ manual = false } = {}) {
     });
 
     if (result.response === 0) {
-      shell.openExternal(getPreferredAsset(release));
+      openApprovedExternal(RELEASES_URL);
     }
-  } catch (error) {
-    if (manual) {
-      const result = await showMessageBox({
-        type: 'warning',
-        title: '检查更新失败',
-        message: error instanceof Error ? error.message : String(error),
-        detail: '可以手动打开 GitHub Releases 页面查看最新版。',
-        buttons: ['打开发布页', '取消'],
-        defaultId: 0,
-        cancelId: 1,
-      });
+  },
+  onManualError: async error => {
+    const result = await showMessageBox({
+      type: 'warning',
+      title: '检查更新失败',
+      message: error instanceof Error ? error.message : String(error),
+      detail: '可以手动打开 GitHub Releases 页面查看最新版。',
+      buttons: ['打开发布页', '取消'],
+      defaultId: 0,
+      cancelId: 1,
+    });
 
-      if (result.response === 0) {
-        shell.openExternal(RELEASES_URL);
-      }
+    if (result.response === 0) {
+      openApprovedExternal(RELEASES_URL);
     }
-  } finally {
-    checkingForUpdates = false;
-  }
-}
+  },
+});
 
 function setupApplicationMenu() {
   const template = [
@@ -250,7 +242,7 @@ function setupApplicationMenu() {
         },
         {
           label: '打开下载页',
-          click: () => shell.openExternal(RELEASES_URL),
+          click: () => openApprovedExternal(RELEASES_URL),
         },
       ],
     },
@@ -259,26 +251,46 @@ function setupApplicationMenu() {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
+function configureAboutPanel() {
+  app.setAboutPanelOptions({
+    applicationName: app.getName(),
+    applicationVersion: app.getVersion(),
+    version: app.getVersion(),
+  });
+}
+
 async function startNextServer() {
-  const appRoot = getAppRoot();
+  const appRoot = app.getAppPath();
+  const resourcesRoot = app.isPackaged ? process.resourcesPath : appRoot;
   const port = await getFreePort(Number(process.env.PORT || 5000));
   const hostname = '127.0.0.1';
+  const origin = `http://${hostname}:${port}`;
   const dev = !app.isPackaged && process.env.ELECTRON_NEXT_DEV !== 'false';
 
-  process.chdir(appRoot);
+  if (!app.isPackaged) {
+    process.chdir(appRoot);
+  }
   process.env.COZE_WORKSPACE_PATH = appRoot;
+  process.env.CABLE_RESOURCES_PATH = resourcesRoot;
   process.env.COZE_PROJECT_ENV = dev ? 'DEV' : 'PROD';
   process.env.NODE_ENV = dev ? 'development' : 'production';
   process.env.PORT = String(port);
   process.env.HOSTNAME = hostname;
   process.env.HOST = hostname;
+  process.env.CABLE_DESKTOP_ORIGIN = origin;
+  process.env.CABLE_DESKTOP_TOKEN = desktopSessionToken;
+  delete process.env.CABLE_DEV_BROWSER_MODE;
 
   if (!dev) {
     const standaloneServerPath = path.join(appRoot, 'next-build', 'standalone', 'server.js');
     if (fs.existsSync(standaloneServerPath)) {
-      require(standaloneServerPath);
+      if (app.isPackaged) {
+        loadPackagedStandalone(standaloneServerPath);
+      } else {
+        require(standaloneServerPath);
+      }
       await waitForPort(port);
-      return `http://${hostname}:${port}`;
+      return origin;
     }
 
     const buildIdPath = path.join(appRoot, 'next-build', 'BUILD_ID');
@@ -311,7 +323,77 @@ async function startNextServer() {
     nextServer.listen(port, hostname, resolve);
   });
 
-  return `http://${hostname}:${port}`;
+  return origin;
+}
+
+function configureSessionSecurity() {
+  session.defaultSession.setPermissionCheckHandler(() => false);
+  session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => {
+    callback(false);
+  });
+}
+
+function registerDesktopSessionBridge() {
+  ipcMain.removeHandler('cable-report:get-session-token');
+  ipcMain.handle('cable-report:get-session-token', event => {
+    const expectedOrigin = process.env.CABLE_DESKTOP_ORIGIN || '';
+    const senderFrame = event.senderFrame;
+    const senderDecision = classifyNavigation(senderFrame?.url || '', expectedOrigin);
+    const authorized =
+      mainWindow &&
+      !mainWindow.isDestroyed() &&
+      event.sender === mainWindow.webContents &&
+      senderFrame === mainWindow.webContents.mainFrame &&
+      senderDecision.kind === 'internal';
+
+    if (!authorized) {
+      throw new Error('Unauthorized desktop session token request');
+    }
+
+    return desktopSessionToken;
+  });
+}
+
+function registerNativeSaveBridge() {
+  unregisterSavePdfHandler?.();
+  unregisterSavePdfHandler = registerSavePdfHandler({
+    ipcMain,
+    getMainWindow: () => mainWindow,
+    savePdf: (window, request) => savePdfAtomically(
+      {
+        showSaveDialog: options => dialog.showSaveDialog(window, options),
+        writeAndSyncTemporary,
+        rename: fs.promises.rename,
+        remove: temporaryPath => fs.promises.rm(temporaryPath, { force: true }),
+        randomUUID: require('node:crypto').randomUUID,
+      },
+      request,
+    ),
+  });
+}
+
+async function shutdownPdfJobs() {
+  const shutdown = Reflect.get(globalThis, pdfJobShutdownKey);
+  if (typeof shutdown === 'function') await shutdown();
+}
+
+async function closeNextServer() {
+  const server = nextServer;
+  nextServer = null;
+  if (!server) return;
+  await new Promise((resolve, reject) => {
+    server.close(error => {
+      if (error) reject(error);
+      else resolve();
+    });
+  });
+}
+
+async function shutdownApplication() {
+  unregisterSavePdfHandler?.();
+  unregisterSavePdfHandler = null;
+  await shutdownPdfJobs();
+  await closeNextServer();
 }
 
 function createMainWindow(url) {
@@ -322,9 +404,15 @@ function createMainWindow(url) {
     minHeight: 720,
     show: false,
     webPreferences: {
+      preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      webSecurity: true,
+      allowRunningInsecureContent: false,
+      webviewTag: false,
+      navigateOnDragDrop: false,
+      spellcheck: false,
     },
   });
 
@@ -333,8 +421,28 @@ function createMainWindow(url) {
   });
 
   mainWindow.webContents.setWindowOpenHandler(({ url: targetUrl }) => {
-    shell.openExternal(targetUrl);
+    const decision = classifyNavigation(targetUrl, url);
+    if (decision.kind === 'external') {
+      openApprovedExternal(decision.url);
+    }
     return { action: 'deny' };
+  });
+
+  const handleNavigation = (event, targetUrl) => {
+    const decision = classifyNavigation(targetUrl, url);
+    if (decision.kind === 'internal') return;
+
+    event.preventDefault();
+    if (decision.kind === 'external') {
+      openApprovedExternal(decision.url);
+    }
+  };
+
+  mainWindow.webContents.on('will-navigate', handleNavigation);
+  mainWindow.webContents.on('will-redirect', handleNavigation);
+
+  mainWindow.on('closed', () => {
+    mainWindow = null;
   });
 
   mainWindow.loadURL(url);
@@ -342,10 +450,14 @@ function createMainWindow(url) {
 
 app.whenReady().then(async () => {
   try {
+    configureSessionSecurity();
+    configureAboutPanel();
+    registerDesktopSessionBridge();
+    registerNativeSaveBridge();
     setupApplicationMenu();
     const url = await startNextServer();
     createMainWindow(url);
-    if (app.isPackaged) {
+    if (app.isPackaged && process.env.CABLE_DESKTOP_E2E !== '1') {
       setTimeout(() => checkForUpdates(), 3000);
     }
   } catch (error) {
@@ -365,9 +477,17 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
-app.on('before-quit', () => {
-  if (nextServer) {
-    nextServer.close();
-    nextServer = null;
-  }
+app.on('before-quit', event => {
+  if (shutdownComplete) return;
+  event.preventDefault();
+  if (shutdownStarted) return;
+  shutdownStarted = true;
+  void shutdownApplication()
+    .catch(error => {
+      console.error('[CABLE_SHUTDOWN_FAILED]', error);
+    })
+    .finally(() => {
+      shutdownComplete = true;
+      app.quit();
+    });
 });

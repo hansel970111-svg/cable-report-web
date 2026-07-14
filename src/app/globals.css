@@ -135,3 +135,389 @@
 body {
   @apply font-sans;
 }
+
+html,
+body {
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+main {
+  min-width: 0;
+}
+
+.report-editor-shell {
+  width: min(100%, 76rem);
+  min-width: 0;
+  margin-inline: auto;
+  padding: clamp(1rem, 3vw, 2.5rem);
+}
+
+.report-editor-header {
+  margin-bottom: 1.5rem;
+}
+
+.report-editor-header h1 {
+  font-size: clamp(1.8rem, 5vw, 3rem);
+  font-weight: 750;
+  letter-spacing: -0.035em;
+  line-height: 1.08;
+}
+
+.report-editor-header > p:last-child {
+  max-width: 42rem;
+  margin-top: 0.75rem;
+  color: var(--muted-foreground);
+}
+
+.report-editor-eyebrow {
+  margin-bottom: 0.5rem;
+  color: oklch(0.53 0.17 252);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.report-editor-card {
+  min-width: 0;
+  overflow: hidden;
+  box-shadow: 0 1.25rem 3rem oklch(0.2 0.04 250 / 8%);
+}
+
+.report-import-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem 1.25rem;
+}
+
+.report-field {
+  display: grid;
+  min-width: 0;
+  gap: 0.45rem;
+}
+
+.report-date-time-field,
+.report-file-field,
+.report-import-actions {
+  grid-column: 1 / -1;
+}
+
+.report-native-select {
+  width: 100%;
+  height: 2.25rem;
+  min-width: 0;
+  border: 1px solid var(--input);
+  border-radius: calc(var(--radius) - 2px);
+  background: var(--background);
+  padding-inline: 0.75rem;
+  color: var(--foreground);
+  font-size: 0.875rem;
+}
+
+.report-native-select:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.report-date-time-picker {
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+
+.report-file-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.5rem;
+}
+
+.report-file-control input {
+  width: 100%;
+  min-width: 0;
+}
+
+.report-import-actions,
+.report-actions,
+.workflow-error-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.report-import-actions [role='status'] {
+  color: var(--muted-foreground);
+  font-size: 0.875rem;
+}
+
+.browser-mode-banner,
+.workflow-error,
+.workflow-progress,
+.workflow-announcement {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+  margin-block: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 0.85rem 1rem;
+}
+
+.browser-mode-banner {
+  border-color: oklch(0.72 0.13 250);
+  background: oklch(0.95 0.04 250);
+  color: oklch(0.35 0.14 250);
+  font-weight: 650;
+}
+
+.workflow-error {
+  border-color: oklch(0.7 0.17 25);
+  background: oklch(0.97 0.025 25);
+  color: oklch(0.43 0.18 25);
+}
+
+.workflow-error > p {
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+
+.workflow-progress {
+  background: var(--muted);
+  color: var(--muted-foreground);
+}
+
+.workflow-announcement {
+  border-color: oklch(0.72 0.13 155);
+  background: oklch(0.96 0.04 155);
+  color: oklch(0.39 0.12 155);
+}
+
+.workflow-feedback:empty {
+  display: none;
+}
+
+.report-preview-card {
+  margin-top: 1.5rem;
+}
+
+.report-preview-header {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.report-preview-header p {
+  margin-top: 0.25rem;
+  color: var(--muted-foreground);
+  font-size: 0.875rem;
+}
+
+.report-preview-content {
+  min-width: 0;
+}
+
+.virtual-record-table {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--card);
+}
+
+.virtual-record-grid {
+  display: grid;
+  grid-template-columns:
+    minmax(0, 0.45fr)
+    minmax(0, 1.1fr)
+    minmax(0, 1.55fr)
+    minmax(0, 0.65fr)
+    minmax(0, 0.75fr)
+    minmax(0, 0.75fr)
+    minmax(0, 1.65fr)
+    minmax(2.5rem, 0.45fr);
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+}
+
+.virtual-record-grid > [role='cell'],
+.virtual-record-grid > [role='columnheader'] {
+  min-width: 0;
+  overflow: hidden;
+  padding: 0.55rem 0.65rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.virtual-record-header {
+  min-height: 2.75rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--muted);
+  color: var(--secondary-foreground);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.virtual-record-viewport {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.virtual-record-spacer {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+
+.virtual-record-row {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+  font-size: 0.8rem;
+}
+
+.virtual-record-row:focus-within {
+  z-index: 1;
+  background: var(--accent);
+}
+
+.record-sequence,
+.record-number {
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+}
+
+.record-label-text,
+.record-time {
+  font-variant-numeric: tabular-nums;
+}
+
+.record-label-input {
+  width: 100%;
+  min-width: 0;
+  height: 2rem;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-sm);
+  background: var(--background);
+  padding-inline: 0.5rem;
+  color: var(--foreground);
+}
+
+.record-label-input:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+
+.record-action {
+  display: flex;
+  justify-content: center;
+}
+
+.record-delete-button {
+  display: inline-flex;
+  width: 2rem;
+  height: 2rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  color: var(--destructive);
+}
+
+.record-delete-button:hover {
+  background: color-mix(in oklab, var(--destructive) 12%, transparent);
+}
+
+.record-delete-button:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.record-delete-button svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.report-empty-state,
+.report-welcome-state {
+  display: grid;
+  min-height: 9rem;
+  place-items: center;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  color: var(--muted-foreground);
+  text-align: center;
+}
+
+.report-welcome-state {
+  margin-top: 1.5rem;
+  background: color-mix(in oklab, var(--muted) 55%, transparent);
+}
+
+@media (max-width: 639px) {
+  .report-editor-shell {
+    padding: 0.75rem;
+  }
+
+  .report-import-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .report-date-time-field,
+  .report-file-field,
+  .report-import-actions {
+    grid-column: auto;
+  }
+
+  .report-date-time-picker {
+    align-items: flex-start;
+  }
+
+  .report-preview-header {
+    align-items: flex-start;
+  }
+
+  .report-actions {
+    width: 100%;
+  }
+
+  .report-actions > button {
+    flex: 1 1 8.5rem;
+  }
+
+  .virtual-record-grid {
+    grid-template-columns:
+      minmax(2rem, 0.5fr)
+      minmax(0, 1.3fr)
+      minmax(0, 2fr)
+      2.6rem;
+  }
+
+  .virtual-record-grid .record-secondary {
+    display: none;
+  }
+
+  .virtual-record-grid > [role='cell'],
+  .virtual-record-grid > [role='columnheader'] {
+    padding-inline: 0.4rem;
+  }
+
+  .record-time {
+    overflow-wrap: anywhere;
+    font-size: 0.68rem;
+    line-height: 1.2;
+    text-overflow: clip;
+    white-space: normal;
+  }
+}

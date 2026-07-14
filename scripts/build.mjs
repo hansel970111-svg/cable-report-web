@@ -4,6 +4,9 @@ import path from 'node:path';
 import process from 'node:process';
 
 const workspace = process.env.COZE_WORKSPACE_PATH || process.cwd();
+const BUILD_ONLY_STANDALONE_PATHS = [
+  path.join('node_modules', 'next', 'dist', 'diagnostics'),
+];
 
 function commandName(name) {
   return process.platform === 'win32' ? `${name}.cmd` : name;
@@ -33,18 +36,20 @@ function run(command, args) {
 }
 
 function runPnpm(args) {
-  const pnpmResult = runRaw(commandName('pnpm'), args);
-  if (!pnpmResult.error) {
-    if (pnpmResult.status !== 0) process.exit(pnpmResult.status ?? 1);
-    return;
-  }
-
-  if (pnpmResult.error.code !== 'ENOENT') {
-    console.error(pnpmResult.error);
-    process.exit(1);
-  }
-
   run(commandName('corepack'), ['pnpm', ...args]);
+}
+
+function currentGitHead() {
+  const result = spawnSync('git', ['rev-parse', 'HEAD'], {
+    cwd: workspace,
+    encoding: 'utf8',
+    shell: false,
+  });
+  const head = result.stdout?.trim();
+  if (result.error || result.status !== 0 || !/^[0-9a-f]{40}$/i.test(head || '')) {
+    throw new Error(`Unable to bind build output to Git HEAD: ${result.stderr || result.error || head}`);
+  }
+  return head;
 }
 
 function copyDirIfExists(sourceDir, targetDir, label) {
@@ -56,11 +61,304 @@ function copyDirIfExists(sourceDir, targetDir, label) {
   console.log(`Copied ${label} into standalone runtime.`);
 }
 
+function pathEntryExists(candidate) {
+  try {
+    fs.lstatSync(candidate);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function collectSymlinks(directory) {
+  const links = [];
+  for (const name of fs.readdirSync(directory).sort()) {
+    const candidate = path.join(directory, name);
+    const stats = fs.lstatSync(candidate);
+    if (stats.isSymbolicLink()) {
+      links.push(candidate);
+    } else if (stats.isDirectory()) {
+      links.push(...collectSymlinks(candidate));
+    }
+  }
+  return links;
+}
+
+function isInsideDirectory(directory, candidate) {
+  const relative = path.relative(directory, candidate);
+  return (
+    relative !== '' &&
+    relative !== '..' &&
+    !relative.startsWith(`..${path.sep}`) &&
+    !path.isAbsolute(relative)
+  );
+}
+
+function copyMaterializedTarget(source, target, stats) {
+  if (stats.isDirectory()) {
+    fs.cpSync(source, target, {
+      recursive: true,
+      dereference: true,
+      errorOnExist: true,
+      force: false,
+    });
+    return;
+  }
+  if (stats.isFile()) {
+    fs.copyFileSync(source, target, fs.constants.COPYFILE_EXCL);
+    return;
+  }
+  throw new Error(`Unsupported standalone dependency symlink target: ${source}`);
+}
+
+function logicalPackageName(nodeModulesDir, linkPath) {
+  const relativeParts = path.relative(nodeModulesDir, linkPath).split(path.sep);
+  const nestedNodeModules = relativeParts.lastIndexOf('node_modules');
+  const packageParts = relativeParts.slice(nestedNodeModules + 1);
+  if (
+    packageParts.length === 1 &&
+    packageParts[0] !== '' &&
+    packageParts[0] !== '.pnpm'
+  ) {
+    return packageParts[0];
+  }
+  if (
+    packageParts.length === 2 &&
+    packageParts[0].startsWith('@') &&
+    packageParts.every(part => part !== '' && part !== '.' && part !== '..')
+  ) {
+    return packageParts.join('/');
+  }
+  return null;
+}
+
+function readPackageName(packageDir, linkPath) {
+  const manifestPath = path.join(packageDir, 'package.json');
+  let packageJson;
+  try {
+    packageJson = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  } catch {
+    throw new Error(
+      `Unsupported standalone dependency symlink without a readable package manifest: ${linkPath}`,
+    );
+  }
+  if (typeof packageJson.name !== 'string' || packageJson.name === '') {
+    throw new Error(`Unsupported unnamed standalone dependency package: ${linkPath}`);
+  }
+  return packageJson.name;
+}
+
+function isApprovedExternalPackageLink(
+  nodeModulesDir,
+  externalNodeModulesRoot,
+  linkPath,
+  targetPath,
+  targetStats,
+) {
+  if (
+    externalNodeModulesRoot === null ||
+    !isInsideDirectory(externalNodeModulesRoot, targetPath)
+  ) {
+    return false;
+  }
+
+  const logicalName = logicalPackageName(nodeModulesDir, linkPath);
+  if (logicalName === null || !targetStats.isDirectory()) return false;
+
+  const declaredName = readPackageName(targetPath, linkPath);
+  if (declaredName !== logicalName) {
+    throw new Error(
+      `Unsupported standalone dependency alias: ${logicalName} -> ${declaredName} at ${linkPath}`,
+    );
+  }
+  return true;
+}
+
+function planRootPackages(nodeModulesDir, plans) {
+  const packages = new Map();
+  for (const plan of plans) {
+    const logicalName = logicalPackageName(nodeModulesDir, plan.linkPath);
+    if (logicalName === null) continue;
+    if (!plan.targetStats.isDirectory()) {
+      throw new Error(`Unsupported standalone package file symlink: ${plan.linkPath}`);
+    }
+    const declaredName = readPackageName(plan.targetPath, plan.linkPath);
+    if (declaredName !== logicalName) {
+      throw new Error(
+        `Unsupported standalone dependency alias: ${logicalName} -> ${declaredName} at ${plan.linkPath}`,
+      );
+    }
+    const previousTarget = packages.get(logicalName);
+    if (previousTarget && previousTarget !== plan.targetPath) {
+      throw new Error(
+        `Conflicting standalone dependency targets for ${logicalName}: ` +
+        `${previousTarget} and ${plan.targetPath}`,
+      );
+    }
+    packages.set(logicalName, plan.targetPath);
+  }
+
+  return [...packages.entries()]
+    .sort(([left], [right]) => left.localeCompare(right, 'en'))
+    .map(([packageName, targetPath]) => ({
+      packageName,
+      targetPath,
+      targetStats: fs.statSync(targetPath),
+      destination: path.join(nodeModulesDir, ...packageName.split('/')),
+    }));
+}
+
+function materializeRootPackages(nodeModulesDir, packages) {
+  for (const rootPackage of packages) {
+    if (pathEntryExists(rootPackage.destination)) continue;
+
+    fs.mkdirSync(path.dirname(rootPackage.destination), { recursive: true });
+    const owner = `.codex-materialize-${process.pid}-package-${rootPackage.packageName.replace('/', '-')}`;
+    const stagedPath = path.join(path.dirname(rootPackage.destination), `${owner}-new`);
+    fs.rmSync(stagedPath, { recursive: true, force: true });
+    try {
+      copyMaterializedTarget(rootPackage.targetPath, stagedPath, rootPackage.targetStats);
+      fs.renameSync(stagedPath, rootPackage.destination);
+    } finally {
+      fs.rmSync(stagedPath, { recursive: true, force: true });
+    }
+  }
+
+  for (const rootPackage of packages) {
+    const declaredName = readPackageName(rootPackage.destination, rootPackage.destination);
+    if (declaredName !== rootPackage.packageName) {
+      throw new Error(
+        `Materialized standalone dependency has incompatible root package: ` +
+        `${rootPackage.destination}`,
+      );
+    }
+  }
+}
+
+export function materializeStandaloneSymlinks(standaloneDir) {
+  const nodeModulesDir = path.join(standaloneDir, 'node_modules');
+  let nodeModulesRoot;
+  try {
+    if (!fs.statSync(nodeModulesDir).isDirectory()) throw new Error('not a directory');
+    nodeModulesRoot = fs.realpathSync(nodeModulesDir);
+  } catch {
+    throw new Error(`Missing standalone dependency directory: ${nodeModulesDir}`);
+  }
+
+  let externalNodeModulesRoot = null;
+  try {
+    const candidate = path.join(workspace, 'node_modules');
+    if (fs.statSync(candidate).isDirectory()) {
+      externalNodeModulesRoot = fs.realpathSync(candidate);
+    }
+  } catch {
+    // A standalone-only fixture has no approved external dependency store.
+  }
+
+  const symlinks = collectSymlinks(nodeModulesDir).sort();
+  const plans = symlinks.map(linkPath => {
+    let targetPath;
+    try {
+      targetPath = fs.realpathSync(linkPath);
+    } catch {
+      throw new Error(`Dangling standalone dependency symlink: ${linkPath}`);
+    }
+    const targetStats = fs.statSync(targetPath);
+    if (
+      !isInsideDirectory(nodeModulesRoot, targetPath) &&
+      !isApprovedExternalPackageLink(
+        nodeModulesDir,
+        externalNodeModulesRoot,
+        linkPath,
+        targetPath,
+        targetStats,
+      )
+    ) {
+      throw new Error(
+        `Out-of-tree standalone dependency symlink: ${linkPath} -> ${targetPath}`,
+      );
+    }
+    return { linkPath, targetPath, targetStats };
+  });
+  const rootPackages = planRootPackages(nodeModulesDir, plans);
+
+  for (const rootPackage of rootPackages) {
+    if (!pathEntryExists(rootPackage.destination)) continue;
+    const existingTarget = fs.realpathSync(rootPackage.destination);
+    if (existingTarget !== rootPackage.targetPath) {
+      throw new Error(
+        `Conflicting standalone root dependency for ${rootPackage.packageName}: ` +
+        `${existingTarget} and ${rootPackage.targetPath}`,
+      );
+    }
+  }
+
+  for (const [index, plan] of plans.entries()) {
+    const owner = `.codex-materialize-${process.pid}-${index}`;
+    const stagedPath = path.join(path.dirname(plan.linkPath), `${owner}-new`);
+    const backupPath = path.join(path.dirname(plan.linkPath), `${owner}-backup`);
+    fs.rmSync(stagedPath, { recursive: true, force: true });
+    fs.rmSync(backupPath, { recursive: true, force: true });
+
+    let backupCreated = false;
+    try {
+      copyMaterializedTarget(plan.targetPath, stagedPath, plan.targetStats);
+      fs.renameSync(plan.linkPath, backupPath);
+      backupCreated = true;
+      fs.renameSync(stagedPath, plan.linkPath);
+      fs.rmSync(backupPath, { recursive: true, force: true });
+      backupCreated = false;
+    } catch (error) {
+      if (backupCreated) {
+        if (pathEntryExists(plan.linkPath)) {
+          fs.rmSync(plan.linkPath, { recursive: true, force: true });
+        }
+        fs.renameSync(backupPath, plan.linkPath);
+        backupCreated = false;
+      }
+      throw error;
+    } finally {
+      fs.rmSync(stagedPath, { recursive: true, force: true });
+      if (backupCreated && pathEntryExists(backupPath)) {
+        if (!pathEntryExists(plan.linkPath)) fs.renameSync(backupPath, plan.linkPath);
+        else fs.rmSync(backupPath, { recursive: true, force: true });
+      }
+    }
+  }
+
+  materializeRootPackages(nodeModulesDir, rootPackages);
+
+  const remaining = collectSymlinks(nodeModulesDir);
+  if (remaining.length > 0) {
+    throw new Error(
+      `Standalone dependency materialization left ${remaining.length} symlink(s): ${remaining[0]}`,
+    );
+  }
+  return plans.length;
+}
+
+export function pruneBuildOnlyStandalonePaths(standaloneDir) {
+  let removedCount = 0;
+  for (const relativePath of BUILD_ONLY_STANDALONE_PATHS) {
+    const candidate = path.join(standaloneDir, relativePath);
+    if (!pathEntryExists(candidate)) continue;
+
+    fs.rmSync(candidate, { recursive: true, force: true });
+    removedCount += 1;
+  }
+  return removedCount;
+}
+
 function prepareStandaloneRuntime() {
   const nextBuildDir = path.join(workspace, 'next-build');
   const standaloneDir = path.join(nextBuildDir, 'standalone');
 
   if (!fs.existsSync(standaloneDir)) return;
+
+  const materializedCount = materializeStandaloneSymlinks(standaloneDir);
+  console.log(`Materialized ${materializedCount} standalone dependency symlinks.`);
+  const prunedCount = pruneBuildOnlyStandalonePaths(standaloneDir);
+  console.log(`Pruned ${prunedCount} build-only standalone path(s).`);
 
   for (const relativeDir of ['worker-bin', path.join('resources', 'bin')]) {
     fs.rmSync(path.join(standaloneDir, relativeDir), { recursive: true, force: true });
@@ -77,40 +375,57 @@ function prepareStandaloneRuntime() {
     path.join(standaloneDir, 'public'),
     'public assets'
   );
+
+  const head = currentGitHead();
+  fs.writeFileSync(path.join(standaloneDir, '.cable-build-commit'), `${head}\n`, 'utf8');
+  console.log(`Bound standalone runtime to Git commit ${head}.`);
 }
 
-if (fs.existsSync(path.join(workspace, 'node_modules'))) {
-  console.log('Dependencies already installed; skipping install.');
+if (process.argv[2] === '--materialize-standalone-runtime') {
+  const standaloneDir = process.argv[3];
+  if (!standaloneDir) {
+    console.error('Missing standalone directory for dependency materialization.');
+    process.exit(1);
+  }
+  try {
+    const count = materializeStandaloneSymlinks(path.resolve(standaloneDir));
+    console.log(`Materialized ${count} standalone dependency symlinks.`);
+    const prunedCount = pruneBuildOnlyStandalonePaths(path.resolve(standaloneDir));
+    console.log(`Pruned ${prunedCount} build-only standalone path(s).`);
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : error);
+    process.exit(1);
+  }
 } else {
-  console.log('Installing dependencies...');
+  console.log('Verifying dependencies against the frozen lock...');
   runPnpm([
     'install',
-    '--prefer-frozen-lockfile',
+    '--frozen-lockfile',
     '--prefer-offline',
     '--loglevel',
     'debug',
     '--reporter=append-only',
   ]);
+
+  console.log('Building the Next.js project...');
+  runPnpm(['next', 'build', '--webpack']);
+  prepareStandaloneRuntime();
+
+  console.log('Bundling server with tsup...');
+  runPnpm([
+    'tsup',
+    'src/server.ts',
+    '--format',
+    'cjs',
+    '--platform',
+    'node',
+    '--target',
+    'node24',
+    '--outDir',
+    'dist',
+    '--no-splitting',
+    '--no-minify',
+  ]);
+
+  console.log('Build completed successfully!');
 }
-
-console.log('Building the Next.js project...');
-runPnpm(['next', 'build', '--webpack']);
-prepareStandaloneRuntime();
-
-console.log('Bundling server with tsup...');
-runPnpm([
-  'tsup',
-  'src/server.ts',
-  '--format',
-  'cjs',
-  '--platform',
-  'node',
-  '--target',
-  'node20',
-  '--outDir',
-  'dist',
-  '--no-splitting',
-  '--no-minify',
-]);
-
-console.log('Build completed successfully!');
