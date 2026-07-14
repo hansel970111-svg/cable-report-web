@@ -134,7 +134,11 @@ const resourcesDir = platform === 'win'
 const appAsarPath = path.join(resourcesDir, 'app.asar');
 
 requireFile(appAsarPath, 'ASAR application archive');
-requireUpdaterProviderConfig(resourcesDir);
+if (platform === 'win') {
+  requireUpdaterProviderConfig(resourcesDir);
+} else if (fs.existsSync(path.join(resourcesDir, 'app-update.yml'))) {
+  fail('Internal macOS packages must not contain updater provider configuration.');
+}
 
 let entries = [];
 let archiveLinks = [];

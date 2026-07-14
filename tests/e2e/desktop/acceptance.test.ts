@@ -237,8 +237,6 @@ test('acceptance manifest binds every report, package, and installer to current 
     'release/mac/Cable Report Generator.app/Contents/Resources/app.asar',
     'release/Cable-Report-Generator-0.1.1.dmg',
     'release/Cable-Report-Generator-0.1.1.zip',
-    'release/Cable-Report-Generator-0.1.1.zip.blockmap',
-    'release/latest-mac.yml',
   ];
   try {
     for (const relativePath of paths) {
@@ -272,6 +270,7 @@ test('acceptance manifest binds every report, package, and installer to current 
       );
     }
     const manifest = createAcceptanceManifest({ workspace, platform: 'mac', head });
+    expect(manifest.updateArtifactNames).toEqual([]);
     expect(() => verifyAcceptanceManifest({ workspace, manifest, platform: 'mac', head }))
       .not.toThrow();
     expect(() => verifyAcceptanceManifest({

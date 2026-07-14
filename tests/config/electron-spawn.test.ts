@@ -121,13 +121,6 @@ test('desktop package verification rejects a packaged tree without the runtime v
       [join(resourcesDir, 'assets', 'M138-DE46-OOB-Cat5e.pdf'), ''],
       [join(resourcesDir, 'assets', 'M138-DE46-D-P-cross-LC.pdf'), ''],
       [join(resourcesDir, 'assets', 'M138-DE46-P-A-MPO.pdf'), ''],
-      [join(resourcesDir, 'app-update.yml'), [
-        'provider: github',
-        'owner: hansel970111-svg',
-        'repo: cable-report-web',
-        'releaseType: release',
-        '',
-      ].join('\n')],
     ];
     await Promise.all(files.map(([filePath, contents]) => writeFile(filePath, contents)));
     await createPackage(appSourceDir, appAsarPath);

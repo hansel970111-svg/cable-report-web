@@ -103,7 +103,9 @@ jobs:
       - name: Build macOS package
         if: runner.os == 'macOS'
         env:
+          CABLE_MAC_SIGNING_MODE: adhoc
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
+          CSC_FOR_PULL_REQUEST: "true"
         run: node scripts/run-evidence-command.mjs --name package --platform mac -- pnpm desktop:dist:mac
 
       - name: Build Windows package
@@ -114,7 +116,7 @@ jobs:
 
       - name: Verify macOS package structure and size
         if: runner.os == 'macOS'
-        run: node scripts/verify-desktop-package.mjs mac && node scripts/check-package-size.mjs mac
+        run: node scripts/verify-desktop-package.mjs mac && node scripts/verify-macos-trust.mjs && node scripts/check-package-size.mjs mac
 
       - name: Verify Windows package structure and size
         if: runner.os == 'Windows'
@@ -132,7 +134,7 @@ jobs:
           PYTHON_CMD: python
         run: node scripts/run-evidence-command.mjs --name desktop --platform win --artifact artifacts/acceptance/desktop-win.json -- pnpm test:e2e:win
 
-      - name: Bind macOS reports and installers to current commit
+      - name: Bind internal macOS package reports to current commit
         if: runner.os == 'macOS'
         run: node scripts/write-acceptance-evidence.mjs mac
 
@@ -147,18 +149,6 @@ jobs:
       - name: Aggregate Windows acceptance
         if: runner.os == 'Windows'
         run: corepack pnpm@9.15.9 verify:acceptance -- --platform win --emit-ci-report artifacts/acceptance/ci-win.json
-
-      - name: Upload macOS installers
-        if: runner.os == 'macOS'
-        uses: actions/upload-artifact@v4
-        with:
-          name: Cable-Report-Generator-macOS
-          path: |
-            release/*.dmg
-            release/*.zip
-            release/latest-mac.yml
-            release/*.blockmap
-          if-no-files-found: error
 
       - name: Upload Windows installer
         if: runner.os == 'Windows'

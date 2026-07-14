@@ -5,7 +5,7 @@ from pathlib import Path
 import sys
 
 import fitz
-from PIL import Image, ImageDraw
+from PIL import Image, ImageChops, ImageDraw, ImageStat
 import pytest
 
 
@@ -34,6 +34,22 @@ CASES = [
 ]
 
 FAIL_RED = (220, 38, 38)
+FACTORY_PASS_RECTS = {
+    "cat5e": fitz.Rect(386.362, 110.109, 398.362, 122.109),
+    "lc": fitz.Rect(272.008, 109.766, 284.008, 121.766),
+}
+FIRST_DATA_PAGE_COUNTS = {
+    "cat5e": 41,
+    "mpo": 43,
+    "lc": 23,
+}
+FOOTER_LOGO_RECT = fitz.Rect(280.5, 819.0, 342.56060791015625, 835.0)
+CAT5E_SECOND_PAGE_FACTORY_RECT = fitz.Rect(
+    386.068024,
+    108.944458,
+    398.068024,
+    120.944458,
+)
 
 
 def _records(kind: str, count: int = 2) -> list[dict[str, object]]:
@@ -239,6 +255,7 @@ def test_pass_and_fail_result_icons_are_rendered(
         assert fail_red >= 80, f"{kind} FAIL icon is not red: red={fail_red}, green={fail_green}"
         assert fail_green <= 10, f"{kind} FAIL icon still contains PASS green: green={fail_green}"
         _assert_fail_icon_design(_crop(page_image, fail_rect), kind)
+
         assert _summary_has_count(page, "Pass", 1), f"{kind} summary does not show Pass = 1"
         assert _summary_has_count(page, "Fail", 1), f"{kind} summary does not show Fail = 1"
 
@@ -272,6 +289,162 @@ def test_lc_data_page_renders_failed_result_icon(tmp_path: Path) -> None:
         assert fail_red >= 80, f"LC data-page FAIL icon is not red: red={fail_red}, green={fail_green}"
         assert fail_green <= 10, f"LC data-page FAIL icon still contains PASS green: green={fail_green}"
         _assert_fail_icon_design(_crop(page_image, fail_rect), "LC data-page")
+@pytest.mark.parametrize("kind,template,first_icon_rect", CASES, ids=lambda value: value if isinstance(value, str) else None)
+def test_last_pass_icon_before_empty_rows_matches_template(
+    kind: str,
+    template: Path,
+    first_icon_rect: fitz.Rect,
+    tmp_path: Path,
+) -> None:
+    record_count = FIRST_DATA_PAGE_COUNTS[kind]
+    output = tmp_path / f"{kind}-last-pass-before-empty-rows.pdf"
+    result = edit_report(template, output, _records(kind, record_count), "M138-DE46")
+    assert result.pages == 2
+
+    with fitz.open(output) as document:
+        page = document[0]
+        pixmap = page.get_pixmap(
+            matrix=fitz.Matrix(8, 8),
+            colorspace=fitz.csRGB,
+            alpha=False,
+        )
+        page_image = Image.frombytes(
+            "RGB",
+            [pixmap.width, pixmap.height],
+            pixmap.samples,
+        )
+
+        last_row_index = record_count - 1
+        last_icon_rect = first_icon_rect + (0, 15 * last_row_index, 0, 15 * last_row_index)
+        first_icon = _crop(page_image, first_icon_rect, scale=8.0)
+        last_icon = _crop(page_image, last_icon_rect, scale=8.0)
+        assert ImageChops.difference(first_icon, last_icon).getbbox() is None, (
+            f"{kind} last PASS icon is clipped instead of matching the template"
+        )
+
+        next_empty_rect = first_icon_rect + (0, 15 * record_count, 0, 15 * record_count)
+        empty_icon = _crop(page_image, next_empty_rect, scale=8.0)
+        empty_red, empty_green = _dominant_pixel_counts(empty_icon)
+        assert empty_red == 0 and empty_green == 0, (
+            f"{kind} first empty row contains a status-icon remnant: "
+            f"red={empty_red}, green={empty_green}"
+        )
+        assert min(minimum for minimum, _maximum in empty_icon.getextrema()) >= 245, (
+            f"{kind} first empty row contains a grey status-icon remnant"
+        )
+
+        factory_rect = FACTORY_PASS_RECTS.get(kind)
+        if factory_rect is not None:
+            last_factory_rect = factory_rect + (
+                0,
+                15 * last_row_index,
+                0,
+                15 * last_row_index,
+            )
+            first_factory = _crop(page_image, factory_rect, scale=8.0)
+            last_factory = _crop(page_image, last_factory_rect, scale=8.0)
+            assert ImageChops.difference(first_factory, last_factory).getbbox() is None, (
+                f"{kind} last factory PASS icon is clipped instead of matching the template"
+            )
+
+
+def test_cat5e_second_data_page_uses_its_template_icon_geometry(tmp_path: Path) -> None:
+    template = ROOT / "assets/M138-DE46-OOB-Cat5e.pdf"
+    output = tmp_path / "cat5e-second-page-last-pass-before-empty-rows.pdf"
+    result = edit_report(template, output, _records("cat5e", 87), "M138-DE46")
+    assert result.pages == 3
+
+    with fitz.open(output) as document:
+        page = document[1]
+        pixmap = page.get_pixmap(
+            matrix=fitz.Matrix(8, 8),
+            colorspace=fitz.csRGB,
+            alpha=False,
+        )
+        page_image = Image.frombytes(
+            "RGB",
+            [pixmap.width, pixmap.height],
+            pixmap.samples,
+        )
+
+        last_row_index = 40
+        last_factory_rect = CAT5E_SECOND_PAGE_FACTORY_RECT + (
+            0,
+            15 * last_row_index,
+            0,
+            15 * last_row_index,
+        )
+        first_factory = _crop(
+            page_image,
+            CAT5E_SECOND_PAGE_FACTORY_RECT,
+            scale=8.0,
+        )
+        last_factory = _crop(page_image, last_factory_rect, scale=8.0)
+        assert ImageChops.difference(first_factory, last_factory).getbbox() is None, (
+            "Cat5e second-page factory PASS icon is clipped instead of matching "
+            "that page's template geometry"
+        )
+
+        empty_factory_rect = CAT5E_SECOND_PAGE_FACTORY_RECT + (
+            0,
+            15 * (last_row_index + 1),
+            0,
+            15 * (last_row_index + 1),
+        )
+        empty_factory = _crop(page_image, empty_factory_rect, scale=8.0)
+        assert min(minimum for minimum, _maximum in empty_factory.getextrema()) >= 245, (
+            "Cat5e second-page empty row contains a factory PASS remnant"
+        )
+
+
+@pytest.mark.parametrize("kind,template,_first_icon_rect", CASES, ids=lambda value: value if isinstance(value, str) else None)
+def test_footer_logo_preserves_template_pixels(
+    kind: str,
+    template: Path,
+    _first_icon_rect: fitz.Rect,
+    tmp_path: Path,
+) -> None:
+    output = tmp_path / f"{kind}-footer-logo.pdf"
+    edit_report(template, output, _records(kind), "M138-DE46")
+
+    with fitz.open(template) as template_document, fitz.open(output) as output_document:
+        template_pixmap = template_document[-1].get_pixmap(
+            matrix=fitz.Matrix(8, 8),
+            colorspace=fitz.csRGB,
+            alpha=False,
+        )
+        output_pixmap = output_document[-1].get_pixmap(
+            matrix=fitz.Matrix(8, 8),
+            colorspace=fitz.csRGB,
+            alpha=False,
+        )
+        template_page = Image.frombytes(
+            "RGB",
+            [template_pixmap.width, template_pixmap.height],
+            template_pixmap.samples,
+        )
+        output_page = Image.frombytes(
+            "RGB",
+            [output_pixmap.width, output_pixmap.height],
+            output_pixmap.samples,
+        )
+        template_logo = _crop(template_page, FOOTER_LOGO_RECT, scale=8.0)
+        output_logo = _crop(output_page, FOOTER_LOGO_RECT, scale=8.0)
+        logo_difference = ImageChops.difference(template_logo, output_logo)
+        channel_extrema = logo_difference.getextrema()
+        mean_difference = max(ImageStat.Stat(logo_difference).mean)
+        assert max(maximum for _minimum, maximum in channel_extrema) <= 1, (
+            f"{kind} footer logo differs from the template: extrema={channel_extrema}"
+        )
+        assert mean_difference <= 0.1, (
+            f"{kind} footer logo was resampled instead of preserving the template pixels: "
+            f"mean_difference={mean_difference:.3f}"
+        )
+        assert not any(
+            image[2] > 500 or image[3] > 500
+            for image in output_document[-1].get_images(full=True)
+            if image[2] / max(image[3], 1) > 3
+        ), f"{kind} footer logo was replaced by an oversized raster"
 
 
 @pytest.mark.parametrize(

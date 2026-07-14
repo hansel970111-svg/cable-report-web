@@ -16,6 +16,8 @@ type BuilderConfiguration = {
   asar?: boolean;
   beforeBuild?: () => boolean | Promise<boolean>;
   buildVersion?: string;
+  dmg?: { sign?: boolean };
+  forceCodeSigning?: boolean;
   extraMetadata?: {
     shortVersion?: string;
     shortVersionWindows?: string;
@@ -25,6 +27,9 @@ type BuilderConfiguration = {
   mac?: {
     bundleShortVersion?: string;
     bundleVersion?: string;
+    hardenedRuntime?: boolean;
+    identity?: string;
+    notarize?: boolean;
   };
   productName?: string;
 };
@@ -271,6 +276,30 @@ describe('single-source application version consumers', () => {
     expect(config.extraMetadata?.shortVersion).toBe('2026.713.2');
     expect(config.extraMetadata?.shortVersionWindows).toBe('2026.713.2.0');
     expect(config).not.toHaveProperty('buildVersion');
+  });
+
+  it('uses explicit macOS signing modes and fails closed for an unknown mode', async () => {
+    const builderConfigModule = await importFresh('electron-builder.config.mjs');
+    const createElectronBuilderConfig = builderConfigModule.createElectronBuilderConfig as
+      | ((version: string, environment?: Record<string, string | undefined>) => BuilderConfiguration)
+      | undefined;
+
+    expect(createElectronBuilderConfig).toBeTypeOf('function');
+
+    const adhoc = createElectronBuilderConfig!('2026.713.2', {
+      CABLE_MAC_SIGNING_MODE: 'adhoc',
+    });
+    expect(adhoc.forceCodeSigning).toBe(false);
+    expect(adhoc.dmg).toEqual({ sign: false });
+    expect(adhoc.mac).toMatchObject({
+      hardenedRuntime: false,
+      identity: '-',
+      notarize: false,
+    });
+
+    expect(() => createElectronBuilderConfig!('2026.713.2', {
+      CABLE_MAC_SIGNING_MODE: 'unexpected',
+    })).toThrow(/Unsupported macOS signing mode/u);
   });
 
   it('contains no second hard-coded version literal in renderer, About, or builder consumers', async () => {

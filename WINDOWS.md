@@ -1,5 +1,8 @@
 # Windows 使用说明
 
+Windows x64 是当前唯一正式发布的桌面平台。GitHub Release 只应包含 `.exe`、
+`.exe.blockmap` 和 `latest.yml`，以支持应用内检测、下载并安装后续版本。
+
 ## 环境要求
 
 - Windows 10/11
