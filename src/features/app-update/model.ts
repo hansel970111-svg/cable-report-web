@@ -23,4 +23,5 @@ export type DesktopUpdateApi = {
   downloadUpdate(): Promise<DesktopUpdateState>;
   installUpdate(): Promise<DesktopUpdateState>;
   onUpdateState(callback: (state: DesktopUpdateState) => void): () => void;
+  onOpenUpdateDialog(callback: () => void): () => void;
 };

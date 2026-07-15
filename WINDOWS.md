@@ -60,7 +60,7 @@ node scripts/run-evidence-command.mjs --name python --platform win --artifact ar
 $env:PLAYWRIGHT_JSON_OUTPUT_FILE = "artifacts/acceptance/browser.json"
 $env:PLAYWRIGHT_PORT = "51237"
 node scripts/run-evidence-command.mjs --name browser --platform win --artifact artifacts/acceptance/browser.json -- pnpm exec playwright test --project=chromium --workers=1 --reporter=json
-node scripts/run-evidence-command.mjs --name audit --platform win --capture artifacts/acceptance/audit-win.json -- pnpm audit --prod --audit-level high --registry=https://registry.npmjs.org --json
+node scripts/run-evidence-command.mjs --name audit --platform win --capture artifacts/acceptance/audit-win.json -- corepack pnpm@11.4.0 --pm-on-fail=ignore audit --prod --audit-level high --registry=https://registry.npmjs.org --json
 $env:CSC_IDENTITY_AUTO_DISCOVERY = "false"
 $env:PYTHON_CMD = "python"
 node scripts/run-evidence-command.mjs --name package --platform win -- pnpm desktop:dist:win

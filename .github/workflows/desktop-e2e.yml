@@ -94,11 +94,11 @@ jobs:
 
       - name: Audit production dependencies (macOS)
         if: runner.os == 'macOS'
-        run: node scripts/run-evidence-command.mjs --name audit --platform mac --capture artifacts/acceptance/audit-mac.json -- pnpm audit --prod --audit-level high --registry=https://registry.npmjs.org --json
+        run: node scripts/run-evidence-command.mjs --name audit --platform mac --capture artifacts/acceptance/audit-mac.json -- corepack pnpm@11.4.0 --pm-on-fail=ignore audit --prod --audit-level high --registry=https://registry.npmjs.org --json
 
       - name: Audit production dependencies (Windows)
         if: runner.os == 'Windows'
-        run: node scripts/run-evidence-command.mjs --name audit --platform win --capture artifacts/acceptance/audit-win.json -- pnpm audit --prod --audit-level high --registry=https://registry.npmjs.org --json
+        run: node scripts/run-evidence-command.mjs --name audit --platform win --capture artifacts/acceptance/audit-win.json -- corepack pnpm@11.4.0 --pm-on-fail=ignore audit --prod --audit-level high --registry=https://registry.npmjs.org --json
 
       - name: Build macOS package
         if: runner.os == 'macOS'

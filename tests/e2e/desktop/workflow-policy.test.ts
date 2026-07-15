@@ -60,6 +60,9 @@ test('CI matrix and frozen runtimes retain the release contract', async () => {
   expect(source).toContain('node scripts/setup-ci-python.mjs 3.12.13');
   expect(source).not.toContain('actions/setup-python');
   expect(source).toContain('corepack pnpm@9.15.9 install --frozen-lockfile');
+  expect(source).toContain(
+    'corepack pnpm@11.4.0 --pm-on-fail=ignore audit --prod --audit-level high',
+  );
   expect(source).not.toMatch(/^\s*run: pnpm /m);
   expect(source).toContain('python -m pip install --require-hashes --only-binary=:all: -r requirements-dev.lock');
   expect(source).toContain('corepack pnpm@9.15.9 exec playwright install chromium');

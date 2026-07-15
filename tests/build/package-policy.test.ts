@@ -612,7 +612,7 @@ test('quality workflow runs the fixed PR gates in exact order', () => {
     'corepack pnpm@9.15.9 ts-check',
     'corepack pnpm@9.15.9 test:unit',
     'python -m pytest -q',
-    'corepack pnpm@9.15.9 audit --prod --audit-level high --registry=https://registry.npmjs.org',
+    'corepack pnpm@11.4.0 --pm-on-fail=ignore audit --prod --audit-level high --registry=https://registry.npmjs.org',
     'corepack pnpm@9.15.9 build',
     'node scripts/verify-build-inputs.mjs',
   ];

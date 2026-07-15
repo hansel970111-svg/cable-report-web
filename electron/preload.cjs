@@ -1,6 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 const UPDATE_STATE_CHANNEL = 'cable-report:update-state';
+const UPDATE_OPEN_DIALOG_CHANNEL = 'cable-report:open-update-dialog';
 
 contextBridge.exposeInMainWorld(
   'cableReport',
@@ -18,6 +19,14 @@ contextBridge.exposeInMainWorld(
       const listener = (_event, state) => callback(state);
       ipcRenderer.on(UPDATE_STATE_CHANNEL, listener);
       return () => ipcRenderer.removeListener(UPDATE_STATE_CHANNEL, listener);
+    },
+    onOpenUpdateDialog: callback => {
+      if (typeof callback !== 'function') {
+        throw new TypeError('Update dialog callback must be a function.');
+      }
+      const listener = () => callback();
+      ipcRenderer.on(UPDATE_OPEN_DIALOG_CHANNEL, listener);
+      return () => ipcRenderer.removeListener(UPDATE_OPEN_DIALOG_CHANNEL, listener);
     },
   }),
 );

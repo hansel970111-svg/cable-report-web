@@ -32,6 +32,6 @@ jobs:
       - run: corepack pnpm@9.15.9 ts-check
       - run: corepack pnpm@9.15.9 test:unit
       - run: python -m pytest -q
-      - run: corepack pnpm@9.15.9 audit --prod --audit-level high --registry=https://registry.npmjs.org
+      - run: corepack pnpm@11.4.0 --pm-on-fail=ignore audit --prod --audit-level high --registry=https://registry.npmjs.org
       - run: corepack pnpm@9.15.9 build
       - run: node scripts/verify-build-inputs.mjs

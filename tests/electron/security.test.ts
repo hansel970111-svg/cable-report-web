@@ -99,7 +99,9 @@ test('Electron window source retains the mandatory isolation controls', async ()
   expect(source).toContain("'cable-report:check-for-updates'");
   expect(source).toContain("'cable-report:download-update'");
   expect(source).toContain("'cable-report:install-update'");
-  expect(source).toContain("label: '检查更新'");
+  expect(source).toContain("label: '检测更新'");
+  expect(source).toContain('mainWindow.webContents.send(UPDATE_OPEN_DIALOG_CHANNEL)');
+  expect(source).not.toContain('setTimeout(() => void updateManager.check()');
   expect(source).not.toContain("label: '打开下载页'");
   expect(source).not.toMatch(/execFile|spawn\(/);
   expect(source).not.toContain('browser_download_url');
@@ -125,8 +127,10 @@ test('preload exposes only fixed desktop-token, save, and updater bridges', asyn
   expect(source).toContain("ipcRenderer.invoke('cable-report:check-for-updates')");
   expect(source).toContain("ipcRenderer.invoke('cable-report:download-update')");
   expect(source).toContain("ipcRenderer.invoke('cable-report:install-update')");
+  expect(source).toContain('ipcRenderer.on(UPDATE_OPEN_DIALOG_CHANNEL, listener)');
+  expect(source).toContain('ipcRenderer.removeListener(UPDATE_OPEN_DIALOG_CHANNEL, listener)');
   expect(source).not.toContain('ipcRenderer.send(');
   expect(source).toContain('ipcRenderer.on(UPDATE_STATE_CHANNEL, listener)');
   expect(source).toContain('ipcRenderer.removeListener(UPDATE_STATE_CHANNEL, listener)');
-  expect(source.match(/ipcRenderer\.on\(/g)).toHaveLength(1);
+  expect(source.match(/ipcRenderer\.on\(/g)).toHaveLength(2);
 });

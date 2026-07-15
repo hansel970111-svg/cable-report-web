@@ -51,6 +51,7 @@ process.env.CABLE_DESKTOP_TOKEN = desktopSessionToken;
 delete process.env.CABLE_DEV_BROWSER_MODE;
 
 const UPDATE_STATE_CHANNEL = 'cable-report:update-state';
+const UPDATE_OPEN_DIALOG_CHANNEL = 'cable-report:open-update-dialog';
 const UPDATE_GET_STATE_CHANNEL = 'cable-report:get-update-state';
 const UPDATE_CHECK_CHANNEL = 'cable-report:check-for-updates';
 const UPDATE_DOWNLOAD_CHANNEL = 'cable-report:download-update';
@@ -124,7 +125,9 @@ function emitUpdateState(state) {
 const updateManager = createUpdateManager({
   updater: electronUpdater.autoUpdater,
   currentVersion: app.getVersion(),
-  supported: app.isPackaged && process.platform === 'win32',
+  supported: app.isPackaged
+    && process.platform === 'win32'
+    && process.env.CABLE_DESKTOP_E2E !== '1',
   emitState: emitUpdateState,
   prepareToInstall: async () => {
     if (shutdownComplete) return;
@@ -163,8 +166,11 @@ function setupApplicationMenu() {
       label: '帮助',
       submenu: [
         {
-          label: '检查更新',
-          click: () => void updateManager.check(),
+          label: '检测更新',
+          click: () => {
+            if (!mainWindow || mainWindow.isDestroyed()) return;
+            mainWindow.webContents.send(UPDATE_OPEN_DIALOG_CHANNEL);
+          },
         },
       ],
     },
@@ -404,13 +410,6 @@ app.whenReady().then(async () => {
     setupApplicationMenu();
     const url = await startNextServer();
     createMainWindow(url);
-    if (
-      app.isPackaged
-      && process.platform === 'win32'
-      && process.env.CABLE_DESKTOP_E2E !== '1'
-    ) {
-      setTimeout(() => void updateManager.check(), 3000);
-    }
   } catch (error) {
     console.error(error);
     dialog.showErrorBox('启动失败', error instanceof Error ? error.message : String(error));

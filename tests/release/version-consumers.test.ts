@@ -120,7 +120,7 @@ async function writeConsumerFixture(version = '2026.713.2') {
     'electron/main.cjs',
     'next.config.mjs',
     'scripts/versioning.mjs',
-    'src/features/app-update/update-controls.tsx',
+    'src/features/app-update/update-dialog.tsx',
     'src/features/report-editor/report-editor.tsx',
     'src/lib/app-version.ts',
   ];
@@ -181,7 +181,7 @@ afterEach(async () => {
 });
 
 describe('single-source application version consumers', () => {
-  it('injects the package version at Next build time and renders it in the editor footer', async () => {
+  it('injects the package version at Next build time and renders it only in the update dialog', async () => {
     const packageJson = await readPackageJson();
     const nextConfig = (await importFresh('next.config.mjs')).default as {
       env?: Record<string, string>;
@@ -192,8 +192,8 @@ describe('single-source application version consumers', () => {
       join(projectRoot, 'src/features/report-editor/report-editor.tsx'),
       'utf8',
     );
-    const updateControlsSource = await readFile(
-      join(projectRoot, 'src/features/app-update/update-controls.tsx'),
+    const updateDialogSource = await readFile(
+      join(projectRoot, 'src/features/app-update/update-dialog.tsx'),
       'utf8',
     );
 
@@ -203,10 +203,9 @@ describe('single-source application version consumers', () => {
     );
     expect(appVersionSource).not.toMatch(/export\s+let|function\s+setAppVersion/u);
     expect(editorSource).toMatch(/import\s*\{\s*APP_VERSION\s*\}.*@\/lib\/app-version/u);
-    expect(editorSource).toMatch(
-      /<footer[^>]*>[\s\S]*<UpdateControls\s+currentVersion=\{APP_VERSION\}\s*\/>[\s\S]*<\/footer>/u,
-    );
-    expect(updateControlsSource).toMatch(/\u7248\u672c\s*\{currentVersion\}/u);
+    expect(editorSource).toMatch(/<UpdateDialog\s+currentVersion=\{APP_VERSION\}\s*\/>/u);
+    expect(editorSource).not.toMatch(/<footer[^>]*>[\s\S]*<UpdateDialog/u);
+    expect(updateDialogSource).toMatch(/\{state\.currentVersion\}/u);
     expect(editorSource).not.toMatch(/fetch\([^)]*version|ipc[^\n]*version/u);
   });
 
@@ -307,7 +306,7 @@ describe('single-source application version consumers', () => {
       'electron-builder.config.mjs',
       'electron/main.cjs',
       'next.config.mjs',
-      'src/features/app-update/update-controls.tsx',
+      'src/features/app-update/update-dialog.tsx',
       'src/features/report-editor/report-editor.tsx',
       'src/lib/app-version.ts',
     ];
