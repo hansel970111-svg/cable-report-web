@@ -8,7 +8,19 @@ import { descendantProcesses, processExists } from './launch-packaged';
 const RELEASES_URL = 'https://github.com/hansel970111-svg/cable-report-web/releases/latest';
 
 test('packaged renderer API and external navigation stay inside the allowlist', async ({ desktop }) => {
-  await expect(desktop.window.getByRole('button', { name: '检测更新' })).toBeVisible();
+  await expect(desktop.window.getByRole('button', { name: '检测更新' })).toHaveCount(0);
+  await expect(desktop.window.getByText(/^版本\s+\d/)).toHaveCount(0);
+
+  await desktop.app.evaluate(async ({ Menu }) => {
+    const helpMenu = Menu.getApplicationMenu()?.items.find(item => item.label === '帮助');
+    const updateItem = helpMenu?.submenu?.items.find(item => item.label === '检测更新');
+    if (!updateItem?.click) throw new Error('帮助菜单中缺少检测更新按钮');
+    Reflect.apply(updateItem.click, updateItem, []);
+  });
+  await expect(desktop.window.getByRole('dialog', { name: '检测更新' })).toBeVisible();
+  await expect(desktop.window.getByText('当前版本')).toBeVisible();
+  await desktop.window.getByRole('button', { name: '关闭更新窗口' }).click();
+  await expect(desktop.window.getByRole('dialog', { name: '检测更新' })).not.toBeVisible();
 
   const unauthenticated = await desktop.window.evaluate(() => (
     fetch('/api/import-excel', { method: 'POST' }).then(response => response.status)

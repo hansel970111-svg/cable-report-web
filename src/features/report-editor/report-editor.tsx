@@ -12,7 +12,7 @@ import {
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { ReportDraft } from '@/domain/report/model';
-import { UpdateControls } from '@/features/app-update/update-controls';
+import { UpdateDialog } from '@/features/app-update/update-dialog';
 import type { WorkflowState } from '@/features/report-workflow/model';
 import type { ReportWorkflowServices } from '@/features/report-workflow/services';
 import { useReportWorkflow } from '@/features/report-workflow/use-report-workflow';
@@ -132,6 +132,8 @@ export function ReportEditor({ services }: ReportEditorProps) {
         <p>导入 Excel、校对记录，然后生成并保存 PDF 报告。</p>
       </header>
 
+      <UpdateDialog currentVersion={APP_VERSION} />
+
       {browserDevelopmentMode && (
         <div role="status" aria-label="运行模式" className="browser-mode-banner">
           浏览器开发模式
@@ -217,9 +219,6 @@ export function ReportEditor({ services }: ReportEditorProps) {
         </div>
       )}
 
-      <footer className="mt-8 text-center text-xs text-muted-foreground">
-        <UpdateControls currentVersion={APP_VERSION} />
-      </footer>
     </div>
   );
 }

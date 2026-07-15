@@ -67,17 +67,17 @@ function renderArtifactName(pattern, values) {
 function assertSourceWiring(sources) {
   const appVersion = sources['src/lib/app-version.ts'];
   const editor = sources['src/features/report-editor/report-editor.tsx'];
-  const updateControls = sources['src/features/app-update/update-controls.tsx'];
+  const updateDialog = sources['src/features/app-update/update-dialog.tsx'];
   const electronMain = sources['electron/main.cjs'];
   if (!/export const APP_VERSION[^=]*=\s*process\.env\.CABLE_REPORT_APP_VERSION/u
     .test(appVersion)) {
     fail('The renderer version module is not wired to the immutable Next build constant.');
   }
   if (!/import\s*\{\s*APP_VERSION\s*\}.*@\/lib\/app-version/u.test(editor)
-      || !/<footer[^>]*>[\s\S]*<UpdateControls\s+currentVersion=\{APP_VERSION\}\s*\/>[\s\S]*<\/footer>/u
-        .test(editor)
-      || !/\u7248\u672c\s*\{currentVersion\}/u.test(updateControls)) {
-    fail('ReportEditor does not render the configured application version footer.');
+      || !/<UpdateDialog\s+currentVersion=\{APP_VERSION\}\s*\/>/u.test(editor)
+      || /<footer[^>]*>[\s\S]*<UpdateDialog/u.test(editor)
+      || !/\{state\.currentVersion\}/u.test(updateDialog)) {
+    fail('ReportEditor does not render the configured version only in the update dialog.');
   }
   if (!/app\.setAboutPanelOptions\(\{[\s\S]*applicationName:\s*app\.getName\(\)[\s\S]*applicationVersion:\s*app\.getVersion\(\)[\s\S]*version:\s*app\.getVersion\(\)[\s\S]*\}\)/u
     .test(electronMain)) {
@@ -172,9 +172,9 @@ export async function collectVersionConsumerEvidence({ cwd, expectedVersion }) {
     ),
     'electron/main.cjs': await readRequiredSource(cwd, 'electron/main.cjs'),
     'next.config.mjs': await readRequiredSource(cwd, 'next.config.mjs'),
-    'src/features/app-update/update-controls.tsx': await readRequiredSource(
+    'src/features/app-update/update-dialog.tsx': await readRequiredSource(
       cwd,
-      'src/features/app-update/update-controls.tsx',
+      'src/features/app-update/update-dialog.tsx',
     ),
     'src/features/report-editor/report-editor.tsx': await readRequiredSource(
       cwd,
