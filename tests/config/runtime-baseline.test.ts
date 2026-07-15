@@ -52,7 +52,7 @@ test('Windows build uses the same Node, pnpm, and frozen lock baseline', async (
   expect(workflow).toContain('node scripts/verify-dependency-policy.mjs');
   expect(workflow).toContain('python scripts/verify_python_locks.py');
   expect(workflow).toContain(
-    'corepack pnpm@9.15.9 audit --audit-level high --registry=https://registry.npmjs.org',
+    'corepack pnpm@11.4.0 --pm-on-fail=ignore audit --audit-level high --registry=https://registry.npmjs.org',
   );
   expect(workflow).toContain('corepack pnpm@9.15.9 check:fast');
   expect(workflow).toContain('corepack pnpm@9.15.9 test:python');

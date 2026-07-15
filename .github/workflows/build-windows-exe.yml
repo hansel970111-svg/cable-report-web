@@ -75,7 +75,7 @@ jobs:
         run: |
           node scripts/verify-dependency-policy.mjs
           python scripts/verify_python_locks.py
-          corepack pnpm@9.15.9 audit --audit-level high --registry=https://registry.npmjs.org
+          corepack pnpm@11.4.0 --pm-on-fail=ignore audit --audit-level high --registry=https://registry.npmjs.org
 
       - name: Run release quality gates
         shell: pwsh
