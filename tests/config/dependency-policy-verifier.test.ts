@@ -54,7 +54,7 @@ test('dependency verifier accepts the trusted root importer', async () => {
 
 test('dependency verifier rejects a direct specifier mismatch', async () => {
   const { packageJson, lockfile } = await trustedInputs();
-  const tampered = lockfile.replace('specifier: 16.2.10', 'specifier: 16.2.9');
+  const tampered = lockfile.replace('specifier: 16.2.11', 'specifier: 16.2.9');
   expect(tampered).not.toBe(lockfile);
 
   await expect(runVerifier(packageJson, tampered)).rejects.toMatchObject({
