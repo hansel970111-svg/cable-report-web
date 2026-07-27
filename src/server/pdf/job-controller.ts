@@ -65,6 +65,15 @@ export type PdfJobFileSystem = {
 const DEFAULT_TIMEOUT_MS = 600_000;
 const DEFAULT_MAX_PDF_BYTES = 256 * 1024 * 1024;
 const PDF_HEADER = Buffer.from('%PDF-', 'ascii');
+const TEMP_DIRECTORY_REMOVE_OPTIONS = {
+  recursive: true,
+  force: true,
+  // Windows can keep the worker log briefly locked after taskkill reports
+  // success. Let fs.rm retry transient EPERM/EBUSY/ENOTEMPTY failures before
+  // returning a response that claims cleanup has completed.
+  maxRetries: 10,
+  retryDelay: 100,
+} as const;
 const DEFAULT_FILE_SYSTEM: PdfJobFileSystem = {
   lstat,
   openOutput: open,
@@ -358,7 +367,7 @@ export class PdfJobController {
       request.signal.removeEventListener('abort', onCallerAbort);
       try {
         if (directory !== undefined) {
-          await this.fileSystem.rm(directory, { recursive: true, force: true });
+          await this.fileSystem.rm(directory, TEMP_DIRECTORY_REMOVE_OPTIONS);
         }
       } catch {
         failure ??= pdfJobError('PDF_PROCESS_FAILED', true);
