@@ -5,6 +5,7 @@ import path from 'node:path';
 import { afterEach, expect, test } from 'vitest';
 
 import {
+  isOwnedPackagedDescendant,
   resolvePackagedExecutable,
   validateMainProcessStderr,
 } from './launch-packaged';
@@ -69,4 +70,30 @@ test('main-process stderr validation catches only release-fatal diagnostics', ()
   expect(() => validateMainProcessStderr('[CABLE_FATAL_UNCAUGHT_EXCEPTION] Error: boom'))
     .toThrow(/fatal/i);
   expect(() => validateMainProcessStderr('Error: 本地服务启动超时')).toThrow(/启动/);
+});
+
+test('Windows cleanup tracks only application and PDF worker process identities', () => {
+  const executable = String.raw`D:\release\win-unpacked\Cable Report Generator.exe`;
+  const snapshot = (command: string) => ({ pid: 20, ppid: 10, command });
+
+  expect(isOwnedPackagedDescendant(
+    snapshot('Cable Report Generator.exe'),
+    executable,
+    'win32',
+  )).toBe(true);
+  expect(isOwnedPackagedDescendant(
+    snapshot(String.raw`D:\release\win-unpacked\pdf_worker.exe`),
+    executable,
+    'win32',
+  )).toBe(true);
+  expect(isOwnedPackagedDescendant(
+    snapshot('svchost.exe'),
+    executable,
+    'win32',
+  )).toBe(false);
+  expect(isOwnedPackagedDescendant(
+    snapshot('/Applications/Cable Report Generator Helper'),
+    executable,
+    'darwin',
+  )).toBe(true);
 });
