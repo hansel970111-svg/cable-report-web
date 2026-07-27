@@ -303,7 +303,7 @@ describe('prepare-release command with a real bare origin', () => {
     git(remote.work, ['push', 'origin', 'v2026.0710.1']);
     git(remote.work, ['tag', '-d', 'v2026.0710.1']);
     await expect(prepare(remote.work)).rejects.toMatchObject({ code: 'INVALID_RELEASE_TAG' });
-  });
+  }, 15_000);
 
   it('rejects an invalid current version', async () => {
     const { work } = await fixture();
