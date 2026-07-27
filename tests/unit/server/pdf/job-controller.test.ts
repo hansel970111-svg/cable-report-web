@@ -552,6 +552,30 @@ describe('PdfJobController output validation', () => {
     await expectClean(root, target);
   });
 
+  test('retries transient Windows-style errors while removing a task directory', async () => {
+    const root = await temporaryRoot();
+    const removeDirectory = vi.fn<typeof rm>(async (...args) => rm(...args));
+    const target = controller(root, fakeWorker(async request => {
+      await writeValidPdf(request);
+      return { pages: 1, records: 1 };
+    }), {
+      fileSystem: { lstat, openOutput: open, rm: removeDirectory },
+    });
+
+    await expect(target.run({
+      jobId: 'job-retry-cleanup',
+      draft: draft(),
+      signal: new AbortController().signal,
+    })).resolves.toMatchObject({ pages: 1, records: 1 });
+    expect(removeDirectory).toHaveBeenCalledWith(expect.any(String), {
+      recursive: true,
+      force: true,
+      maxRetries: 10,
+      retryDelay: 100,
+    });
+    await expectClean(root, target);
+  });
+
   test('maps a cleanup-only failure safely and always releases busy', async () => {
     const root = await temporaryRoot();
     const removeDirectory = vi.fn<typeof rm>(async (...args) => {
