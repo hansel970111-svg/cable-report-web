@@ -43,5 +43,6 @@ export const lcStrategy = defineStrategy('LC', (context, limits) => {
     generatedCableNo: sequence => String(sequence),
     replaceConstantExplicitCableNo: true,
     requirePositiveLength: true,
+    sumOdfSegmentLengths: true,
   });
 });

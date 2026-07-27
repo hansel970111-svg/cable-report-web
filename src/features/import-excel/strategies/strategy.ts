@@ -37,6 +37,7 @@ type CollectMatchingRowsOptions = {
   replaceConstantExplicitCableNo?: boolean;
   bandwidth?: (cableTypeText: string, sourceLabel: string) => string | null;
   requirePositiveLength?: boolean;
+  sumOdfSegmentLengths?: boolean;
 };
 
 export function defineStrategy(
@@ -76,7 +77,9 @@ export function collectMatchingRows(
     const { rows: sheetRows, firstRowNumber } = readSheetRows(worksheet);
     if (sheetRows.length === 0) continue;
 
-    const columns = detectSheetColumns(sheetRows, sheetName, options.typeMatcher);
+    const columns = detectSheetColumns(sheetRows, sheetName, options.typeMatcher, {
+      sumOdfSegmentLengths: options.sumOdfSegmentLengths,
+    });
     if (!columns) continue;
 
     for (let rowIndex = columns.headerRowCount; rowIndex < sheetRows.length; rowIndex++) {

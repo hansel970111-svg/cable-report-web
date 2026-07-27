@@ -180,8 +180,13 @@ main {
 }
 
 .update-dialog {
+  position: fixed;
+  inset: 0;
   width: min(32rem, calc(100vw - 2rem));
+  max-height: calc(100dvh - 2rem);
   max-width: none;
+  margin: auto;
+  overflow: auto;
   border: 1px solid var(--border);
   border-radius: calc(var(--radius) + 0.5rem);
   background: var(--background);
