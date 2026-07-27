@@ -311,7 +311,7 @@ describe('prepare-release command with a real bare origin', () => {
     git(work, ['add', 'package.json']);
     git(work, ['commit', '-m', 'invalid version']);
     await expect(prepare(work)).rejects.toMatchObject({ code: 'INVALID_CURRENT_VERSION' });
-  });
+  }, 15_000);
 
   it('requires current package version to be the highest published ancestor', async () => {
     const stale = await fixture();

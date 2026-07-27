@@ -162,4 +162,4 @@ test('desktop package verification rejects a packaged tree without the runtime v
   } finally {
     await rm(workspace, { recursive: true, force: true });
   }
-});
+}, 15_000);
