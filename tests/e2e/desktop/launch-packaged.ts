@@ -197,6 +197,23 @@ export function processExists(pid: number): boolean {
   }
 }
 
+export function isOwnedPackagedDescendant(
+  processInfo: ProcessSnapshot,
+  executablePath: string,
+  platform: NodeJS.Platform = process.platform,
+): boolean {
+  if (platform !== 'win32') return true;
+
+  // Win32_Process can retain a creator PID after that process exits. Once the
+  // PID is reused, an ancestry-only traversal can falsely attach unrelated
+  // system processes to the packaged app. Production desktop code can create
+  // only Electron subprocesses (the same executable name) and pdf_worker.exe,
+  // so keep the shutdown assertion strict to those owned process identities.
+  const processName = path.win32.basename(processInfo.command).toLowerCase();
+  const applicationName = path.win32.basename(executablePath).toLowerCase();
+  return processName === applicationName || processName === 'pdf_worker.exe';
+}
+
 async function waitForProcessExit(pids: readonly number[], timeoutMs = 10_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -261,7 +278,9 @@ export async function launchPackaged(
 
 export async function closePackaged(desktop: PackagedDesktop): Promise<void> {
   const descendants = desktop.mainPid > 0
-    ? descendantProcesses(desktop.mainPid)
+    ? descendantProcesses(desktop.mainPid).filter(processInfo => (
+      isOwnedPackagedDescendant(processInfo, desktop.executablePath)
+    ))
     : [];
   let primaryError: unknown;
   try {
