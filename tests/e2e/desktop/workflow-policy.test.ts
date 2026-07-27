@@ -129,7 +129,7 @@ test('release documentation uses the actual frozen toolchain and dev lock', asyn
   const releaseReadme = readme.slice(readme.indexOf('## 发布验证'));
   const frozenReleaseDocs = `${releaseReadme}\n${releaseDocs}`;
 
-  expect(readme).toContain('Next.js 16.2.10');
+  expect(readme).toContain('Next.js 16.2.11');
   expect(readme).toContain('pnpm 9.15.9');
   expect(frozenReleaseDocs).not.toContain('corepack prepare pnpm@9.15.9');
   expect(frozenReleaseDocs).not.toMatch(/^pnpm /m);

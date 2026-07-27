@@ -291,6 +291,41 @@ describe('legacy parsing rules', () => {
     expect(result.metadata.detectedColumns.length).toBe('线长 A, Length + 50m');
   });
 
+  it('sums both LC segment lengths and adds 50 when ODF columns exist outside Cross sheets', () => {
+    const result = importExcel(workbookInput([
+      ['DSW-PSW', [
+        ['A设备', 'A-ODF设备', '长度', 'Z-ODF设备', '长度', '线号', '线缆类型'],
+        ['DSW-1', 'ODF-A', 30, 'ODF-Z', 40, 'LC-ODF-1', 'SM,LC-LC,200G'],
+      ]],
+    ]), 'LC');
+
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0]).toMatchObject({
+      cableNumber: 'LC-ODF-1',
+      cableTypeText: 'SM,LC-LC,200G',
+      length: 120,
+      source: {
+        sheetName: 'DSW-PSW',
+        rowNumber: 2,
+        expansionIndex: 0,
+        rule: 'lc',
+      },
+    });
+    expect(result.metadata.detectedColumns.length).toBe('长度, 长度 + 50m');
+  });
+
+  it('does not sum generic LC length columns when the sheet has no Cross or ODF structure', () => {
+    const result = importExcel(workbookInput([
+      ['Fiber', [
+        ['线缆类型', '线号', '线长 A', 'Length', '备注'],
+        ['SM,LC-LC', 'LC-DIRECT', 10, 20, 'ODF 仅出现在数据中'],
+      ]],
+    ]), 'LC');
+
+    expect(result.rows[0].length).toBe(10);
+    expect(result.metadata.detectedColumns.length).toBe('线长 A, Length');
+  });
+
   it('extracts the MPO blue fallback bandwidth from Source Label', () => {
     const result = importExcel(workbookInput([
       ['Fiber', [

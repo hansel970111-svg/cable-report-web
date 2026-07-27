@@ -13,6 +13,10 @@ export type DetectedColumns = Readonly<Record<string, string | null>>;
 
 export type LengthMode = 'firstNumeric' | 'sumFirstTwoPlus50';
 
+export type SheetColumnDetectionOptions = {
+  sumOdfSegmentLengths?: boolean;
+};
+
 export type SheetColumnProfile = {
   headerRowCount: number;
   cableTypeCol: number;
@@ -365,6 +369,7 @@ export function detectSheetColumns(
   rows: ExcelRow[],
   sheetName: string,
   typeMatcher: (value: unknown) => boolean,
+  options: SheetColumnDetectionOptions = {},
 ): SheetColumnProfile | null {
   const firstHeaders = rows[0] || [];
   const secondHeaders = rows[1] || [];
@@ -428,7 +433,15 @@ export function detectSheetColumns(
   ];
 
   const isCrossSheet = sheetName.toLowerCase().includes('cross');
-  const lengthMode: LengthMode = (isCrossSheet || useTwoRowHeader) && lengthCols.length >= 2
+  const structuralHeaders = useTwoRowHeader
+    ? [...firstHeaders, ...secondHeaders]
+    : primaryHeaders;
+  const hasOdfColumns = structuralHeaders
+    .some(header => normalizeLower(header).includes('odf'));
+  const shouldSumSegmentLengths = isCrossSheet
+    || useTwoRowHeader
+    || (options.sumOdfSegmentLengths === true && hasOdfColumns);
+  const lengthMode: LengthMode = shouldSumSegmentLengths && lengthCols.length >= 2
     ? 'sumFirstTwoPlus50'
     : 'firstNumeric';
   const lengthName = combineColumnNames(primaryHeaders, lengthCols);

@@ -338,7 +338,7 @@ export const useStore = create<Store>((set) => ({
 
 ## 技术栈
 
-- **框架**: Next.js 16.2.10 (App Router)
+- **框架**: Next.js 16.2.11 (App Router)
 - **UI 组件**: shadcn/ui (基于 Radix UI)
 - **样式**: Tailwind CSS v4
 - **表单**: React Hook Form + Zod

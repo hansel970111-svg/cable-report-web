@@ -17,7 +17,19 @@ test('packaged renderer API and external navigation stay inside the allowlist', 
     if (!updateItem?.click) throw new Error('帮助菜单中缺少检测更新按钮');
     Reflect.apply(updateItem.click, updateItem, []);
   });
-  await expect(desktop.window.getByRole('dialog', { name: '检测更新' })).toBeVisible();
+  const updateDialog = desktop.window.getByRole('dialog', { name: '检测更新' });
+  await expect(updateDialog).toBeVisible();
+  const dialogPosition = await updateDialog.evaluate(element => {
+    const bounds = element.getBoundingClientRect();
+    return {
+      centerX: bounds.left + bounds.width / 2,
+      centerY: bounds.top + bounds.height / 2,
+      viewportCenterX: window.innerWidth / 2,
+      viewportCenterY: window.innerHeight / 2,
+    };
+  });
+  expect(Math.abs(dialogPosition.centerX - dialogPosition.viewportCenterX)).toBeLessThanOrEqual(1);
+  expect(Math.abs(dialogPosition.centerY - dialogPosition.viewportCenterY)).toBeLessThanOrEqual(1);
   await expect(desktop.window.getByText('当前版本')).toBeVisible();
   await desktop.window.getByRole('button', { name: '关闭更新窗口' }).click();
   await expect(desktop.window.getByRole('dialog', { name: '检测更新' })).not.toBeVisible();

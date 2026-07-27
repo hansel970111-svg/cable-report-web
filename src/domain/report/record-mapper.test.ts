@@ -80,6 +80,31 @@ test('uses 19 as the missing base length and preserves the low Margin branch', (
   expect(random.calls()).toBe(3);
 });
 
+test('applies the original random coefficient to the summed ODF LC base length', () => {
+  const random = sequence([0.75, 0.79, 0.25]);
+
+  const [record] = mapImportedRows([importRow({
+    cableNumber: 'LC-ODF-1',
+    cableTypeText: 'SM,LC-LC,200G',
+    length: 120,
+    source: {
+      sheetName: 'DSW-PSW',
+      rowNumber: 2,
+      expansionIndex: 0,
+      rule: 'lc',
+    },
+  })], {
+    cableType: 'LC',
+    startingDateTime: '10-07-2026 09:00:00 AM',
+    random,
+    idFactory: defaultRecordIdFactory,
+  });
+
+  expect(record.length).toBe(121.8);
+  expect(record.limit).toBe('Link Validation');
+  expect(random.calls()).toBe(3);
+});
+
 test('generates all automatic times before row randomness even when Excel times win', () => {
   const random = sequence([
     0, 0, 0,
