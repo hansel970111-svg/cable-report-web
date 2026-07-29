@@ -270,14 +270,14 @@ describe('legacy parsing rules', () => {
   it('sums the first two prioritized length columns and adds 50 on Cross sheets', () => {
     const result = importExcel(workbookInput([
       ['Cross Connect', [
-        ['线缆类型', '线号', '线长 A', 'Length'],
-        ['SM,LC-LC', 'LC-SUM', 10, 20],
+        ['线缆类型', '线号', '线长 A', '线号', 'Length'],
+        ['SM,LC-LC', 'LC-A', 10, 'LC-B', 20],
       ]],
     ]), 'LC');
 
     expect(result.rows).toEqual<CableImportRow[]>([
       {
-        cableNumber: 'LC-SUM',
+        cableNumber: 'LC-A & LC-B',
         cableTypeText: 'SM,LC-LC',
         length: 80,
         dateTime: null,
@@ -294,14 +294,14 @@ describe('legacy parsing rules', () => {
   it('sums both LC segment lengths and adds 50 when ODF columns exist outside Cross sheets', () => {
     const result = importExcel(workbookInput([
       ['DSW-PSW', [
-        ['A设备', 'A-ODF设备', '长度', 'Z-ODF设备', '长度', '线号', '线缆类型'],
-        ['DSW-1', 'ODF-A', 30, 'ODF-Z', 40, 'LC-ODF-1', 'SM,LC-LC,200G'],
+        ['A设备', '线号', 'A-ODF设备', '长度', 'Z-ODF设备', '线号', '长度', '线缆类型'],
+        ['DSW-1', '#1', 'ODF-A', 30, 'ODF-Z', '#2', 40, 'SM,LC-LC,200G'],
       ]],
     ]), 'LC');
 
     expect(result.rows).toHaveLength(1);
     expect(result.rows[0]).toMatchObject({
-      cableNumber: 'LC-ODF-1',
+      cableNumber: '#1 & #2',
       cableTypeText: 'SM,LC-LC,200G',
       length: 120,
       source: {
@@ -312,6 +312,17 @@ describe('legacy parsing rules', () => {
       },
     });
     expect(result.metadata.detectedColumns.length).toBe('长度, 长度 + 50m');
+  });
+
+  it('keeps the first Cable Label when duplicate number columns are not an ODF path', () => {
+    const result = importExcel(workbookInput([
+      ['Fiber', [
+        ['线缆类型', '线号', '线号', '线长'],
+        ['SM,LC-LC', '#DIRECT-A', '#DIRECT-B', 20],
+      ]],
+    ]), 'LC');
+
+    expect(result.rows[0].cableNumber).toBe('#DIRECT-A');
   });
 
   it('does not sum generic LC length columns when the sheet has no Cross or ODF structure', () => {

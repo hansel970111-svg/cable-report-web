@@ -33,6 +33,14 @@ export function buildCableLabel(row: CableImportRow, cableType: CableType): stri
     return `#${numberPart}`;
   }
 
+  if (cableType === 'LC' && cableNumber.includes('&')) {
+    return cableNumber
+      .split(/\s*&\s*/)
+      .filter(Boolean)
+      .map(segment => segment.startsWith('#') ? segment : `#${segment}`)
+      .join(' & ');
+  }
+
   return cableNumber.startsWith('#') ? cableNumber : `#${cableNumber}`;
 }
 

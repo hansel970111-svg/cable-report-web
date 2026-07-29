@@ -84,7 +84,7 @@ test('applies the original random coefficient to the summed ODF LC base length',
   const random = sequence([0.75, 0.79, 0.25]);
 
   const [record] = mapImportedRows([importRow({
-    cableNumber: 'LC-ODF-1',
+    cableNumber: '#1 & #2',
     cableTypeText: 'SM,LC-LC,200G',
     length: 120,
     source: {
@@ -101,6 +101,8 @@ test('applies the original random coefficient to the summed ODF LC base length',
   });
 
   expect(record.length).toBe(121.8);
+  expect(record.cableLabel).toBe('#1 & #2');
+  expect(record.cableNumber).toBe('1 & 2');
   expect(record.limit).toBe('Link Validation');
   expect(random.calls()).toBe(3);
 });
@@ -157,6 +159,7 @@ test('generates all automatic times before row randomness even when Excel times 
 test('preserves Vertical, LC, and MPO Label and Limit rules', () => {
   const vertical = importRow({ cableNumber: '#R01-42-1' });
   const lc = importRow({ cableNumber: 'LC-42' });
+  const odfLc = importRow({ cableNumber: '#1 & 2' });
   const mpo = importRow({
     cableNumber: 'MPO #42',
     cableTypeText: 'MPO 蓝',
@@ -166,6 +169,7 @@ test('preserves Vertical, LC, and MPO Label and Limit rules', () => {
   expect(buildCableLabel(vertical, 'Cat 5e (Vertical Cabling)')).toBe('R01-42-1');
   expect(buildLimit(vertical, 'Cat 5e (Vertical Cabling)')).toBe('TIA - Cat 5e Channel');
   expect(buildCableLabel(lc, 'LC')).toBe('#LC-42');
+  expect(buildCableLabel(odfLc, 'LC')).toBe('#1 & #2');
   expect(buildLimit(lc, 'LC')).toBe('Link Validation');
   expect(buildCableLabel(mpo, 'MPO')).toBe('#42');
   expect(buildLimit(mpo, 'MPO')).toBe('100GBASE-SR10');

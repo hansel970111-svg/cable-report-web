@@ -15,6 +15,18 @@ export type MapImportedRowsOptions = {
 export const defaultRecordIdFactory: RecordIdFactory = row =>
   `${row.source.sheetName}:${row.source.rowNumber}:${row.source.expansionIndex}`;
 
+function normalizeCableNumber(cableNumber: string, cableType: CableType): string {
+  if (cableType !== 'LC' || !cableNumber.includes('&')) {
+    return cableNumber.replace(/^#/, '');
+  }
+
+  return cableNumber
+    .split(/\s*&\s*/)
+    .filter(Boolean)
+    .map(segment => segment.replace(/^#/, ''))
+    .join(' & ');
+}
+
 export function mapImportedRows(
   rows: readonly CableImportRow[],
   options: MapImportedRowsOptions,
@@ -34,7 +46,7 @@ export function mapImportedRows(
     return {
       id: options.idFactory(row, index),
       cableLabel: buildCableLabel(row, options.cableType),
-      cableNumber: row.cableNumber.replace(/^#/, ''),
+      cableNumber: normalizeCableNumber(row.cableNumber, options.cableType),
       limit: buildLimit(row, options.cableType),
       result: 'PASS',
       length,
