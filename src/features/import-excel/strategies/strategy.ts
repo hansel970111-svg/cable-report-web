@@ -2,8 +2,8 @@ import type { CableImportRow, CableType, ImportRule } from '@/domain/report/mode
 import type { ImportLimits, WorkbookContext } from '../contracts';
 import {
   detectSheetColumns,
+  readCableNo,
   readDateTime,
-  readFirstCableNo,
   readFirstSourceLabel,
   readLength,
   readSheetRows,
@@ -89,7 +89,7 @@ export function collectMatchingRows(
 
       const hasCableNumberColumn = columns.cableNoCols.length > 0;
       const explicitCableNumber = hasCableNumberColumn
-        ? readFirstCableNo(row, columns.cableNoCols)
+        ? readCableNo(row, columns.cableNoCols, columns.cableNoMode)
         : '';
       if (hasCableNumberColumn && !explicitCableNumber) continue;
 

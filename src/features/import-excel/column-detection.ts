@@ -12,6 +12,7 @@ export type SheetRowsContext = {
 export type DetectedColumns = Readonly<Record<string, string | null>>;
 
 export type LengthMode = 'firstNumeric' | 'sumFirstTwoPlus50';
+export type CableNoMode = 'firstNonEmpty' | 'combineFirstTwo';
 
 export type SheetColumnDetectionOptions = {
   sumOdfSegmentLengths?: boolean;
@@ -22,6 +23,7 @@ export type SheetColumnProfile = {
   cableTypeCol: number;
   cableNoCol: number;
   cableNoCols: number[];
+  cableNoMode: CableNoMode;
   lengthCols: number[];
   lengthMode: LengthMode;
   dateTimeCol: number;
@@ -441,6 +443,11 @@ export function detectSheetColumns(
   const shouldSumSegmentLengths = isCrossSheet
     || useTwoRowHeader
     || (options.sumOdfSegmentLengths === true && hasOdfColumns);
+  const cableNoMode: CableNoMode = options.sumOdfSegmentLengths === true
+    && (isCrossSheet || hasOdfColumns)
+    && cableNoCols.length >= 2
+    ? 'combineFirstTwo'
+    : 'firstNonEmpty';
   const lengthMode: LengthMode = shouldSumSegmentLengths && lengthCols.length >= 2
     ? 'sumFirstTwoPlus50'
     : 'firstNumeric';
@@ -452,6 +459,7 @@ export function detectSheetColumns(
     cableTypeCol,
     cableNoCol,
     cableNoCols,
+    cableNoMode,
     lengthCols,
     lengthMode,
     dateTimeCol,
@@ -480,6 +488,22 @@ export function readFirstCableNo(row: ExcelRow, columns: number[]): string {
   }
 
   return '';
+}
+
+export function readCableNo(
+  row: ExcelRow,
+  columns: number[],
+  mode: CableNoMode = 'firstNonEmpty',
+): string {
+  if (mode === 'combineFirstTwo') {
+    return columns
+      .map(column => normalizeCell(row[column]))
+      .filter(Boolean)
+      .slice(0, 2)
+      .join(' & ');
+  }
+
+  return readFirstCableNo(row, columns);
 }
 
 function formatDateTime(date: Date): string {
