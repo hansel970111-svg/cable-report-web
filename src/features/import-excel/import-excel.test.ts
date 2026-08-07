@@ -8,6 +8,7 @@ import * as XLSX from 'xlsx';
 
 import type { CableImportRow, CableType } from '@/domain/report/model';
 import { POST } from '@/app/api/import-excel/route';
+import { readSheetRows } from './column-detection';
 import {
   excelStrategies,
   importExcel,
@@ -267,19 +268,42 @@ describe('legacy parsing rules', () => {
     });
   });
 
-  it('sums the first two prioritized length columns and adds 50 on Cross sheets', () => {
+  it('expands both Cable Label and length columns on Cross sheets and sorts naturally', () => {
     const result = importExcel(workbookInput([
       ['Cross Connect', [
         ['线缆类型', '线号', '线长 A', '线号', 'Length'],
-        ['SM,LC-LC', 'LC-A', 10, 'LC-B', 20],
+        ['SM,LC-LC', 'LC-10', 10, 'LC-11', 20],
+        ['SM,LC-LC', 'LC-2', 30, 'LC-3', 40],
       ]],
     ]), 'LC');
 
     expect(result.rows).toEqual<CableImportRow[]>([
       {
-        cableNumber: 'LC-A & LC-B',
+        cableNumber: 'LC-2',
         cableTypeText: 'SM,LC-LC',
-        length: 80,
+        length: 30,
+        dateTime: null,
+        sourceLabel: null,
+        bandwidth: null,
+        source: {
+          sheetName: 'Cross Connect', rowNumber: 3, expansionIndex: 0, rule: 'lc',
+        },
+      },
+      {
+        cableNumber: 'LC-3',
+        cableTypeText: 'SM,LC-LC',
+        length: 40,
+        dateTime: null,
+        sourceLabel: null,
+        bandwidth: null,
+        source: {
+          sheetName: 'Cross Connect', rowNumber: 3, expansionIndex: 1, rule: 'lc',
+        },
+      },
+      {
+        cableNumber: 'LC-10',
+        cableTypeText: 'SM,LC-LC',
+        length: 10,
         dateTime: null,
         sourceLabel: null,
         bandwidth: null,
@@ -287,31 +311,192 @@ describe('legacy parsing rules', () => {
           sheetName: 'Cross Connect', rowNumber: 2, expansionIndex: 0, rule: 'lc',
         },
       },
+      {
+        cableNumber: 'LC-11',
+        cableTypeText: 'SM,LC-LC',
+        length: 20,
+        dateTime: null,
+        sourceLabel: null,
+        bandwidth: null,
+        source: {
+          sheetName: 'Cross Connect', rowNumber: 2, expansionIndex: 1, rule: 'lc',
+        },
+      },
     ]);
-    expect(result.metadata.detectedColumns.length).toBe('线长 A, Length + 50m');
+    expect(result.metadata.detectedColumns.length).toBe('线长 A, Length');
   });
 
-  it('sums both LC segment lengths and adds 50 when ODF columns exist outside Cross sheets', () => {
+  it('expands both ODF Cable Label columns with their corresponding lengths', () => {
     const result = importExcel(workbookInput([
       ['DSW-PSW', [
         ['A设备', '线号', 'A-ODF设备', '长度', 'Z-ODF设备', '线号', '长度', '线缆类型'],
-        ['DSW-1', '#1', 'ODF-A', 30, 'ODF-Z', '#2', 40, 'SM,LC-LC,200G'],
+        ['DSW-1', '#10', 'ODF-A', 30, 'ODF-Z', '#2', 40, 'SM,LC-LC,200G'],
+      ]],
+    ]), 'LC');
+
+    expect(result.rows).toEqual<CableImportRow[]>([
+      {
+        cableNumber: '#2',
+        cableTypeText: 'SM,LC-LC,200G',
+        length: 40,
+        dateTime: null,
+        sourceLabel: null,
+        bandwidth: null,
+        source: {
+          sheetName: 'DSW-PSW', rowNumber: 2, expansionIndex: 1, rule: 'lc',
+        },
+      },
+      {
+        cableNumber: '#10',
+        cableTypeText: 'SM,LC-LC,200G',
+        length: 30,
+        dateTime: null,
+        sourceLabel: null,
+        bandwidth: null,
+        source: {
+          sheetName: 'DSW-PSW', rowNumber: 2, expansionIndex: 0, rule: 'lc',
+        },
+      },
+    ]);
+    expect(result.metadata.detectedColumns.length).toBe('长度, 长度');
+  });
+
+  it('pairs ODF labels with length columns by physical column order', () => {
+    const result = importExcel(workbookInput([
+      ['Cross Connect', [
+        ['线缆类型', '线号', 'Length', '线号', '线长'],
+        ['SM,LC-LC', '#1', 11, '#2', 22],
+      ]],
+    ]), 'LC');
+
+    expect(result.rows.map(row => ({
+      cableNumber: row.cableNumber,
+      length: row.length,
+      expansionIndex: row.source.expansionIndex,
+    }))).toEqual([
+      { cableNumber: '#1', length: 11, expansionIndex: 0 },
+      { cableNumber: '#2', length: 22, expansionIndex: 1 },
+    ]);
+  });
+
+  it('does not let an extra length field shift the second ODF segment', () => {
+    const result = importExcel(workbookInput([
+      ['Cross Connect', [
+        ['线缆类型', '线号', '线长', '总长度', '线号', '长度'],
+        ['SM,LC-LC', '#1', 11, 999, '#2', 22],
+      ]],
+    ]), 'LC');
+
+    expect(result.rows.map(row => ({
+      cableNumber: row.cableNumber,
+      length: row.length,
+    }))).toEqual([
+      { cableNumber: '#1', length: 11 },
+      { cableNumber: '#2', length: 22 },
+    ]);
+  });
+
+  it('prefers the segment line length when a total length field comes first', () => {
+    const result = importExcel(workbookInput([
+      ['Cross Connect', [
+        ['线缆类型', '线号', '总长度', '线长', '线号', '总长度', '长度'],
+        ['SM,LC-LC', '#1', 999, 11, '#2', 888, 22],
+      ]],
+    ]), 'LC');
+
+    expect(result.rows.map(row => ({
+      cableNumber: row.cableNumber,
+      length: row.length,
+    }))).toEqual([
+      { cableNumber: '#1', length: 11 },
+      { cableNumber: '#2', length: 22 },
+    ]);
+  });
+
+  it.each([
+    [
+      'a second Cable Label',
+      ['线缆类型', '线号', '长度', '长度'],
+      ['SM,LC-LC', '#1', 30, 40],
+    ],
+    [
+      'a corresponding second length',
+      ['线缆类型', '线号', '长度', '线号'],
+      ['SM,LC-LC', '#1', 30, '#2'],
+    ],
+  ])('rejects an ODF segment layout missing %s', (_label, headers, row) => {
+    expectImportError(
+      () => importExcel(workbookInput([
+        ['Cross Connect', [headers, row]],
+      ]), 'LC'),
+      { code: 'ODF_SEGMENT_COLUMNS_INVALID', retryable: false, field: 'file' },
+    );
+  });
+
+  it('rejects a matching ODF sheet that exposes only one complete segment', () => {
+    expectImportError(
+      () => importExcel(workbookInput([
+        ['ODF Links', [
+          ['线缆类型', '线号', '长度', 'A-ODF设备'],
+          ['SM,LC-LC', '#1', 30, 'ODF-A'],
+        ]],
+      ]), 'LC'),
+      { code: 'ODF_SEGMENT_COLUMNS_INVALID', retryable: false, field: 'file' },
+    );
+  });
+
+  it('ignores malformed Cross sheets that contain no matching LC rows', () => {
+    const result = importExcel(workbookInput([
+      ['Valid LC', [
+        ['线缆类型', '线号', '长度'],
+        ['SM,LC-LC', '#7', 70],
+      ]],
+      ['Cross MPO', [
+        ['线缆类型', '线号', '长度', '总长度'],
+        ['MPO-MPO,200G', '#M1', 10, 20],
+      ]],
+    ]), 'LC');
+
+    expect(result.rows.map(row => ({
+      cableNumber: row.cableNumber,
+      length: row.length,
+      sheetName: row.source.sheetName,
+    }))).toEqual([
+      { cableNumber: '#7', length: 70, sheetName: 'Valid LC' },
+    ]);
+  });
+
+  it('keeps the second ODF segment paired when the first label is empty', () => {
+    const result = importExcel(workbookInput([
+      ['Cross Connect', [
+        ['线缆类型', '线号', '线长', '线号', '线长'],
+        ['SM,LC-LC', '', 11, '#2', 22],
       ]],
     ]), 'LC');
 
     expect(result.rows).toHaveLength(1);
     expect(result.rows[0]).toMatchObject({
-      cableNumber: '#1 & #2',
-      cableTypeText: 'SM,LC-LC,200G',
-      length: 120,
-      source: {
-        sheetName: 'DSW-PSW',
-        rowNumber: 2,
-        expansionIndex: 0,
-        rule: 'lc',
-      },
+      cableNumber: '#2',
+      length: 22,
+      source: { expansionIndex: 1 },
     });
-    expect(result.metadata.detectedColumns.length).toBe('长度, 长度 + 50m');
+  });
+
+  it('skips only the ODF segment whose corresponding length is invalid', () => {
+    const result = importExcel(workbookInput([
+      ['Cross Connect', [
+        ['线缆类型', '线号', '线长', '线号', '线长'],
+        ['SM,LC-LC', '#1', '', '#2', 22],
+      ]],
+    ]), 'LC');
+
+    expect(result.rows.map(row => ({
+      cableNumber: row.cableNumber,
+      length: row.length,
+      expansionIndex: row.source.expansionIndex,
+    }))).toEqual([
+      { cableNumber: '#2', length: 22, expansionIndex: 1 },
+    ]);
   });
 
   it('keeps the first Cable Label when duplicate number columns are not an ODF path', () => {
@@ -322,7 +507,28 @@ describe('legacy parsing rules', () => {
       ]],
     ]), 'LC');
 
-    expect(result.rows[0].cableNumber).toBe('#DIRECT-A');
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0]).toMatchObject({
+      cableNumber: '#DIRECT-A',
+      length: 20,
+      source: { expansionIndex: 0 },
+    });
+  });
+
+  it('keeps metadata sheet names in workbook order after natural row sorting', () => {
+    const result = importExcel(workbookInput([
+      ['Cross A', [
+        ['线缆类型', '线号', '线长'],
+        ['SM,LC-LC', '#10', 10],
+      ]],
+      ['Cross B', [
+        ['线缆类型', '线号', '线长'],
+        ['SM,LC-LC', '#2', 20],
+      ]],
+    ]), 'LC');
+
+    expect(result.rows.map(row => row.cableNumber)).toEqual(['#2', '#10']);
+    expect(result.metadata.sheetNames).toEqual(['Cross A', 'Cross B']);
   });
 
   it('does not sum generic LC length columns when the sheet has no Cross or ODF structure', () => {
@@ -457,6 +663,32 @@ describe('workbook boundary', () => {
     );
   });
 
+  it('rejects an extreme declared sheet range before materializing its cell matrix', () => {
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.aoa_to_sheet([
+      ['线缆类型', '线号', '线长'],
+      ['红', '1', 10],
+    ]);
+    worksheet['!ref'] = 'A1:XFD500';
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'OOB');
+    const bytes = new Uint8Array(XLSX.write(workbook, { type: 'array', bookType: 'xlsx' }));
+
+    expectImportError(
+      () => importExcel({ fileName: 'extreme.xlsx', mimeType: XLSX_MIME, bytes }, 'Cat 5e'),
+      { code: 'EXCEL_SHEET_TOO_LARGE', retryable: false, field: 'file' },
+    );
+  });
+
+  it.each(['garbage', 'B2:A1', 'A0:A1'])(
+    'rejects an invalid declared sheet range %s before materializing rows',
+    reference => {
+      expectImportError(
+        () => readSheetRows({ '!ref': reference }),
+        { code: 'EXCEL_PARSE_FAILED', retryable: false, field: 'file' },
+      );
+    },
+  );
+
   it('maps SheetJS parser failures without exposing the parser message', () => {
     const error = expectImportError(
       () => importExcel({
@@ -509,6 +741,18 @@ describe('expansion and record limits', () => {
           ['DE48', 'RU03', '红', 1, 30],
         ]],
       ]), 'Cat 5e (Vertical Cabling)'),
+      { code: 'RECORD_LIMIT_EXCEEDED', retryable: false },
+    );
+  });
+
+  it('applies the record limit after expanding an ODF row into two segments', () => {
+    expectImportError(
+      () => importExcel(workbookInput([
+        ['Cross Connect', [
+          ['线缆类型', '线号', '线长', '线号', '线长'],
+          ['SM,LC-LC', '#1', 10, '#2', 20],
+        ]],
+      ]), 'LC', { ...IMPORT_LIMITS, maxRecords: 1 }),
       { code: 'RECORD_LIMIT_EXCEEDED', retryable: false },
     );
   });

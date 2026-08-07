@@ -96,6 +96,54 @@ afterEach(() => {
 });
 
 describe('ReportEditor import flow', () => {
+  it('aligns Site input constraints with the PDF-safe schema', async () => {
+    const user = userEvent.setup();
+    const services = makeServices();
+    render(<ReportEditor services={services} />);
+
+    const siteInput = screen.getByLabelText('项目号 (Site)');
+    expect(siteInput).toBeRequired();
+    expect(siteInput).toHaveAttribute('maxlength', '18');
+    expect(siteInput).toHaveAttribute('pattern', String.raw`[A-Za-z0-9: \-]+`);
+    expect(siteInput).toHaveAttribute('aria-invalid', 'false');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+
+    await user.type(siteInput, '   ');
+    expect(siteInput).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByRole('alert')).toHaveTextContent('项目号 (Site) 不能为空');
+    await user.upload(screen.getByLabelText('Excel 布线表'), excelFile());
+    await user.click(screen.getByRole('button', { name: '加载并导入' }));
+    expect(services.importExcel).not.toHaveBeenCalled();
+
+    await user.clear(siteInput);
+    await user.type(siteInput, 'DE46_1');
+    expect(siteInput).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByRole('alert')).toHaveTextContent('仅支持英文字母');
+    await user.click(screen.getByRole('button', { name: '加载并导入' }));
+    expect(services.importExcel).not.toHaveBeenCalled();
+
+    await user.clear(siteInput);
+    await user.type(siteInput, 'YYBX-OE38-00027');
+    expect(siteInput).toHaveAttribute('aria-invalid', 'false');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('shows an invalid Site once instead of duplicating the generation warning', async () => {
+    const user = userEvent.setup();
+    render(<ReportEditor services={makeServices()} />);
+    await selectAndImport(user);
+    await screen.findByRole('table');
+
+    const siteInput = screen.getByLabelText('项目号 (Site)');
+    await user.clear(siteInput);
+    await user.type(siteInput, 'DE46_1');
+
+    expect(screen.getAllByRole('alert')).toHaveLength(1);
+    expect(screen.getByRole('alert')).toHaveTextContent('仅支持英文字母');
+    expect(screen.queryByText(/暂时无法生成报告/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '生成测试报告' })).toBeDisabled();
+  });
+
   it('enables report generation for a real operational Site identifier', async () => {
     const user = userEvent.setup();
     render(<ReportEditor services={makeServices()} />);
@@ -181,6 +229,26 @@ describe('ReportEditor import flow', () => {
     expect(screen.getByRole('status', { name: '预览状态' }))
       .toHaveTextContent('暂无线缆记录');
     expect(screen.getByRole('button', { name: '生成测试报告' })).toBeDisabled();
+  });
+
+  it('explains an empty saved Cable Label instead of only disabling generation', async () => {
+    const user = userEvent.setup();
+    const services = makeServices();
+    render(<ReportEditor services={services} />);
+    await selectAndImport(user);
+    await screen.findByRole('table');
+
+    await user.click(screen.getByRole('button', { name: '批量编辑' }));
+    const input = screen.getByLabelText('第 1 条 Cable Label');
+    await user.clear(input);
+    expect(input).toHaveAttribute('aria-invalid', 'true');
+    await user.click(screen.getByRole('button', { name: '保存编辑' }));
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      '暂时无法生成报告：第 1 条记录：Cable Label 不能为空。',
+    );
+    expect(screen.getByRole('button', { name: '生成测试报告' })).toBeDisabled();
+    expect(services.generateReport).not.toHaveBeenCalled();
   });
 });
 

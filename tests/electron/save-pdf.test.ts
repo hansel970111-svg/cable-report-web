@@ -523,6 +523,7 @@ test('preload exposes fixed save and update bridges without exposing ipcRenderer
   expect(source).toContain("ipcRenderer.invoke('cable-report:check-for-updates')");
   expect(source).toContain("ipcRenderer.invoke('cable-report:download-update')");
   expect(source).toContain("ipcRenderer.invoke('cable-report:install-update')");
+  expect(source).toContain("ipcRenderer.invoke('cable-report:update-now')");
   expect(source).toContain('ipcRenderer.on(UPDATE_STATE_CHANNEL, listener)');
   expect(source).toContain('ipcRenderer.removeListener(UPDATE_STATE_CHANNEL, listener)');
   expect(source).not.toMatch(/\bipcRenderer\s*:/);

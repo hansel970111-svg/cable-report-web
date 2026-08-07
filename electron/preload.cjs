@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld(
     checkForUpdates: () => ipcRenderer.invoke('cable-report:check-for-updates'),
     downloadUpdate: () => ipcRenderer.invoke('cable-report:download-update'),
     installUpdate: () => ipcRenderer.invoke('cable-report:install-update'),
+    updateNow: () => ipcRenderer.invoke('cable-report:update-now'),
     onUpdateState: callback => {
       if (typeof callback !== 'function') {
         throw new TypeError('Update state callback must be a function.');

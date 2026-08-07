@@ -99,9 +99,13 @@ test('Electron window source retains the mandatory isolation controls', async ()
   expect(source).toContain("'cable-report:check-for-updates'");
   expect(source).toContain("'cable-report:download-update'");
   expect(source).toContain("'cable-report:install-update'");
+  expect(source).toContain("'cable-report:update-now'");
   expect(source).toContain("label: '检测更新'");
   expect(source).toContain('mainWindow.webContents.send(UPDATE_OPEN_DIALOG_CHANNEL)');
-  expect(source).not.toContain('setTimeout(() => void updateManager.check()');
+  expect(source).toContain('createAutomaticUpdateChecker({');
+  expect(source).toContain('automaticUpdateChecker.schedule()');
+  expect(source).toContain('automaticUpdateChecker.cancel()');
+  expect(source).toContain("process.env.CABLE_DISABLE_AUTO_UPDATE_CHECK !== '1'");
   expect(source).not.toContain("label: '打开下载页'");
   expect(source).not.toMatch(/execFile|spawn\(/);
   expect(source).not.toContain('browser_download_url');
@@ -110,6 +114,8 @@ test('Electron window source retains the mandatory isolation controls', async ()
   expect(source).toContain('[CABLE_FATAL_UNHANDLED_REJECTION]');
   expect(source).toContain('[CABLE_FATAL_UNCAUGHT_EXCEPTION]');
   expect(source).toContain("Symbol.for('cable-report.pdf-job-shutdown')");
+  expect(source).toContain('app.requestSingleInstanceLock()');
+  expect(source).toContain("app.on('second-instance'");
   expect(source).toContain('event.preventDefault()');
   expect(source).toContain('await shutdownPdfJobs()');
 
@@ -127,6 +133,7 @@ test('preload exposes only fixed desktop-token, save, and updater bridges', asyn
   expect(source).toContain("ipcRenderer.invoke('cable-report:check-for-updates')");
   expect(source).toContain("ipcRenderer.invoke('cable-report:download-update')");
   expect(source).toContain("ipcRenderer.invoke('cable-report:install-update')");
+  expect(source).toContain("ipcRenderer.invoke('cable-report:update-now')");
   expect(source).toContain('ipcRenderer.on(UPDATE_OPEN_DIALOG_CHANNEL, listener)');
   expect(source).toContain('ipcRenderer.removeListener(UPDATE_OPEN_DIALOG_CHANNEL, listener)');
   expect(source).not.toContain('ipcRenderer.send(');

@@ -13,6 +13,9 @@ export type DesktopUpdateState = {
   phase: DesktopUpdatePhase;
   currentVersion: string;
   version?: string;
+  releaseName?: string;
+  releaseDate?: string;
+  releaseNotes?: string[];
   percent?: number;
   message?: string;
 };
@@ -22,6 +25,7 @@ export type DesktopUpdateApi = {
   checkForUpdates(): Promise<DesktopUpdateState>;
   downloadUpdate(): Promise<DesktopUpdateState>;
   installUpdate(): Promise<DesktopUpdateState>;
+  updateNow(): Promise<DesktopUpdateState>;
   onUpdateState(callback: (state: DesktopUpdateState) => void): () => void;
   onOpenUpdateDialog(callback: () => void): () => void;
 };

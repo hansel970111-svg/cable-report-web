@@ -21,8 +21,8 @@ import {
 import { generateWorkingTimes } from '@/domain/report/time-sequence';
 import type { WorkflowAction, WorkflowModel, WorkflowSelection } from './model';
 import {
-  canGenerateReport,
   createInitialWorkflowModel,
+  reportGenerationEligibility,
   workflowReducer,
 } from './reducer';
 import type { ReportWorkflowServices } from './services';
@@ -43,6 +43,7 @@ export type ReportWorkflow = {
   state: WorkflowModel['state'];
   selection: WorkflowSelection;
   canGenerate: boolean;
+  generationBlockReason: string | null;
   selectFile(file: File | null): void;
   selectCableType(cableType: CableType): void;
   changeSite(site: string): void;
@@ -576,18 +577,19 @@ export function useReportWorkflow(
   const applyCableLabels = useCallback((values: ReadonlyMap<string, string>) => {
     const source = editableDraft(modelRef.current);
     if (source === null || values.size === 0) return;
+    const normalizedValues = new Map<string, string>();
+    values.forEach((value, id) => normalizedValues.set(id, value.trim()));
     const changes = source.records.some(record => {
-      const value = values.get(record.id);
+      const value = normalizedValues.get(record.id);
       return value !== undefined
         && (record.cableLabel !== value
           || record.cableNumber !== value.replace(/^#/, ''));
     });
     if (!changes) return;
-    const snapshot = new Map(values);
     invalidateForMutation();
     dispatch({
       type: 'draft/changed',
-      change: { kind: 'cable-labels', values: snapshot },
+      change: { kind: 'cable-labels', values: normalizedValues },
     });
   }, [dispatch, invalidateForMutation]);
 
@@ -600,7 +602,8 @@ export function useReportWorkflow(
 
   const generateAndSave = useCallback(async (): Promise<void> => {
     const current = modelRef.current;
-    if (!canGenerateReport(current) || current.state.status !== 'ready') return;
+    if (!reportGenerationEligibility(current).canGenerate
+        || current.state.status !== 'ready') return;
     await startGeneration(current.state.draft);
   }, [startGeneration]);
 
@@ -674,13 +677,17 @@ export function useReportWorkflow(
     };
   }, []);
 
-  const canGenerate = useMemo(() => canGenerateReport(model), [model]);
+  const generationEligibility = useMemo(
+    () => reportGenerationEligibility(model),
+    [model],
+  );
 
   return {
     model,
     state: model.state,
     selection: model.selection,
-    canGenerate,
+    canGenerate: generationEligibility.canGenerate,
+    generationBlockReason: generationEligibility.reason,
     selectFile,
     selectCableType,
     changeSite,

@@ -52,8 +52,9 @@ test('the updater runtime is bundled as one controlled production file', async (
 
   expect(main).toContain("require('../updater-runtime/index.cjs')");
   expect(main).toMatch(
-    /supported:\s*app\.isPackaged\s*&&\s*process\.platform === 'win32'/u,
+    /const desktopUpdaterSupported = app\.isPackaged\s*&&\s*process\.platform === 'win32'/u,
   );
+  expect(main).toContain('supported: desktopUpdaterSupported');
   expect(main).toContain("process.env.CABLE_DESKTOP_E2E !== '1'");
   expect(dist).toContain("runNodeScript('build-updater-runtime.mjs')");
   expect(packageJson.build.files).toContain('updater-runtime/**/*');

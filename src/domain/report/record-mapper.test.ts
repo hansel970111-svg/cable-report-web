@@ -80,13 +80,13 @@ test('uses 19 as the missing base length and preserves the low Margin branch', (
   expect(random.calls()).toBe(3);
 });
 
-test('applies the original random coefficient to the summed ODF LC base length', () => {
+test('applies the original random coefficient to an individual ODF LC segment', () => {
   const random = sequence([0.75, 0.79, 0.25]);
 
   const [record] = mapImportedRows([importRow({
-    cableNumber: '#1 & #2',
+    cableNumber: '#1',
     cableTypeText: 'SM,LC-LC,200G',
-    length: 120,
+    length: 30,
     source: {
       sheetName: 'DSW-PSW',
       rowNumber: 2,
@@ -100,9 +100,9 @@ test('applies the original random coefficient to the summed ODF LC base length',
     idFactory: defaultRecordIdFactory,
   });
 
-  expect(record.length).toBe(121.8);
-  expect(record.cableLabel).toBe('#1 & #2');
-  expect(record.cableNumber).toBe('1 & 2');
+  expect(record.length).toBe(30.4);
+  expect(record.cableLabel).toBe('#1');
+  expect(record.cableNumber).toBe('1');
   expect(record.limit).toBe('Link Validation');
   expect(random.calls()).toBe(3);
 });
@@ -159,7 +159,8 @@ test('generates all automatic times before row randomness even when Excel times 
 test('preserves Vertical, LC, and MPO Label and Limit rules', () => {
   const vertical = importRow({ cableNumber: '#R01-42-1' });
   const lc = importRow({ cableNumber: 'LC-42' });
-  const odfLc = importRow({ cableNumber: '#1 & 2' });
+  const odfFirst = importRow({ cableNumber: '#1' });
+  const odfSecond = importRow({ cableNumber: '#2' });
   const mpo = importRow({
     cableNumber: 'MPO #42',
     cableTypeText: 'MPO 蓝',
@@ -169,7 +170,8 @@ test('preserves Vertical, LC, and MPO Label and Limit rules', () => {
   expect(buildCableLabel(vertical, 'Cat 5e (Vertical Cabling)')).toBe('R01-42-1');
   expect(buildLimit(vertical, 'Cat 5e (Vertical Cabling)')).toBe('TIA - Cat 5e Channel');
   expect(buildCableLabel(lc, 'LC')).toBe('#LC-42');
-  expect(buildCableLabel(odfLc, 'LC')).toBe('#1 & #2');
+  expect(buildCableLabel(odfFirst, 'LC')).toBe('#1');
+  expect(buildCableLabel(odfSecond, 'LC')).toBe('#2');
   expect(buildLimit(lc, 'LC')).toBe('Link Validation');
   expect(buildCableLabel(mpo, 'MPO')).toBe('#42');
   expect(buildLimit(mpo, 'MPO')).toBe('100GBASE-SR10');

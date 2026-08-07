@@ -10,6 +10,10 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { Trash2 } from 'lucide-react';
 
 import type { CableRecord } from '@/domain/report/model';
+import {
+  cableLabelValidationMessage,
+  REPORT_FIELD_LIMITS,
+} from '@/domain/report/schema';
 import type { RecordDraftStore } from './record-draft-store';
 
 export type VirtualRecordTableProps = {
@@ -51,6 +55,8 @@ const VirtualRecordRow = memo(function VirtualRecordRow({
   );
   const cableLabel = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
   const inputId = `cable-label-${record.id}`;
+  const errorId = `${inputId}-error`;
+  const validationMessage = cableLabelValidationMessage(cableLabel);
 
   return (
     <div
@@ -76,8 +82,17 @@ const VirtualRecordRow = memo(function VirtualRecordRow({
               id={inputId}
               className="record-label-input"
               value={cableLabel}
+              required
+              maxLength={REPORT_FIELD_LIMITS.cableLabel}
+              aria-invalid={validationMessage !== null}
+              aria-describedby={validationMessage === null ? undefined : errorId}
               onChange={event => draftStore.set(record.id, event.target.value)}
             />
+            {validationMessage !== null && (
+              <span id={errorId} role="alert" className="sr-only">
+                {validationMessage}
+              </span>
+            )}
           </>
         ) : (
           <span className="record-label-text">{record.cableLabel}</span>

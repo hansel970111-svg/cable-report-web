@@ -154,7 +154,7 @@ def test_candidate_writer_validates_each_approved_case(case, tmp_path: Path) -> 
     write_golden_candidate(case, pdf_path, golden_dir)
 
     manifest = _read_manifest(golden_dir)
-    expected_printed_counts = [0] * (case.expected_pages - 1) + [3 if case.kind == "lc" else 1]
+    expected_printed_counts = [0] * (case.expected_pages - 1) + [1]
     assert manifest["printed"]["span_counts"] == expected_printed_counts
     assert_pdf_matches_golden(pdf_path, golden_dir)
 
@@ -566,11 +566,11 @@ def test_comparator_never_updates_baseline_on_failure(
 ) -> None:
     _, pdf_path, golden_dir = _copy_candidate(approved_candidate, tmp_path)
     manifest = _read_manifest(golden_dir)
-    manifest["pdf"]["normalized_text"][0] += "\nchanged"
+    manifest["pdf"]["metadata"]["producer"] = "changed"
     _write_manifest(golden_dir, manifest)
     before = _tree_digest(golden_dir)
 
-    with pytest.raises(AssertionError, match="normalized text"):
+    with pytest.raises(AssertionError, match="stable PDF metadata"):
         assert_pdf_matches_golden(pdf_path, golden_dir)
     assert _tree_digest(golden_dir) == before
 

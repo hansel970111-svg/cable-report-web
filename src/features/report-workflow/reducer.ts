@@ -1,5 +1,8 @@
 import type { ReportDraft } from '@/domain/report/model';
-import { ReportDraftSchema } from '@/domain/report/schema';
+import {
+  reportDraftValidationMessage,
+  ReportDraftSchema,
+} from '@/domain/report/schema';
 import type {
   DraftChange,
   WorkflowAction,
@@ -67,12 +70,32 @@ export function createInitialWorkflowModel(
 }
 
 export function canGenerateReport(model: WorkflowModel): boolean {
-  if (model.state.status !== 'ready') return false;
+  return reportGenerationEligibility(model).canGenerate;
+}
+
+export type ReportGenerationEligibility = {
+  canGenerate: boolean;
+  reason: string | null;
+};
+
+export function reportGenerationEligibility(
+  model: WorkflowModel,
+): ReportGenerationEligibility {
+  if (model.state.status !== 'ready') return { canGenerate: false, reason: null };
   const draft = model.state.draft;
-  if (draft.revision !== model.revision) return false;
-  if (draft.cableType !== model.selection.cableType) return false;
-  if (draft.site !== model.selection.site || draft.records.length === 0) return false;
-  return ReportDraftSchema.safeParse(draft).success;
+  if (draft.revision !== model.revision) {
+    return { canGenerate: false, reason: '报告内容已变化，请重新确认后生成。' };
+  }
+  if (draft.cableType !== model.selection.cableType) {
+    return { canGenerate: false, reason: '线缆类型与当前报告不一致，请重新导入。' };
+  }
+  if (draft.site !== model.selection.site) {
+    return { canGenerate: false, reason: '项目号与当前报告不一致，请重新确认。' };
+  }
+  if (draft.records.length === 0) return { canGenerate: false, reason: null };
+
+  const reason = reportDraftValidationMessage(draft);
+  return { canGenerate: reason === null, reason };
 }
 
 function toReadyModel(
@@ -164,8 +187,9 @@ function applyCableLabelChanges(
   let changed = false;
   const records = source.records.map(record => {
     if (!values.has(record.id)) return record;
-    const cableLabel = values.get(record.id);
-    if (cableLabel === undefined) return record;
+    const rawCableLabel = values.get(record.id);
+    if (rawCableLabel === undefined) return record;
+    const cableLabel = rawCableLabel.trim();
     const cableNumber = cableLabel.replace(/^#/, '');
     if (record.cableLabel === cableLabel && record.cableNumber === cableNumber) {
       return record;

@@ -8,6 +8,7 @@ import type { WorkflowState } from '@/features/report-workflow/model';
 export type WorkflowAlertProps = {
   state: WorkflowState;
   announcement: string | null;
+  validationMessage: string | null;
   onRetry(): Promise<void>;
   onDismiss(): void;
 };
@@ -15,6 +16,7 @@ export type WorkflowAlertProps = {
 export function WorkflowAlert({
   state,
   announcement,
+  validationMessage,
   onRetry,
   onDismiss,
 }: WorkflowAlertProps) {
@@ -34,6 +36,13 @@ export function WorkflowAlert({
               关闭
             </Button>
           </div>
+        </div>
+      )}
+
+      {state.status !== 'error' && validationMessage !== null && (
+        <div role="alert" className="workflow-error">
+          <AlertCircle aria-hidden="true" />
+          <p>暂时无法生成报告：{validationMessage}</p>
         </div>
       )}
 

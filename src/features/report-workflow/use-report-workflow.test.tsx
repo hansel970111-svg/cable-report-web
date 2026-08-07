@@ -188,7 +188,7 @@ describe('import ownership', () => {
     const services = makeServices();
     const { result } = renderWorkflow(services);
     await act(async () => result.current.importSelected());
-    const values = new Map([['record-1', '#C100']]);
+    const values = new Map([['record-1', '  #C100  ']]);
 
     act(() => {
       result.current.applyCableLabels(values);

@@ -90,6 +90,7 @@ test('packaged production modules expose only the fixed verified updater path', 
   expect(sources).toContain('updater.quitAndInstall(true, true)');
   expect(sources).toContain("'cable-report:download-update'");
   expect(sources).toContain("'cable-report:install-update'");
+  expect(sources).toContain("'cable-report:update-now'");
   expect(sources).not.toMatch(/child_process|execFile|spawn\(/);
   expect(sources).not.toContain('browser_download_url');
   expect(sources).toContain("'/hansel970111-svg/cable-report-web/releases/latest'");

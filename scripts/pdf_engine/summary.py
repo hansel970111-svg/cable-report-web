@@ -5,8 +5,9 @@ from datetime import datetime
 import fitz
 
 from pdf_engine.layout import (
-    _draw_clear_rect,
+    _clear_template_region,
     _format_pdf_value,
+    _insert_text_with_font_fitted,
     _redraw_outline,
     insert_text_with_font,
 )
@@ -33,14 +34,16 @@ def _draw_lc_fx_icon(page, x, y):
     )
 
 
-def _insert_lc_summary_text(page, x, y, text, bold=True):
-    insert_text_with_font(
+def _insert_lc_summary_text(page, x, y, text, bold=True, max_width=None):
+    _insert_text_with_font_fitted(
         page,
         fitz.Point(x, y),
         text,
         fontname="calibri-bold" if bold else "calibri",
         fontsize=8.0,
         color=(0, 0, 0),
+        max_width=max_width,
+        min_fontsize=4.5,
     )
 
 
@@ -85,7 +88,7 @@ def _draw_export_logo(page, logo_rect, logo_xref):
 def draw_final_footer(page, footer_template_page):
     logo_rect = _get_footer_logo_rect(footer_template_page)
     logo_xref = _get_existing_footer_logo_xref(page)
-    _draw_clear_rect(page, fitz.Rect(0.0, 812.0, 595.0, 842.0))
+    _clear_template_region(page, fitz.Rect(0.0, 812.0, 595.0, 842.0))
 
     insert_text_with_font(
         page,
@@ -122,7 +125,7 @@ def draw_lc_summary_boxes(page, top_y, site, pass_count, fail_count, total_lengt
         header_y = box_top + 10.0
         value_y = box_top + 25.0
 
-        _insert_lc_summary_text(page, 13.95, header_y, title)
+        _insert_lc_summary_text(page, 13.95, header_y, title, max_width=196.0)
         _insert_lc_summary_text(page, 214.0, header_y, "Pass")
         _insert_lc_summary_text(page, 334.0, header_y, "Fail")
         _insert_lc_summary_text(page, 464.0, header_y, "Length (m)")
@@ -209,14 +212,16 @@ def _draw_media_icon(page, x, y, label, fill_color):
     )
 
 
-def _insert_summary_text(page, x, y, text, bold=True, size=8.0):
-    insert_text_with_font(
+def _insert_summary_text(page, x, y, text, bold=True, size=8.0, max_width=None):
+    _insert_text_with_font_fitted(
         page,
         fitz.Point(x, y),
         text,
         fontname="calibri-bold" if bold else "calibri",
         fontsize=size,
         color=(0, 0, 0),
+        max_width=max_width,
+        min_fontsize=4.5,
     )
 
 
@@ -240,7 +245,7 @@ def draw_non_lc_summary_boxes(page, top_y, site, pass_count, fail_count, total_l
         header_y = box_top + 10.0
         value_y = box_top + 25.0
 
-        _insert_summary_text(page, 13.95, header_y, title)
+        _insert_summary_text(page, 13.95, header_y, title, max_width=196.0)
         _insert_summary_text(page, 214.0, header_y, "Pass")
         _insert_summary_text(page, 334.0, header_y, "Fail")
         _insert_summary_text(page, 464.0, header_y, "Length (m)")
@@ -260,7 +265,7 @@ def _non_lc_summary_totals(records, is_mpo_template):
 
 
 def _clear_summary_body(page):
-    _draw_clear_rect(page, fitz.Rect(8.5, 45.0, 576.5, 805.0))
+    _clear_template_region(page, fitz.Rect(8.5, 45.0, 576.5, 805.0))
 
 
 def _finish_empty_non_lc_summary_page(page, site, records, is_mpo_template):
@@ -276,7 +281,7 @@ def _finish_non_lc_summary_page(page, fields, filled_count, site, records, is_mp
     summary_top_y = data_bottom_y + 5.0
 
     clear_rect = fitz.Rect(table_rect.x0 - 1.5, data_bottom_y - 0.4, table_rect.x1 + 1.5, table_rect.y1 + 1.5)
-    _draw_clear_rect(page, clear_rect)
+    _clear_template_region(page, clear_rect)
 
     _redraw_outline(page, fitz.Rect(table_rect.x0, table_rect.y0, table_rect.x1, data_bottom_y), width=1.0)
 
