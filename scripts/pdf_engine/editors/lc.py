@@ -12,14 +12,12 @@ import fitz
 from ..cid import _fix_lc_template_date
 from ..layout import (
     _apply_redacts_and_inserts,
-    _cover_rect,
     _draw_failed_result_icons,
     _expanded_rect,
     _format_lc_datetime,
     _format_lc_label,
     _format_pdf_value,
     _get_lc_rows,
-    _insert_text_items,
     _iter_page_spans,
     _queue_lc_site_update,
     _queue_page_number_update,
@@ -74,12 +72,16 @@ def _fill_lc_data_page(page, page_records, site, page_num):
                 "text": values[field_name],
                 "size": field["size"],
                 "font": "calibri",
+                "max_width": (
+                    (84.0 if field_name == "cable_label" else 155.0)
+                    - field["bbox"][0]
+                    if field_name in {"cable_label", "limit"}
+                    else None
+                ),
+                "min_size": 4.5,
             })
 
-    for rect in redacts:
-        _cover_rect(page, rect)
-
-    _insert_text_items(page, inserts)
+    _apply_redacts_and_inserts(page, redacts, inserts)
     _replace_template_datetimes(page, page_records)
     _rewrite_lc_datetimes(page, rows, page_records)
     _redraw_lc_data_outline(page)
@@ -132,6 +134,13 @@ def _fill_lc_summary_page(page, page_records, all_records, site, page_num):
                 "text": values[field_name],
                 "size": field["size"],
                 "font": "calibri",
+                "max_width": (
+                    (84.0 if field_name == "cable_label" else 155.0)
+                    - field["bbox"][0]
+                    if field_name in {"cable_label", "limit"}
+                    else None
+                ),
+                "min_size": 4.5,
             })
 
     last_row = rows[len(page_records) - 1]

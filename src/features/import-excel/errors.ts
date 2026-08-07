@@ -1,8 +1,10 @@
 export type ImportExcelErrorCode =
   | 'UNSUPPORTED_EXCEL_FILE'
   | 'EXCEL_FILE_TOO_LARGE'
+  | 'EXCEL_SHEET_TOO_LARGE'
   | 'EXCEL_PARSE_FAILED'
   | 'NO_MATCHING_ROWS'
+  | 'ODF_SEGMENT_COLUMNS_INVALID'
   | 'QTY_LIMIT_EXCEEDED'
   | 'RECORD_LIMIT_EXCEEDED';
 
@@ -32,6 +34,12 @@ const PUBLIC_ERRORS: Readonly<Record<ImportExcelErrorCode, {
     retryable: false,
     field: 'file',
   },
+  EXCEL_SHEET_TOO_LARGE: {
+    status: 413,
+    message: 'Excel 工作表范围过大，请清理多余的空白行或列后重试。',
+    retryable: false,
+    field: 'file',
+  },
   EXCEL_PARSE_FAILED: {
     status: 400,
     message: 'Excel 文件解析失败。',
@@ -42,6 +50,12 @@ const PUBLIC_ERRORS: Readonly<Record<ImportExcelErrorCode, {
     status: 400,
     message: '未找到与所选线缆类型匹配的记录。',
     retryable: false,
+  },
+  ODF_SEGMENT_COLUMNS_INVALID: {
+    status: 400,
+    message: '过 ODF 的工作表需要两列线号及各自对应的长度列。',
+    retryable: false,
+    field: 'file',
   },
   QTY_LIMIT_EXCEEDED: {
     status: 400,

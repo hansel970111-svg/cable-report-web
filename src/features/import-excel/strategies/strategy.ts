@@ -3,6 +3,7 @@ import type { ImportLimits, WorkbookContext } from '../contracts';
 import {
   detectSheetColumns,
   readCableNo,
+  readCableSegments,
   readDateTime,
   readFirstSourceLabel,
   readLength,
@@ -37,8 +38,20 @@ type CollectMatchingRowsOptions = {
   replaceConstantExplicitCableNo?: boolean;
   bandwidth?: (cableTypeText: string, sourceLabel: string) => string | null;
   requirePositiveLength?: boolean;
-  sumOdfSegmentLengths?: boolean;
+  expandOdfSegments?: boolean;
+  sortByCableNumber?: boolean;
 };
+
+const cableNumberCollator = new Intl.Collator('en', {
+  numeric: true,
+  sensitivity: 'base',
+});
+
+function compareCableNumbers(first: CableImportRow, second: CableImportRow): number {
+  const firstNumber = first.cableNumber.trim().replace(/^#/, '');
+  const secondNumber = second.cableNumber.trim().replace(/^#/, '');
+  return cableNumberCollator.compare(firstNumber, secondNumber);
+}
 
 export function defineStrategy(
   cableType: CableType,
@@ -78,7 +91,7 @@ export function collectMatchingRows(
     if (sheetRows.length === 0) continue;
 
     const columns = detectSheetColumns(sheetRows, sheetName, options.typeMatcher, {
-      sumOdfSegmentLengths: options.sumOdfSegmentLengths,
+      expandOdfSegments: options.expandOdfSegments,
     });
     if (!columns) continue;
 
@@ -87,43 +100,48 @@ export function collectMatchingRows(
       const cableTypeText = normalizeCell(row[columns.cableTypeCol]);
       if (!cableTypeText || !options.typeMatcher(cableTypeText)) continue;
 
-      const hasCableNumberColumn = columns.cableNoCols.length > 0;
-      const explicitCableNumber = hasCableNumberColumn
-        ? readCableNo(row, columns.cableNoCols, columns.cableNoMode)
-        : '';
-      if (hasCableNumberColumn && !explicitCableNumber) continue;
-
-      const generatedCableNumber = hasCableNumberColumn
-        ? ''
-        : options.generatedCableNo?.(rows.length + 1) || '';
-      const cableNumber = explicitCableNumber || generatedCableNumber;
-      if (!cableNumber) continue;
-
-      if (!detectedColumns) detectedColumns = columns.detectedColumns;
-
-      const length = readLength(row, columns.lengthCols, columns.lengthMode);
-      if (options.requirePositiveLength && (!columns.lengthCols.length || length <= 0)) {
-        continue;
-      }
-
-      if (rows.length >= limits.maxRecords) throw recordLimitExceeded(limits.maxRecords);
-
       const sourceLabel = readFirstSourceLabel(row, columns.sourceLabelCols);
-      rows.push({
-        cableNumber,
-        cableTypeText,
-        length,
-        dateTime: readDateTime(row, columns.dateTimeCol),
-        sourceLabel: sourceLabel || null,
-        bandwidth: options.bandwidth?.(cableTypeText, sourceLabel) ?? null,
-        source: {
-          sheetName,
-          rowNumber: firstRowNumber + rowIndex,
-          expansionIndex: 0,
-          rule: options.rule,
-        },
-      });
-      explicitCableNumbers.push(explicitCableNumber);
+      const dateTime = readDateTime(row, columns.dateTimeCol);
+      const bandwidth = options.bandwidth?.(cableTypeText, sourceLabel) ?? null;
+      const hasCableNumberColumn = columns.cableNoCols.length > 0;
+      const candidates = columns.cableNoMode === 'expandSegments'
+        ? readCableSegments(row, columns.cableSegmentColumns)
+        : [{
+            cableNumber: hasCableNumberColumn
+              ? readCableNo(row, columns.cableNoCols)
+              : options.generatedCableNo?.(rows.length + 1) || '',
+            length: readLength(row, columns.lengthCols, columns.lengthMode),
+            expansionIndex: 0,
+          }];
+
+      for (const candidate of candidates) {
+        if (!candidate.cableNumber) continue;
+        if (
+          options.requirePositiveLength
+          && (!columns.lengthCols.length || candidate.length === null || candidate.length <= 0)
+        ) {
+          continue;
+        }
+
+        if (!detectedColumns) detectedColumns = columns.detectedColumns;
+        if (rows.length >= limits.maxRecords) throw recordLimitExceeded(limits.maxRecords);
+
+        rows.push({
+          cableNumber: candidate.cableNumber,
+          cableTypeText,
+          length: candidate.length,
+          dateTime,
+          sourceLabel: sourceLabel || null,
+          bandwidth,
+          source: {
+            sheetName,
+            rowNumber: firstRowNumber + rowIndex,
+            expansionIndex: candidate.expansionIndex,
+            rule: options.rule,
+          },
+        });
+        explicitCableNumbers.push(hasCableNumberColumn ? candidate.cableNumber : '');
+      }
     }
   }
 
@@ -156,6 +174,8 @@ export function collectMatchingRows(
       cableNo: `${detectedColumns.cableNo} / 自动序号`,
     };
   }
+
+  if (options.sortByCableNumber) rows.sort(compareCableNumbers);
 
   return {
     rows,

@@ -85,7 +85,7 @@ def test_verifier_rejects_an_unpinned_requirement() -> None:
 
 def test_verifier_rejects_runtime_dev_version_drift() -> None:
     runtime, dev, tools = _inputs()
-    tampered = dev.replace("pillow==12.2.0", "pillow==12.2.1", 1)
+    tampered = dev.replace("pillow==12.3.0", "pillow==12.3.1", 1)
     assert tampered != dev
     with pytest.raises(ValueError, match="pillow.*drift"):
         verify_python_locks(runtime, tampered, tools)

@@ -12,13 +12,13 @@ ROOT = Path(__file__).resolve().parents[2]
 RUNTIME_REQUIREMENTS = [
     "PyMuPDF==1.26.7",
     "pyinstaller==6.21.0",
-    "Pillow==12.2.0",
+    "Pillow==12.3.0",
 ]
 DEV_REQUIREMENTS = ["-r requirements.txt", "pytest==9.0.3"]
 INSTALLED_VERSIONS = {
     "PyMuPDF": "1.26.7",
     "pyinstaller": "6.21.0",
-    "Pillow": "12.2.0",
+    "Pillow": "12.3.0",
     "pytest": "9.0.3",
 }
 

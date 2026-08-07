@@ -30,26 +30,26 @@ test('approved dependency baseline is exact', async () => {
   expect(packageJson.pnpm?.overrides).toMatchObject({
     '@babel/core@7.28.6': '7.29.7',
     'ajv@6.12.6': '6.14.0',
-    'brace-expansion@1.1.13': '1.1.16',
-    'brace-expansion@2.0.3': '2.1.2',
-    'brace-expansion@5.0.7': '5.0.8',
+    'brace-expansion@1.1.13': '1.1.18',
+    'brace-expansion@2.0.3': '2.1.4',
+    'brace-expansion@5.0.7': '5.0.9',
     'esbuild@0.27.3': '0.28.1',
     lodash: '4.18.1',
-    postcss: '8.5.18',
+    postcss: '8.5.23',
     sharp: '0.35.0',
     'minimatch@3.1.2': '3.1.4',
     'minimatch@9.0.5': '9.0.7',
     flatted: '3.4.2',
     'picomatch@2.3.1': '2.3.2',
     'picomatch@4.0.3': '4.0.5',
-    'fast-uri': '3.1.4',
-    'js-yaml@4.1.1': '4.3.0',
-    'tar@7.5.15': '7.5.19',
+    'fast-uri': '3.1.5',
+    'js-yaml@4.1.1': '4.3.1',
+    'tar@7.5.15': '7.5.21',
     tmp: '0.2.7',
     'form-data': '4.0.6',
-    '@electron/get@5.0.0>undici': '7.28.0',
-    'jsdom@29.1.1>undici': '7.28.0',
-    'node-gyp@12.3.0>undici': '6.27.0',
+    '@electron/get@5.0.0>undici': '7.29.0',
+    'jsdom@29.1.1>undici': '7.29.0',
+    'node-gyp@12.3.0>undici': '6.28.0',
   });
   expect(packageJson.pnpm?.overrides).not.toHaveProperty('undici');
   expect(packageJson.packageManager).toBe('pnpm@9.15.9');
@@ -114,11 +114,11 @@ test('undici lock topology follows supported consumer ranges', async () => {
   const lockfile = await readFile('pnpm-lock.yaml', 'utf8');
 
   expect(snapshotDependency(lockfile, 'jsdom@29.1.1(@noble/hashes@2.2.0)', 'undici'))
-    .toBe('7.28.0');
+    .toBe('7.29.0');
   expect(snapshotDependency(lockfile, '@electron/get@5.0.0', 'undici'))
-    .toBe('7.28.0');
+    .toBe('7.29.0');
   expect(snapshotDependency(lockfile, 'node-gyp@12.3.0', 'undici'))
-    .toBe('6.27.0');
+    .toBe('6.28.0');
 });
 
 test('package store and compiler policy is strict', async () => {

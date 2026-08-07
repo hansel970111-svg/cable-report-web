@@ -479,6 +479,32 @@ describe('workbook validation and limits', () => {
     });
   });
 
+  it.each([
+    [
+      'EXCEL_SHEET_TOO_LARGE' as const,
+      413,
+      'Excel 工作表范围过大，请清理多余的空白行或列后重试。',
+    ],
+    [
+      'ODF_SEGMENT_COLUMNS_INVALID' as const,
+      400,
+      '过 ODF 的工作表需要两列线号及各自对应的长度列。',
+    ],
+  ])('maps %s to its stable public file error', async (code, status, message) => {
+    const importer = vi.fn(() => {
+      throw new ImportExcelError(code, 'private parser detail', false, 'file');
+    });
+
+    await expectApiError(await publicHandler(importer)(multipartRequest({
+      file: fixtureUpload('cat5e-oob.xlsx'),
+    })), {
+      status,
+      code,
+      message,
+      field: 'file',
+    });
+  });
+
   it('rejects cumulative expansion at record 10,001', async () => {
     const bytes = makeWorkbookBytes('Vertical Cabling', [
       ['Rack&Room', 'RU', '线缆类型', 'QTY', 'Length'],

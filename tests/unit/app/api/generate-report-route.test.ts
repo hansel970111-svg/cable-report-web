@@ -217,6 +217,24 @@ describe('generate-report schema boundary', () => {
     ['invalid date', {
       records: [{ ...record(), dateTime: '31-02-2026 09:00:00 AM' }],
     }],
+    ['blank Cable Label', {
+      records: [{ ...record(), cableLabel: ' ', cableNumber: '' }],
+    }],
+    ['unsupported Cable Label characters', {
+      records: [{ ...record(), cableLabel: '#线缆😀' }],
+    }],
+    ['punctuation-only Cable Label', {
+      records: [{ ...record(), cableLabel: '##', cableNumber: '#' }],
+    }],
+    ['unsafe Limit characters', {
+      records: [{ ...record(), limit: '链路验证' }],
+    }],
+    ['Limit for the wrong cable type', {
+      records: [{ ...record(), limit: 'Link Validation' }],
+    }],
+    ['excessive numeric fields', {
+      records: [{ ...record(), length: 100_000, nextMargin: 100 }],
+    }],
     ['zero records', { records: [] }],
     ['10,001 records', {
       records: Array.from({ length: 10_001 }, (_, index) => ({
@@ -240,14 +258,29 @@ describe('generate-report schema boundary', () => {
   test('passes normalized schema data and the exact request signal', async () => {
     const deps = dependencies();
     const handler = createGenerateReportHandler(deps);
-    const request = requestWithJson(draft({ site: '  m138-de46  ' }));
+    const request = requestWithJson(draft({
+      site: '  m138-de46  ',
+      records: [{
+        ...record(),
+        cableLabel: '  #1  ',
+        cableNumber: '  1  ',
+        limit: '  TIA - Cat 5e Channel  ',
+      }],
+    }));
 
     const response = await handler(request);
 
     expect(response.status).toBe(200);
     expect(deps.controller.run).toHaveBeenCalledWith({
       jobId: 'job-safe-1',
-      draft: expect.objectContaining({ site: 'M138-DE46' }),
+      draft: expect.objectContaining({
+        site: 'M138-DE46',
+        records: [expect.objectContaining({
+          cableLabel: '#1',
+          cableNumber: '1',
+          limit: 'TIA - Cat 5e Channel',
+        })],
+      }),
       signal: request.signal,
     });
   });

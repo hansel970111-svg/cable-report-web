@@ -42,7 +42,11 @@ describe('VirtualRecordTable', () => {
     expect(table).toHaveAttribute('aria-rowcount', '5001');
     expect(screen.getAllByRole('table')).toHaveLength(1);
     expect(screen.getAllByRole('row').length).toBeLessThanOrEqual(200);
-    expect(screen.getByLabelText('第 1 条 Cable Label')).toHaveValue('#1');
+    const firstLabel = screen.getByLabelText('第 1 条 Cable Label');
+    expect(firstLabel).toHaveValue('#1');
+    expect(firstLabel).toBeRequired();
+    expect(firstLabel).toHaveAttribute('maxlength', '13');
+    expect(firstLabel).toHaveAttribute('aria-invalid', 'false');
     expect(screen.getByRole('button', { name: '删除线缆 #1' })).toBeEnabled();
     expect(container.querySelector('[data-record-id="record-1"]'))
       .toHaveAttribute('aria-rowindex', '2');
@@ -68,10 +72,21 @@ describe('VirtualRecordTable', () => {
 
     const input = screen.getByLabelText('第 1 条 Cable Label');
     await user.clear(input);
+
+    expect(input).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByRole('alert')).toHaveTextContent('Cable Label 不能为空');
+
+    await user.type(input, '##');
+    expect(input).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByRole('alert')).toHaveTextContent('至少要包含一个英文字母或数字');
+
+    await user.clear(input);
     await user.type(input, '#100');
 
     expect(draftStore.get('record-1')).toBe('#100');
     expect(draftStore.get('record-2')).toBe('#2');
+    expect(input).toHaveAttribute('aria-invalid', 'false');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: '删除线缆 #100' }));
     expect(onDelete).toHaveBeenCalledWith('record-1');
   });

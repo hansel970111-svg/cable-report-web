@@ -51,6 +51,9 @@ test('Electron main wires electron-updater without a private comparator or downl
   expect(source).toContain("require('./update-check.cjs')");
   expect(source).toContain("require('../updater-runtime/index.cjs')");
   expect(source).toContain('createUpdateManager({');
+  expect(source).toContain('createAutomaticUpdateChecker({');
+  expect(source).toContain('automaticUpdateChecker.schedule()');
+  expect(source).toContain('app.requestSingleInstanceLock()');
   expect(source).toContain('updater: electronUpdater.autoUpdater');
   expect(source).not.toMatch(/function compareVersions\s*\(/);
   expect(source).not.toMatch(/\.split\('\.'\)\.map\(/);

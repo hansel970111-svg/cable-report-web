@@ -5,6 +5,7 @@ import type { WorkflowSelection } from './model';
 import {
   canGenerateReport,
   createInitialWorkflowModel,
+  reportGenerationEligibility,
   workflowReducer,
 } from './reducer';
 
@@ -132,7 +133,7 @@ describe('revision and stale completions', () => {
       type: 'draft/changed',
       change: {
         kind: 'cable-labels',
-        values: new Map([['record-1', '#C001']]),
+        values: new Map([['record-1', '  #C001  ']]),
       },
     })).toBe(model);
     expect(workflowReducer(model, {
@@ -152,6 +153,46 @@ describe('revision and stale completions', () => {
     if (changed.state.status !== 'ready') throw new Error('Expected ready state.');
 
     expect(changed.state.draft.records).toBe(records);
+  });
+
+  it('trims batch-edited labels before deriving Cable Number', () => {
+    const model = readyModel();
+
+    const changed = workflowReducer(model, {
+      type: 'draft/changed',
+      change: {
+        kind: 'cable-labels',
+        values: new Map([['record-1', '  #LC(A)+B_1/2  ']]),
+      },
+    });
+
+    expect(changed.revision).toBe(1);
+    expect(changed.recoverableDraft?.records[0]).toMatchObject({
+      cableLabel: '#LC(A)+B_1/2',
+      cableNumber: 'LC(A)+B_1/2',
+    });
+  });
+
+  it('keeps an empty saved label recoverable and explains why generation is blocked', () => {
+    const model = readyModel();
+
+    const changed = workflowReducer(model, {
+      type: 'draft/changed',
+      change: {
+        kind: 'cable-labels',
+        values: new Map([['record-1', '   ']]),
+      },
+    });
+
+    expect(changed.state).toMatchObject({ status: 'ready' });
+    expect(changed.recoverableDraft?.records[0]).toMatchObject({
+      cableLabel: '', cableNumber: '',
+    });
+    expect(reportGenerationEligibility(changed)).toEqual({
+      canGenerate: false,
+      reason: '第 1 条记录：Cable Label 不能为空。',
+    });
+    expect(canGenerateReport(changed)).toBe(false);
   });
 
   it('guards import completion by both request ID and revision', () => {

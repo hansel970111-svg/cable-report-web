@@ -17,7 +17,7 @@ REQUIREMENT_PATTERN = re.compile(
 APPROVED_RUNTIME = {
     "pymupdf": "1.26.7",
     "pyinstaller": "6.21.0",
-    "pillow": "12.2.0",
+    "pillow": "12.3.0",
 }
 
 

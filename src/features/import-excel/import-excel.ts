@@ -43,11 +43,15 @@ export function importExcel(
     );
   }
 
+  const matchedSheetNames = new Set(
+    extraction.rows.map(row => row.source.sheetName),
+  );
+
   return {
     rows: extraction.rows,
     metadata: {
-      sheetNames: Array.from(new Set(
-        extraction.rows.map(row => row.source.sheetName),
+      sheetNames: workbook.workbook.SheetNames.filter(sheetName => (
+        matchedSheetNames.has(sheetName)
       )),
       detectedColumns: extraction.detectedColumns,
       rule: extraction.rows[0].source.rule,

@@ -12,6 +12,7 @@ import {
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { ReportDraft } from '@/domain/report/model';
+import { siteValidationMessage } from '@/domain/report/schema';
 import { UpdateDialog } from '@/features/app-update/update-dialog';
 import type { WorkflowState } from '@/features/report-workflow/model';
 import type { ReportWorkflowServices } from '@/features/report-workflow/services';
@@ -77,6 +78,9 @@ export function ReportEditor({ services }: ReportEditorProps) {
   const shellRef = useRef<HTMLDivElement>(null);
   const draft = visibleDraft(workflow.state, workflow.model.recoverableDraft);
   const records = draft?.records ?? NO_RECORDS;
+  const generationBlockReason = siteValidationMessage(workflow.selection.site) === null
+    ? workflow.generationBlockReason
+    : null;
   const operationInProgress = workflow.state.status === 'importing'
     || workflow.state.status === 'generating'
     || workflow.state.status === 'saving';
@@ -167,6 +171,7 @@ export function ReportEditor({ services }: ReportEditorProps) {
       <WorkflowAlert
         state={workflow.state}
         announcement={workflow.model.announcement}
+        validationMessage={generationBlockReason}
         onRetry={workflow.retry}
         onDismiss={workflow.cancel}
       />

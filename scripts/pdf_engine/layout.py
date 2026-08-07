@@ -106,6 +106,37 @@ def _draw_clear_rects(page, rects):
             _draw_clear_rect(page, rect)
 
 
+def _remove_template_text(page, rects):
+    """Permanently remove template text while preserving images and line art."""
+    rects = [fitz.Rect(rect) & page.rect for rect in rects]
+    rects = [rect for rect in rects if not rect.is_empty and not rect.is_infinite]
+    if not rects:
+        return
+
+    for rect in rects:
+        # Template fonts have vertically overlapping bounding boxes between the
+        # header and first data row. Redacting through the interior of a short
+        # field still removes the whole target glyph, without touching an
+        # adjacent line whose bounding box only overlaps the field edge.
+        text_rect = fitz.Rect(rect)
+        if 4.0 < text_rect.height <= 20.0:
+            inset = min(2.0, (text_rect.height - 2.0) / 2.0)
+            text_rect.y0 += inset
+            text_rect.y1 -= inset
+        page.add_redact_annot(text_rect, fill=None, cross_out=False)
+    page.apply_redactions(
+        images=fitz.PDF_REDACT_IMAGE_NONE,
+        graphics=fitz.PDF_REDACT_LINE_ART_NONE,
+        text=fitz.PDF_REDACT_TEXT_REMOVE,
+    )
+
+
+def _clear_template_region(page, rect):
+    """Remove hidden template text, then retain the existing white cover."""
+    _remove_template_text(page, [rect])
+    _draw_clear_rect(page, rect)
+
+
 def _get_textwriter_font(fontname):
     if not EMBED_INSERT_FONTS:
         builtin = "hebo" if fontname in {"calibri-bold", "hebo"} else "helv"
@@ -133,6 +164,28 @@ def _get_textwriter_font(fontname):
     return _TEXTWRITER_FONT_CACHE[key]
 
 
+def _fit_font_size(fontname, text, fontsize, max_width=None, min_fontsize=4.5):
+    """Shrink only overflowing text; keep the requested size for normal values."""
+    if max_width is None or not text:
+        return fontsize
+    try:
+        available = float(max_width)
+        requested = float(fontsize)
+        minimum = min(float(min_fontsize), requested)
+    except (TypeError, ValueError):
+        return fontsize
+    if available <= 0 or requested <= 0 or minimum <= 0:
+        return fontsize
+
+    width = _get_textwriter_font(fontname).text_length(
+        str(text),
+        fontsize=requested,
+    )
+    if width <= available or width <= 0:
+        return requested
+    return max(minimum, requested * available / width)
+
+
 def _insert_text_items(page, inserts):
     if not inserts:
         return
@@ -143,26 +196,46 @@ def _insert_text_items(page, inserts):
             text = str(item.get("text", ""))
             if not text:
                 continue
+            fontname = item.get("font", "calibri")
+            fontsize = _fit_font_size(
+                fontname,
+                text,
+                item.get("size", 8.0),
+                item.get("max_width"),
+                item.get("min_size", 4.5),
+            )
             writer.append(
                 fitz.Point(item["x"], item["y"]),
                 text,
-                font=_get_textwriter_font(item.get("font", "calibri")),
-                fontsize=item.get("size", 8.0),
+                font=_get_textwriter_font(fontname),
+                fontsize=fontsize,
             )
         writer.write_text(page, color=(0, 0, 0))
     except Exception:
         for item in inserts:
-            insert_text_with_font(
+            _insert_text_with_font_fitted(
                 page,
                 fitz.Point(item["x"], item["y"]),
                 item["text"],
                 fontname=item.get("font", "calibri"),
                 fontsize=item.get("size", 8.0),
                 color=(0, 0, 0),
+                max_width=item.get("max_width"),
+                min_fontsize=item.get("min_size", 4.5),
             )
 
 
-def insert_text_with_font(page, point, text, fontname="helv", fontsize=DEFAULT_FONT_SIZE, color=(0, 0, 0), clip=None):
+def _insert_text_with_font_fitted(
+    page,
+    point,
+    text,
+    fontname="helv",
+    fontsize=DEFAULT_FONT_SIZE,
+    color=(0, 0, 0),
+    clip=None,
+    max_width=None,
+    min_fontsize=4.5,
+):
     """
     ( Calibri )
 
@@ -177,6 +250,13 @@ def insert_text_with_font(page, point, text, fontname="helv", fontsize=DEFAULT_F
         color:
         clip: ,
     """
+    fontsize = _fit_font_size(
+        fontname,
+        text,
+        fontsize,
+        max_width,
+        min_fontsize,
+    )
     actual_fontname = fontname
 
     if not EMBED_INSERT_FONTS:
@@ -211,6 +291,27 @@ def insert_text_with_font(page, point, text, fontname="helv", fontsize=DEFAULT_F
         actual_fontname = FONT_NAME_MAP.get(fontname, fontname)
 
     page.insert_text(point, text, fontname=actual_fontname, fontsize=fontsize, color=color)
+
+
+def insert_text_with_font(
+    page,
+    point,
+    text,
+    fontname="helv",
+    fontsize=DEFAULT_FONT_SIZE,
+    color=(0, 0, 0),
+    clip=None,
+):
+    """Insert text using the stable public layout API."""
+    return _insert_text_with_font_fitted(
+        page,
+        point,
+        text,
+        fontname=fontname,
+        fontsize=fontsize,
+        color=color,
+        clip=clip,
+    )
 
 
 def get_field_positions(page):
@@ -624,6 +725,8 @@ def _queue_site_header_update(page, site, redacts, inserts):
             "text": f"Site: {site}",
             "size": 8.0,
             "font": "calibri-bold",
+            "max_width": 188.0,
+            "min_size": 4.5,
         })
         return True
 
@@ -648,6 +751,8 @@ def _queue_site_header_update(page, site, redacts, inserts):
         "text": f"Site: {site}",
         "size": font_size,
         "font": "calibri-bold",
+        "max_width": 188.0,
+        "min_size": 4.5,
     })
     return True
 
@@ -738,5 +843,6 @@ def _queue_page_number_update(page, page_num, redacts, inserts):
 
 
 def _apply_redacts_and_inserts(page, redacts, inserts):
+    _remove_template_text(page, redacts)
     _draw_clear_rects(page, redacts)
     _insert_text_items(page, inserts)

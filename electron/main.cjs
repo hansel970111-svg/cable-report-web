@@ -24,7 +24,10 @@ const {
   savePdfAtomically,
   writeAndSyncTemporary,
 } = require('./save-pdf.cjs');
-const { createUpdateManager } = require('./update-check.cjs');
+const {
+  createAutomaticUpdateChecker,
+  createUpdateManager,
+} = require('./update-check.cjs');
 const { loadPackagedStandalone } = require('./standalone-runtime.cjs');
 
 process.on('unhandledRejection', reason => {
@@ -41,8 +44,8 @@ if (!process.env.NEXT_TELEMETRY_DISABLED) {
 let mainWindow = null;
 let nextServer = null;
 let unregisterSavePdfHandler = null;
-let shutdownStarted = false;
 let shutdownComplete = false;
+let shutdownPromise = null;
 
 const pdfJobShutdownKey = Symbol.for('cable-report.pdf-job-shutdown');
 
@@ -50,12 +53,16 @@ const desktopSessionToken = createDesktopSessionToken();
 process.env.CABLE_DESKTOP_TOKEN = desktopSessionToken;
 delete process.env.CABLE_DEV_BROWSER_MODE;
 
+const singleInstanceLockAcquired = app.requestSingleInstanceLock();
+if (!singleInstanceLockAcquired) app.quit();
+
 const UPDATE_STATE_CHANNEL = 'cable-report:update-state';
 const UPDATE_OPEN_DIALOG_CHANNEL = 'cable-report:open-update-dialog';
 const UPDATE_GET_STATE_CHANNEL = 'cable-report:get-update-state';
 const UPDATE_CHECK_CHANNEL = 'cable-report:check-for-updates';
 const UPDATE_DOWNLOAD_CHANNEL = 'cable-report:download-update';
 const UPDATE_INSTALL_CHANNEL = 'cable-report:install-update';
+const UPDATE_NOW_CHANNEL = 'cable-report:update-now';
 
 function openApprovedExternal(targetUrl) {
   const decision = classifyNavigation(
@@ -122,24 +129,21 @@ function emitUpdateState(state) {
   mainWindow.webContents.send(UPDATE_STATE_CHANNEL, state);
 }
 
+const desktopUpdaterSupported = app.isPackaged
+  && process.platform === 'win32'
+  && process.env.CABLE_DESKTOP_E2E !== '1';
+
 const updateManager = createUpdateManager({
   updater: electronUpdater.autoUpdater,
   currentVersion: app.getVersion(),
-  supported: app.isPackaged
-    && process.platform === 'win32'
-    && process.env.CABLE_DESKTOP_E2E !== '1',
+  supported: desktopUpdaterSupported,
   emitState: emitUpdateState,
-  prepareToInstall: async () => {
-    if (shutdownComplete) return;
-    shutdownStarted = true;
-    try {
-      await shutdownApplication();
-      shutdownComplete = true;
-    } catch (error) {
-      shutdownStarted = false;
-      throw error;
-    }
-  },
+});
+
+const automaticUpdateChecker = createAutomaticUpdateChecker({
+  check: () => updateManager.check(),
+  enabled: desktopUpdaterSupported
+    && process.env.CABLE_DISABLE_AUTO_UPDATE_CHECK !== '1',
 });
 
 function setupApplicationMenu() {
@@ -288,9 +292,13 @@ function registerDesktopSessionBridge() {
 function registerUpdateBridge() {
   const handlers = [
     [UPDATE_GET_STATE_CHANNEL, () => updateManager.getState()],
-    [UPDATE_CHECK_CHANNEL, () => updateManager.check()],
+    [UPDATE_CHECK_CHANNEL, () => {
+      automaticUpdateChecker.cancel();
+      return updateManager.check();
+    }],
     [UPDATE_DOWNLOAD_CHANNEL, () => updateManager.download()],
     [UPDATE_INSTALL_CHANNEL, () => updateManager.install()],
+    [UPDATE_NOW_CHANNEL, () => updateManager.updateNow()],
   ];
   for (const [channel, action] of handlers) {
     ipcMain.removeHandler(channel);
@@ -338,11 +346,17 @@ async function closeNextServer() {
   });
 }
 
-async function shutdownApplication() {
-  unregisterSavePdfHandler?.();
-  unregisterSavePdfHandler = null;
-  await shutdownPdfJobs();
-  await closeNextServer();
+function shutdownApplication() {
+  if (shutdownPromise) return shutdownPromise;
+  shutdownPromise = (async () => {
+    automaticUpdateChecker.cancel();
+    updateManager.dispose();
+    unregisterSavePdfHandler?.();
+    unregisterSavePdfHandler = null;
+    await shutdownPdfJobs();
+    await closeNextServer();
+  })();
+  return shutdownPromise;
 }
 
 function createMainWindow(url) {
@@ -391,6 +405,7 @@ function createMainWindow(url) {
   mainWindow.webContents.on('will-redirect', handleNavigation);
   mainWindow.webContents.once('did-finish-load', () => {
     emitUpdateState(updateManager.getState());
+    automaticUpdateChecker.schedule();
   });
 
   mainWindow.on('closed', () => {
@@ -400,22 +415,31 @@ function createMainWindow(url) {
   mainWindow.loadURL(url);
 }
 
-app.whenReady().then(async () => {
-  try {
-    configureSessionSecurity();
-    configureAboutPanel();
-    registerDesktopSessionBridge();
-    registerUpdateBridge();
-    registerNativeSaveBridge();
-    setupApplicationMenu();
-    const url = await startNextServer();
-    createMainWindow(url);
-  } catch (error) {
-    console.error(error);
-    dialog.showErrorBox('启动失败', error instanceof Error ? error.message : String(error));
-    app.quit();
-  }
-});
+if (singleInstanceLockAcquired) {
+  app.on('second-instance', () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    if (!mainWindow.isVisible()) mainWindow.show();
+    mainWindow.focus();
+  });
+
+  app.whenReady().then(async () => {
+    try {
+      configureSessionSecurity();
+      configureAboutPanel();
+      registerDesktopSessionBridge();
+      registerUpdateBridge();
+      registerNativeSaveBridge();
+      setupApplicationMenu();
+      const url = await startNextServer();
+      createMainWindow(url);
+    } catch (error) {
+      console.error(error);
+      dialog.showErrorBox('启动失败', error instanceof Error ? error.message : String(error));
+      app.quit();
+    }
+  });
+}
 
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0 && process.env.PORT) {
@@ -430,8 +454,7 @@ app.on('window-all-closed', () => {
 app.on('before-quit', event => {
   if (shutdownComplete) return;
   event.preventDefault();
-  if (shutdownStarted) return;
-  shutdownStarted = true;
+  if (shutdownPromise) return;
   void shutdownApplication()
     .catch(error => {
       console.error('[CABLE_SHUTDOWN_FAILED]', error);

@@ -10,9 +10,159 @@ const UPDATE_PHASES = new Set([
   'error',
 ]);
 
+const RELEASE_NOTES_MAX_SOURCE_LENGTH = 20_000;
+const RELEASE_NOTES_MAX_LINES = 16;
+const RELEASE_NOTES_MAX_LINE_LENGTH = 320;
+const RELEASE_NOTES_MAX_TOTAL_LENGTH = 4_000;
+
+function decodeHtmlEntities(value) {
+  const namedEntities = {
+    amp: '&',
+    apos: "'",
+    gt: '>',
+    lt: '<',
+    nbsp: ' ',
+    quot: '"',
+  };
+
+  return value
+    .replace(/&#(x?)([0-9a-f]+);/gi, (_match, hexadecimal, code) => {
+      const numeric = Number.parseInt(code, hexadecimal ? 16 : 10);
+      if (!Number.isSafeInteger(numeric) || numeric < 0 || numeric > 0x10ffff) return '';
+      try {
+        return String.fromCodePoint(numeric);
+      } catch {
+        return '';
+      }
+    })
+    .replace(/&(amp|apos|gt|lt|nbsp|quot);/gi, (_match, name) => (
+      namedEntities[name.toLowerCase()] || ''
+    ));
+}
+
+function releaseNoteLines(value) {
+  if (typeof value !== 'string' || !value.trim()) return [];
+
+  const plainText = decodeHtmlEntities(
+    value
+      .slice(0, RELEASE_NOTES_MAX_SOURCE_LENGTH)
+      .replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, '')
+      .replace(/<\s*br\s*\/?\s*>/gi, '\n')
+      .replace(/<\s*li\b[^>]*>/gi, '\n')
+      .replace(/<\s*\/\s*(?:div|h[1-6]|li|ol|p|pre|section|ul)\s*>/gi, '\n')
+      .replace(/<[^>]*>/g, '')
+      .replace(/\[([^\]]+)]\([^\s)]+\)/g, '$1'),
+  );
+
+  const lines = [];
+  let totalLength = 0;
+  for (const rawLine of plainText.replace(/\r/g, '').split('\n')) {
+    const line = rawLine
+      .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '')
+      .replace(/[\u202a-\u202e\u2066-\u2069]/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(/^[-*•]\s+/, '')
+      .slice(0, RELEASE_NOTES_MAX_LINE_LENGTH);
+    if (!line || lines.at(-1) === line) continue;
+    if (lines.length >= RELEASE_NOTES_MAX_LINES) break;
+    if (totalLength + line.length > RELEASE_NOTES_MAX_TOTAL_LENGTH) break;
+    lines.push(line);
+    totalLength += line.length;
+  }
+  return lines;
+}
+
+function normalizeReleaseNotes(releaseNotes) {
+  const values = Array.isArray(releaseNotes)
+    ? releaseNotes.map(item => (
+        typeof item === 'string' ? item : item?.note
+      ))
+    : [releaseNotes];
+  const lines = [];
+  let totalLength = 0;
+  for (const value of values) {
+    for (const line of releaseNoteLines(value)) {
+      if (lines.includes(line)) continue;
+      if (totalLength + line.length > RELEASE_NOTES_MAX_TOTAL_LENGTH) return lines;
+      lines.push(line);
+      totalLength += line.length;
+      if (lines.length >= RELEASE_NOTES_MAX_LINES) return lines;
+    }
+  }
+  return lines;
+}
+
+function normalizeReleaseText(value, maximumLength) {
+  if (typeof value !== 'string') return '';
+  return value
+    .replace(/[\u0000-\u001f\u007f\u202a-\u202e\u2066-\u2069]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, maximumLength);
+}
+
+function releaseDetails(info, fallback = {}) {
+  const version = normalizeReleaseText(info?.version, 64)
+    || normalizeReleaseText(fallback.version, 64);
+  const releaseName = normalizeReleaseText(info?.releaseName, 160)
+    || normalizeReleaseText(fallback.releaseName, 160);
+  const releaseDate = normalizeReleaseText(info?.releaseDate, 80)
+    || normalizeReleaseText(fallback.releaseDate, 80);
+  const notes = normalizeReleaseNotes(info?.releaseNotes);
+  const releaseNotes = notes.length > 0
+    ? notes
+    : normalizeReleaseNotes(fallback.releaseNotes);
+
+  return {
+    ...(version ? { version } : {}),
+    ...(releaseName ? { releaseName } : {}),
+    ...(releaseDate ? { releaseDate } : {}),
+    ...(releaseNotes.length > 0 ? { releaseNotes } : {}),
+  };
+}
+
+function createAutomaticUpdateChecker({
+  check,
+  enabled = true,
+  delayMs = 8_000,
+  setTimer = setTimeout,
+  clearTimer = clearTimeout,
+  logger = console,
+}) {
+  if (typeof check !== 'function') {
+    throw new TypeError('An automatic update check function is required.');
+  }
+
+  let scheduled = false;
+  let timer = null;
+
+  function schedule() {
+    if (!enabled || scheduled) return false;
+    scheduled = true;
+    timer = setTimer(() => {
+      timer = null;
+      void Promise.resolve()
+        .then(check)
+        .catch(error => logger.warn('自动检测更新失败:', error));
+    }, delayMs);
+    timer?.unref?.();
+    return true;
+  }
+
+  function cancel() {
+    if (timer !== null) clearTimer(timer);
+    timer = null;
+  }
+
+  return { schedule, cancel };
+}
+
 function errorMessage(error) {
-  if (error instanceof Error && error.message.trim()) return error.message.trim();
-  const value = String(error || '').trim();
+  if (error instanceof Error && error.message.trim()) {
+    return normalizeReleaseText(error.message, 600);
+  }
+  const value = normalizeReleaseText(String(error || ''), 600);
   return value || '更新操作失败，请稍后重试。';
 }
 
@@ -27,7 +177,6 @@ function createUpdateManager({
   currentVersion,
   supported,
   emitState = () => undefined,
-  prepareToInstall = async () => undefined,
   logger = console,
 }) {
   if (!updater || typeof updater.on !== 'function') {
@@ -43,16 +192,19 @@ function createUpdateManager({
       };
   let checkPromise = null;
   let downloadPromise = null;
+  let disposed = false;
 
   updater.autoDownload = false;
-  updater.autoInstallOnAppQuit = true;
+  updater.autoInstallOnAppQuit = false;
   updater.autoRunAppAfterInstall = true;
+  updater.fullChangelog = false;
   updater.allowPrerelease = false;
   updater.allowDowngrade = false;
   updater.disableWebInstaller = true;
   updater.logger = logger;
 
   function publish(nextState) {
+    if (disposed) return state;
     if (!UPDATE_PHASES.has(nextState.phase)) {
       throw new Error(`Unknown update phase: ${String(nextState.phase)}`);
     }
@@ -62,32 +214,51 @@ function createUpdateManager({
   }
 
   const listeners = {
-    'checking-for-update': () => publish({ phase: 'checking' }),
-    'update-not-available': info => publish({
-      phase: 'up-to-date',
-      version: info?.version || currentVersion,
-      message: '当前已是最新版本。',
+    'checking-for-update': () => publish({
+      phase: 'checking',
+      ...releaseDetails(state),
     }),
-    'update-available': info => publish({
-      phase: 'available',
-      version: info?.version,
-      message: `发现新版本 ${info?.version || ''}`.trim(),
-    }),
-    'download-progress': progress => publish({
-      phase: 'downloading',
-      version: state.version,
-      percent: normalizeProgress(progress?.percent),
-      message: '正在下载更新…',
-    }),
-    'update-downloaded': event => publish({
-      phase: 'downloaded',
-      version: event?.version || state.version,
-      percent: 100,
-      message: '更新已下载，点击“重启并更新”后将自动完成更新。',
-    }),
+    'update-not-available': info => (
+      state.phase === 'checking'
+        ? publish({
+            phase: 'up-to-date',
+            version: normalizeReleaseText(info?.version, 64) || currentVersion,
+            message: '当前已是最新版本。',
+          })
+        : state
+    ),
+    'update-available': info => {
+      if (!['idle', 'checking', 'up-to-date', 'error'].includes(state.phase)) return state;
+      const details = releaseDetails(info);
+      return publish({
+        phase: 'available',
+        ...details,
+        message: details.version ? `发现新版本 ${details.version}` : '发现新版本。',
+      });
+    },
+    'download-progress': progress => (
+      state.phase === 'downloading'
+        ? publish({
+            phase: 'downloading',
+            ...releaseDetails(state),
+            percent: normalizeProgress(progress?.percent),
+            message: '正在下载更新…',
+          })
+        : state
+    ),
+    'update-downloaded': event => (
+      ['available', 'downloading'].includes(state.phase)
+        ? publish({
+            phase: 'downloaded',
+            ...releaseDetails(event, state),
+            percent: 100,
+            message: '更新已下载，可以立即完成安装并重启应用。',
+          })
+        : state
+    ),
     error: error => publish({
       phase: 'error',
-      version: state.version,
+      ...releaseDetails(state),
       message: errorMessage(error),
     }),
   };
@@ -97,9 +268,11 @@ function createUpdateManager({
   }
 
   async function check() {
-    if (!supported) return state;
+    if (!supported || disposed) return state;
     if (checkPromise) return checkPromise;
-    if (['downloading', 'downloaded', 'installing'].includes(state.phase)) return state;
+    if (['available', 'downloading', 'downloaded', 'installing'].includes(state.phase)) {
+      return state;
+    }
 
     publish({ phase: 'checking' });
     checkPromise = Promise.resolve()
@@ -108,10 +281,11 @@ function createUpdateManager({
         if (state.phase !== 'checking') return state;
         const updateInfo = result?.updateInfo;
         if (updateInfo?.version && result?.isUpdateAvailable !== false) {
+          const details = releaseDetails(updateInfo);
           return publish({
             phase: 'available',
-            version: updateInfo.version,
-            message: `发现新版本 ${updateInfo.version}`,
+            ...details,
+            message: details.version ? `发现新版本 ${details.version}` : '发现新版本。',
           });
         }
         return publish({
@@ -122,7 +296,7 @@ function createUpdateManager({
       })
       .catch(error => publish({
         phase: 'error',
-        version: state.version,
+        ...releaseDetails(state),
         message: errorMessage(error),
       }))
       .finally(() => {
@@ -132,13 +306,13 @@ function createUpdateManager({
   }
 
   async function download() {
-    if (!supported) return state;
+    if (!supported || disposed) return state;
     if (downloadPromise) return downloadPromise;
     if (state.phase !== 'available') return state;
 
     publish({
       phase: 'downloading',
-      version: state.version,
+      ...releaseDetails(state),
       percent: 0,
       message: '正在下载更新…',
     });
@@ -148,16 +322,16 @@ function createUpdateManager({
         if (state.phase === 'downloading') {
           return publish({
             phase: 'downloaded',
-            version: state.version,
+            ...releaseDetails(state),
             percent: 100,
-            message: '更新已下载，点击“重启并更新”后将自动完成更新。',
+            message: '更新已下载，可以立即完成安装并重启应用。',
           });
         }
         return state;
       })
       .catch(error => publish({
         phase: 'error',
-        version: state.version,
+        ...releaseDetails(state),
         message: errorMessage(error),
       }))
       .finally(() => {
@@ -167,27 +341,37 @@ function createUpdateManager({
   }
 
   async function install() {
-    if (!supported || state.phase !== 'downloaded') return state;
+    if (!supported || disposed || state.phase !== 'downloaded') return state;
     publish({
       phase: 'installing',
-      version: state.version,
+      ...releaseDetails(state),
       percent: 100,
       message: '正在退出应用、后台更新并重新启动…',
     });
     try {
-      await prepareToInstall();
       updater.quitAndInstall(true, true);
     } catch (error) {
       return publish({
         phase: 'error',
-        version: state.version,
+        ...releaseDetails(state),
         message: errorMessage(error),
       });
     }
     return state;
   }
 
+  async function updateNow() {
+    if (!supported || disposed) return state;
+    if (state.phase === 'downloaded') return install();
+    if (state.phase !== 'available' && state.phase !== 'downloading') return state;
+
+    const downloaded = await download();
+    return downloaded.phase === 'downloaded' ? install() : downloaded;
+  }
+
   function dispose() {
+    if (disposed) return;
+    disposed = true;
     for (const [eventName, listener] of Object.entries(listeners)) {
       updater.removeListener(eventName, listener);
     }
@@ -198,8 +382,14 @@ function createUpdateManager({
     check,
     download,
     install,
+    updateNow,
     dispose,
   };
 }
 
-module.exports = { createUpdateManager, normalizeProgress };
+module.exports = {
+  createAutomaticUpdateChecker,
+  createUpdateManager,
+  normalizeProgress,
+  normalizeReleaseNotes,
+};

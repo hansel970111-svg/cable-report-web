@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx';
 
 import type { WorkbookContext } from './contracts';
+import { ImportExcelError } from './errors';
 
 export type ExcelRow = unknown[];
 
@@ -11,11 +12,16 @@ export type SheetRowsContext = {
 
 export type DetectedColumns = Readonly<Record<string, string | null>>;
 
+export type CableSegmentColumns = {
+  cableNoColumn: number;
+  lengthColumn: number | null;
+};
+
 export type LengthMode = 'firstNumeric' | 'sumFirstTwoPlus50';
-export type CableNoMode = 'firstNonEmpty' | 'combineFirstTwo';
+export type CableNoMode = 'firstNonEmpty' | 'expandSegments';
 
 export type SheetColumnDetectionOptions = {
-  sumOdfSegmentLengths?: boolean;
+  expandOdfSegments?: boolean;
 };
 
 export type SheetColumnProfile = {
@@ -24,6 +30,7 @@ export type SheetColumnProfile = {
   cableNoCol: number;
   cableNoCols: number[];
   cableNoMode: CableNoMode;
+  cableSegmentColumns: CableSegmentColumns[];
   lengthCols: number[];
   lengthMode: LengthMode;
   dateTimeCol: number;
@@ -50,12 +57,76 @@ export function normalizeLower(value: unknown): string {
   return normalizeCell(value).toLowerCase();
 }
 
-export function readSheetRows(worksheet: XLSX.WorkSheet): SheetRowsContext {
+const MAX_SHEET_ROWS = 20_000;
+const MAX_SHEET_COLUMNS = 256;
+const MAX_SHEET_CELLS = 2_000_000;
+
+function assertSafeSheetRange(reference: string | undefined): void {
+  if (!reference) return;
+
+  let range: XLSX.Range;
+  try {
+    range = XLSX.utils.decode_range(reference);
+  } catch {
+    throw new ImportExcelError(
+      'EXCEL_PARSE_FAILED',
+      'The Excel worksheet range is invalid.',
+      false,
+      'file',
+    );
+  }
+
+  const coordinates = [range.s.r, range.s.c, range.e.r, range.e.c];
+  if (
+    coordinates.some(value => !Number.isSafeInteger(value) || value < 0)
+    || range.e.r < range.s.r
+    || range.e.c < range.s.c
+  ) {
+    throw new ImportExcelError(
+      'EXCEL_PARSE_FAILED',
+      'The Excel worksheet range is invalid.',
+      false,
+      'file',
+    );
+  }
+
+  const rowCount = range.e.r - range.s.r + 1;
+  const columnCount = range.e.c - range.s.c + 1;
+  if (
+    rowCount > MAX_SHEET_ROWS
+    || columnCount > MAX_SHEET_COLUMNS
+    || rowCount * columnCount > MAX_SHEET_CELLS
+  ) {
+    throw new ImportExcelError(
+      'EXCEL_SHEET_TOO_LARGE',
+      'The Excel worksheet range is too large to import safely.',
+      false,
+      'file',
+    );
+  }
+}
+
+export function readSheetRows(
+  worksheet: XLSX.WorkSheet,
+  maximumRows?: number,
+): SheetRowsContext {
   const reference = worksheet['!ref'];
+  assertSafeSheetRange(reference);
+  const decodedRange = reference ? XLSX.utils.decode_range(reference) : null;
+  const selectedRange = decodedRange && maximumRows !== undefined
+    ? {
+        s: decodedRange.s,
+        e: {
+          r: Math.min(decodedRange.e.r, decodedRange.s.r + maximumRows - 1),
+          c: decodedRange.e.c,
+        },
+      }
+    : undefined;
   return {
     rows: XLSX.utils.sheet_to_json(worksheet, {
       header: 1,
       defval: '',
+      ...(selectedRange ? { range: selectedRange } : {}),
     }) as ExcelRow[],
     firstRowNumber: reference ? XLSX.utils.decode_range(reference).s.r + 1 : 1,
   };
@@ -123,9 +194,35 @@ function getLengthColumnPriority(value: unknown): number {
 
   if (headerLower.includes('线长')) return 0;
   if (headerLower === 'length' || headerLower.includes('length (m)')) return 1;
-  if (headerLower.includes('长度') && !headerLower.includes('距离')) return 2;
-  if (headerLower.includes('length')) return 3;
-  return 4;
+  if (headerLower === '长度') return 2;
+  if (headerLower.includes('长度') && !headerLower.includes('距离')) return 3;
+  if (headerLower.includes('length')) return 4;
+  return 5;
+}
+
+function pairCableSegmentColumns(
+  headers: ExcelRow,
+  cableNoColumns: number[],
+  lengthColumns: number[],
+): CableSegmentColumns[] {
+  const orderedCableNoColumns = [...cableNoColumns]
+    .sort((first, second) => first - second)
+    .slice(0, 2);
+
+  return orderedCableNoColumns.map((cableNoColumn, index) => {
+    const nextCableNoColumn = orderedCableNoColumns[index + 1];
+    const lengthColumn = lengthColumns
+      .filter(candidate => (
+        candidate > cableNoColumn
+        && (nextCableNoColumn === undefined || candidate < nextCableNoColumn)
+      ))
+      .sort((first, second) => (
+        getLengthColumnPriority(headers[first]) - getLengthColumnPriority(headers[second])
+        || first - second
+      ))[0] ?? null;
+
+    return { cableNoColumn, lengthColumn };
+  });
 }
 
 function findLengthColumns(headers: ExcelRow): number[] {
@@ -287,7 +384,7 @@ export function isYYBXWorkbook(context: WorkbookContext): boolean {
   if (/yybx/i.test(context.fileName)) return true;
 
   for (const sheetName of context.workbook.SheetNames.slice(0, 5)) {
-    const rows = readSheetRows(context.workbook.Sheets[sheetName]).rows.slice(0, 30);
+    const rows = readSheetRows(context.workbook.Sheets[sheetName], 30).rows;
     for (const row of rows) {
       if (row.some(cell => /yybx/i.test(normalizeCell(cell)))) return true;
     }
@@ -440,14 +537,35 @@ export function detectSheetColumns(
     : primaryHeaders;
   const hasOdfColumns = structuralHeaders
     .some(header => normalizeLower(header).includes('odf'));
-  const shouldSumSegmentLengths = isCrossSheet
-    || useTwoRowHeader
-    || (options.sumOdfSegmentLengths === true && hasOdfColumns);
-  const cableNoMode: CableNoMode = options.sumOdfSegmentLengths === true
-    && (isCrossSheet || hasOdfColumns)
-    && cableNoCols.length >= 2
-    ? 'combineFirstTwo'
+  const isOdfPath = options.expandOdfSegments === true
+    && (isCrossSheet || hasOdfColumns);
+  const hasSegmentStructure = cableNoCols.length > 1 || lengthCols.length > 1;
+  const hasMatchingDataRows = rows
+    .slice(headerRowCount)
+    .some(row => typeMatcher(row[cableTypeCol]));
+  const cableSegmentColumns = isOdfPath && cableNoCols.length === 2
+    ? pairCableSegmentColumns(primaryHeaders, cableNoCols, lengthCols)
+    : [];
+  const hasCompleteSegmentColumns = cableSegmentColumns.length === 2
+    && cableSegmentColumns.every(segment => segment.lengthColumn !== null);
+  if (
+    isOdfPath
+    && hasMatchingDataRows
+    && (hasOdfColumns || hasSegmentStructure)
+    && !hasCompleteSegmentColumns
+  ) {
+    throw new ImportExcelError(
+      'ODF_SEGMENT_COLUMNS_INVALID',
+      'ODF worksheets must provide two Cable Label columns with matching lengths.',
+      false,
+      'file',
+    );
+  }
+  const cableNoMode: CableNoMode = hasCompleteSegmentColumns
+    ? 'expandSegments'
     : 'firstNonEmpty';
+  const shouldSumSegmentLengths = !hasCompleteSegmentColumns
+    && (isCrossSheet || useTwoRowHeader);
   const lengthMode: LengthMode = shouldSumSegmentLengths && lengthCols.length >= 2
     ? 'sumFirstTwoPlus50'
     : 'firstNumeric';
@@ -460,6 +578,7 @@ export function detectSheetColumns(
     cableNoCol,
     cableNoCols,
     cableNoMode,
+    cableSegmentColumns,
     lengthCols,
     lengthMode,
     dateTimeCol,
@@ -493,17 +612,25 @@ export function readFirstCableNo(row: ExcelRow, columns: number[]): string {
 export function readCableNo(
   row: ExcelRow,
   columns: number[],
-  mode: CableNoMode = 'firstNonEmpty',
 ): string {
-  if (mode === 'combineFirstTwo') {
-    return columns
-      .map(column => normalizeCell(row[column]))
-      .filter(Boolean)
-      .slice(0, 2)
-      .join(' & ');
-  }
-
   return readFirstCableNo(row, columns);
+}
+
+export type CableSegment = {
+  cableNumber: string;
+  length: number | null;
+  expansionIndex: number;
+};
+
+export function readCableSegments(
+  row: ExcelRow,
+  columns: CableSegmentColumns[],
+): CableSegment[] {
+  return columns.map(({ cableNoColumn, lengthColumn }, expansionIndex) => ({
+    cableNumber: normalizeCell(row[cableNoColumn]),
+    length: lengthColumn === null ? null : readNumber(row, lengthColumn),
+    expansionIndex,
+  }));
 }
 
 function formatDateTime(date: Date): string {

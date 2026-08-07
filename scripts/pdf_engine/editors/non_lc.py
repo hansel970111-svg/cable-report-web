@@ -25,6 +25,7 @@ from ..layout import (
     _field_baseline,
     _field_size,
     _insert_text_items,
+    _remove_template_text,
     _redraw_outline,
     _split_pdf_datetime,
     _text_width_for_insert,
@@ -278,6 +279,7 @@ def fill_page(page, records, start_idx, page_num, is_last_data_page=False):
 
     # Do NOT redact date rects - dates are already replaced in content stream (preserves Calibri font)
     # Skip redaction for dates
+    _remove_template_text(page, clear_rects)
     _draw_clear_rects(page, clear_rects)
 
     # Dates are already replaced - no need to redraw
@@ -448,6 +450,8 @@ def _rewrite_non_lc_cable_labels(page, fields, page_records, is_mpo_template=Fal
             "text": label,
             "size": _field_size(field),
             "font": "calibri",
+            "max_width": clear_x1 - bbox.x0 - 1.0,
+            "min_size": 4.5,
         })
 
     _apply_redacts_and_inserts(page, redacts, inserts)

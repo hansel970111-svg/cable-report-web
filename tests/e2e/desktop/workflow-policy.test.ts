@@ -30,6 +30,7 @@ test('server-side release publishing accepts only a successful tagged Windows pa
   expect(source).toContain('--name Cable-Report-Generator-Windows');
   expect(source).toContain('Verify Windows-only release payload');
   expect(source).toContain('gh release create "$TAG"');
+  expect(source).toContain('--generate-notes');
   expect(source).not.toMatch(/dmg|latest-mac|Upload macOS installers/i);
 });
 

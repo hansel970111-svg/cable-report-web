@@ -8,6 +8,10 @@ import { DateTimePicker } from '@/components/ui/date-time-picker';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { CableType } from '@/domain/report/model';
+import {
+  REPORT_FIELD_LIMITS,
+  siteValidationMessage,
+} from '@/domain/report/schema';
 
 const CABLE_TYPES: readonly CableType[] = [
   'Cat 5e',
@@ -15,6 +19,7 @@ const CABLE_TYPES: readonly CableType[] = [
   'LC',
   'MPO',
 ];
+const SITE_INPUT_PATTERN = String.raw`[A-Za-z0-9: \-]+`;
 
 export type ImportPanelProps = {
   file: File | null;
@@ -45,6 +50,11 @@ export function ImportPanel({
   onImport,
   onCancel,
 }: ImportPanelProps) {
+  const siteErrorId = 'report-site-error';
+  // Keep the initial form quiet. Once the user enters anything, surface a
+  // schema-aligned error immediately (including whitespace-only input).
+  const siteIssue = site.length === 0 ? null : siteValidationMessage(site);
+
   return (
     <Card className="report-editor-card">
       <CardHeader>
@@ -55,6 +65,7 @@ export function ImportPanel({
           className="report-import-form"
           onSubmit={event => {
             event.preventDefault();
+            if (siteValidationMessage(site) !== null) return;
             void onImport();
           }}
         >
@@ -66,7 +77,17 @@ export function ImportPanel({
               onChange={event => onSiteChange(event.target.value)}
               placeholder="输入项目号"
               autoComplete="off"
+              required
+              maxLength={REPORT_FIELD_LIMITS.site}
+              pattern={SITE_INPUT_PATTERN}
+              aria-invalid={siteIssue !== null}
+              aria-describedby={siteIssue === null ? undefined : siteErrorId}
             />
+            {siteIssue !== null && (
+              <p id={siteErrorId} role="alert" className="report-field-error">
+                {siteIssue}
+              </p>
+            )}
           </div>
 
           <div className="report-field">
