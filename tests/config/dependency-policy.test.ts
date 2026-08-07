@@ -43,7 +43,7 @@ test('approved dependency baseline is exact', async () => {
     'picomatch@2.3.1': '2.3.2',
     'picomatch@4.0.3': '4.0.5',
     'fast-uri': '3.1.5',
-    'js-yaml@4.1.1': '4.3.0',
+    'js-yaml@4.1.1': '4.3.1',
     'tar@7.5.15': '7.5.21',
     tmp: '0.2.7',
     'form-data': '4.0.6',
