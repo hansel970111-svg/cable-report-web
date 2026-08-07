@@ -663,13 +663,13 @@ describe('workbook boundary', () => {
     );
   });
 
-  it('rejects an extreme declared sheet range before materializing its cell matrix', () => {
+  it('rejects an oversized declared sheet range before materializing its cell matrix', () => {
     const workbook = XLSX.utils.book_new();
     const worksheet = XLSX.utils.aoa_to_sheet([
       ['线缆类型', '线号', '线长'],
       ['红', '1', 10],
     ]);
-    worksheet['!ref'] = 'A1:XFD500';
+    worksheet['!ref'] = 'A1:IW2';
     XLSX.utils.book_append_sheet(workbook, worksheet, 'OOB');
     const bytes = new Uint8Array(XLSX.write(workbook, { type: 'array', bookType: 'xlsx' }));
 
