@@ -8,6 +8,7 @@ import {
   useState,
 } from 'react';
 
+import { cableNumberFromCableLabel } from '@/domain/report/cable-rules';
 import type { CableType, ReportDraft } from '@/domain/report/model';
 import {
   defaultRecordIdFactory,
@@ -583,7 +584,10 @@ export function useReportWorkflow(
       const value = normalizedValues.get(record.id);
       return value !== undefined
         && (record.cableLabel !== value
-          || record.cableNumber !== value.replace(/^#/, ''));
+          || record.cableNumber !== cableNumberFromCableLabel(
+            value,
+            source.cableType,
+          ));
     });
     if (!changes) return;
     invalidateForMutation();

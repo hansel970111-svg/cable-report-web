@@ -200,6 +200,37 @@ describe('import ownership', () => {
     expect(result.current.model.recoverableDraft?.records[0].cableNumber)
       .toBe('C100');
   });
+
+  it('preserves the raw three-digit Cable Number when saving a console label', async () => {
+    const services = makeServices({
+      importExcel: vi.fn(async () => ({
+        ...importResult,
+        rows: [{
+          ...importResult.rows[0],
+          cableNumber: '#123(console)',
+          cableTypeText: 'Cat5e(Yellow)',
+        }],
+      })),
+    });
+    const { result } = renderWorkflow(services);
+    await act(async () => result.current.importSelected());
+
+    expect(result.current.model.recoverableDraft?.records[0]).toMatchObject({
+      cableLabel: '#123(console)', cableNumber: '123', result: 'FAIL',
+    });
+
+    act(() => {
+      result.current.applyCableLabels(new Map([['record-1', '#123(console)']]));
+    });
+    expect(result.current.model.revision).toBe(0);
+
+    act(() => {
+      result.current.applyCableLabels(new Map([['record-1', '#122(console)']]));
+    });
+    expect(result.current.model.recoverableDraft?.records[0]).toMatchObject({
+      cableLabel: '#122(console)', cableNumber: '122', result: 'FAIL',
+    });
+  });
 });
 
 describe('generate and save ownership', () => {

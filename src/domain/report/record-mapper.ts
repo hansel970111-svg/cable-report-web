@@ -1,4 +1,9 @@
-import { buildCableLabel, buildLimit } from './cable-rules';
+import {
+  buildCableLabel,
+  buildLimit,
+  cableNumberFromCableLabel,
+  isYellowCat5eType,
+} from './cable-rules';
 import type { CableImportRow, CableRecord, CableType } from './model';
 import type { RandomSource } from './random-source';
 import { generateWorkingTimes } from './time-sequence';
@@ -42,13 +47,19 @@ export function mapImportedRows(
     const length = Number((baseLength * (0.97 + options.random.next() * 0.06)).toFixed(1));
     const highMargin = options.random.next() < 0.8;
     const nextMargin = Number(((highMargin ? 11 : 9) + options.random.next() * 2).toFixed(1));
+    const cableLabel = buildCableLabel(row, options.cableType);
+    const cableNumber = options.cableType === 'Cat 5e'
+      ? cableNumberFromCableLabel(cableLabel, options.cableType)
+      : normalizeCableNumber(row.cableNumber, options.cableType);
 
     return {
       id: options.idFactory(row, index),
-      cableLabel: buildCableLabel(row, options.cableType),
-      cableNumber: normalizeCableNumber(row.cableNumber, options.cableType),
+      cableLabel,
+      cableNumber,
       limit: buildLimit(row, options.cableType),
-      result: 'PASS',
+      result: options.cableType === 'Cat 5e' && isYellowCat5eType(row.cableTypeText)
+        ? 'FAIL'
+        : 'PASS',
       length,
       nextMargin,
       dateTime: row.dateTime?.trim() || generatedTimes[index],

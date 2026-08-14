@@ -20,3 +20,18 @@ export function makeCat5eWorkbookBuffer(recordCount: number): Buffer {
 
   return Buffer.from(XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' }));
 }
+
+export function makeMixedCat5eWorkbookBuffer(): Buffer {
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(
+    workbook,
+    XLSX.utils.aoa_to_sheet([
+      ['线缆类型', '线号', '线长', 'Date & Time'],
+      ['红', '1', 20, ''],
+      ['Cat 5e (Yellow)', '123', 21, ''],
+    ]),
+    'OOB',
+  );
+
+  return Buffer.from(XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' }));
+}

@@ -84,6 +84,7 @@ describe('report contracts', () => {
     'A&B',
     'LC(A)+1',
     'A.B:1',
+    '#123(console)',
   ])('accepts PDF-safe Cable Label %s', value => {
     expect(cableLabelValidationMessage(value)).toBeNull();
   });
