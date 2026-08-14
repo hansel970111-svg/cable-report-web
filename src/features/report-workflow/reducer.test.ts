@@ -173,6 +173,49 @@ describe('revision and stale completions', () => {
     });
   });
 
+  it('keeps the console suffix out of the Cat5e Cable Number', () => {
+    let model = createInitialWorkflowModel(selection);
+    model = workflowReducer(model, {
+      type: 'import/started', requestId: 'request-1', revision: 0,
+    });
+    model = workflowReducer(model, {
+      type: 'import/succeeded',
+      requestId: 'request-1',
+      revision: 0,
+      draft: {
+        ...draft(),
+        records: [{
+          ...draft().records[0],
+          cableLabel: '#123(console)',
+          cableNumber: '123',
+          result: 'FAIL',
+        }],
+      },
+    });
+
+    const unchanged = workflowReducer(model, {
+      type: 'draft/changed',
+      change: {
+        kind: 'cable-labels',
+        values: new Map([['record-1', '#123(console)']]),
+      },
+    });
+    expect(unchanged).toBe(model);
+
+    const changed = workflowReducer(model, {
+      type: 'draft/changed',
+      change: {
+        kind: 'cable-labels',
+        values: new Map([['record-1', '#122(console)']]),
+      },
+    });
+    expect(changed.recoverableDraft?.records[0]).toMatchObject({
+      cableLabel: '#122(console)',
+      cableNumber: '122',
+      result: 'FAIL',
+    });
+  });
+
   it('keeps an empty saved label recoverable and explains why generation is blocked', () => {
     const model = readyModel();
 

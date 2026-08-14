@@ -33,7 +33,7 @@ export interface DetailedExcelImportStrategy extends ExcelImportStrategy {
 type CollectMatchingRowsOptions = {
   rule: ImportRule;
   sheetFilter: (sheetName: string) => boolean;
-  typeMatcher: (value: unknown) => boolean;
+  typeMatcher: (value: unknown, sheetName: string) => boolean;
   generatedCableNo?: (sequence: number) => string;
   replaceConstantExplicitCableNo?: boolean;
   bandwidth?: (cableTypeText: string, sourceLabel: string) => string | null;
@@ -90,7 +90,8 @@ export function collectMatchingRows(
     const { rows: sheetRows, firstRowNumber } = readSheetRows(worksheet);
     if (sheetRows.length === 0) continue;
 
-    const columns = detectSheetColumns(sheetRows, sheetName, options.typeMatcher, {
+    const typeMatcher = (value: unknown) => options.typeMatcher(value, sheetName);
+    const columns = detectSheetColumns(sheetRows, sheetName, typeMatcher, {
       expandOdfSegments: options.expandOdfSegments,
     });
     if (!columns) continue;
@@ -98,7 +99,7 @@ export function collectMatchingRows(
     for (let rowIndex = columns.headerRowCount; rowIndex < sheetRows.length; rowIndex++) {
       const row = sheetRows[rowIndex];
       const cableTypeText = normalizeCell(row[columns.cableTypeCol]);
-      if (!cableTypeText || !options.typeMatcher(cableTypeText)) continue;
+      if (!cableTypeText || !typeMatcher(cableTypeText)) continue;
 
       const sourceLabel = readFirstSourceLabel(row, columns.sourceLabelCols);
       const dateTime = readDateTime(row, columns.dateTimeCol);

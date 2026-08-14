@@ -57,7 +57,14 @@ _RESULT_ICON_FIRST_RECTS = {
     "lc": fitz.Rect(162.109, 109.766, 174.109, 121.766),
 }
 _RESULT_ICON_ROW_PITCH = 15.0
-_FAIL_ICON_RED = (220 / 255, 38 / 255, 38 / 255)
+# Geometry and colors match the 128 px FAIL status icon used by Softing reports.
+_FAIL_ICON_RED = (236 / 255, 28 / 255, 36 / 255)
+_FAIL_ICON_RING_GRAY = (208 / 255, 210 / 255, 211 / 255)
+_FAIL_ICON_OUTER_RADIUS = 5.9
+_FAIL_ICON_INNER_RADIUS = 5.0
+_FAIL_ICON_CROSS_OFFSET = 1.45
+_FAIL_ICON_CROSS_WIDTH = 0.9
+_FAIL_ICON_CROSS_Y_OFFSET = -0.15
 
 def save_pdf_compact(doc, output_path):
     """Save a generated report with lossless PDF cleanup/compression."""
@@ -785,24 +792,43 @@ def _draw_fail_result_icon(page, rect):
     center = fitz.Point((rect.x0 + rect.x1) / 2, (rect.y0 + rect.y1) / 2)
     page.draw_circle(
         center,
-        5.5,
+        _FAIL_ICON_OUTER_RADIUS,
+        color=_FAIL_ICON_RING_GRAY,
+        fill=_FAIL_ICON_RING_GRAY,
+        width=0.1,
+    )
+    page.draw_circle(
+        center,
+        _FAIL_ICON_INNER_RADIUS,
         color=_FAIL_ICON_RED,
         fill=_FAIL_ICON_RED,
-        width=0.5,
+        width=0.1,
     )
-    cross_offset = 2.5
+    cross_center = fitz.Point(center.x, center.y + _FAIL_ICON_CROSS_Y_OFFSET)
     page.draw_line(
-        fitz.Point(center.x - cross_offset, center.y - cross_offset),
-        fitz.Point(center.x + cross_offset, center.y + cross_offset),
+        fitz.Point(
+            cross_center.x - _FAIL_ICON_CROSS_OFFSET,
+            cross_center.y - _FAIL_ICON_CROSS_OFFSET,
+        ),
+        fitz.Point(
+            cross_center.x + _FAIL_ICON_CROSS_OFFSET,
+            cross_center.y + _FAIL_ICON_CROSS_OFFSET,
+        ),
         color=(1, 1, 1),
-        width=1.5,
+        width=_FAIL_ICON_CROSS_WIDTH,
         lineCap=1,
     )
     page.draw_line(
-        fitz.Point(center.x - cross_offset, center.y + cross_offset),
-        fitz.Point(center.x + cross_offset, center.y - cross_offset),
+        fitz.Point(
+            cross_center.x - _FAIL_ICON_CROSS_OFFSET,
+            cross_center.y + _FAIL_ICON_CROSS_OFFSET,
+        ),
+        fitz.Point(
+            cross_center.x + _FAIL_ICON_CROSS_OFFSET,
+            cross_center.y - _FAIL_ICON_CROSS_OFFSET,
+        ),
         color=(1, 1, 1),
-        width=1.5,
+        width=_FAIL_ICON_CROSS_WIDTH,
         lineCap=1,
     )
 

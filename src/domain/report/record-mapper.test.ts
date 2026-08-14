@@ -2,7 +2,9 @@ import { expect, test } from 'vitest';
 import {
   buildCableLabel,
   buildLimit,
+  cableNumberFromCableLabel,
   defaultLimitForCableType,
+  isYellowCat5eType,
   suggestedPdfName,
   templateAssetFor,
 } from './cable-rules';
@@ -62,6 +64,101 @@ test('preserves Cat5e formulas and random call order', () => {
     nextMargin: 11.5,
     dateTime: '10-07-2026 09:00:00 AM',
   }]);
+  expect(random.calls()).toBe(3);
+});
+
+test.each([
+  ['Cat5e(Yellow)', true],
+  ['CAT5E(YELLOW)', true],
+  [' cat 5e ( yellow ) ', true],
+  ['黄网', true],
+  ['Yellow', false],
+  ['黄色', false],
+  ['黄', false],
+  ['Cat5e(Yellow) console', false],
+] as const)('classifies the confirmed yellow Cat5e spelling %s', (value, expected) => {
+  expect(isYellowCat5eType(value)).toBe(expected);
+});
+
+test('maps yellow Cat5e rows to FAIL console labels without changing red rows', () => {
+  const rows = [
+    importRow({ cableNumber: '1', cableTypeText: '红' }),
+    importRow({
+      cableNumber: '123',
+      cableTypeText: 'Cat 5e (Yellow)',
+      source: {
+        sheetName: 'OOB', rowNumber: 3, expansionIndex: 0, rule: 'cat5e-oob',
+      },
+    }),
+    importRow({
+      cableNumber: '2',
+      cableTypeText: '黄网',
+      source: {
+        sheetName: 'OOB', rowNumber: 4, expansionIndex: 0, rule: 'cat5e-oob',
+      },
+    }),
+  ];
+  const random: RandomSource = { next: () => 0.5 };
+
+  const records = mapImportedRows(rows, {
+    cableType: 'Cat 5e',
+    startingDateTime: '10-07-2026 09:00:00 AM',
+    random,
+    idFactory: defaultRecordIdFactory,
+  });
+
+  expect(records.map(record => ({
+    cableLabel: record.cableLabel,
+    cableNumber: record.cableNumber,
+    result: record.result,
+  }))).toEqual([
+    { cableLabel: '#1', cableNumber: '1', result: 'PASS' },
+    { cableLabel: '#123(console)', cableNumber: '123', result: 'FAIL' },
+    { cableLabel: '#2(console)', cableNumber: '2', result: 'FAIL' },
+  ]);
+  expect(records[1].cableLabel).toHaveLength(13);
+  expect(cableNumberFromCableLabel(records[1].cableLabel, 'Cat 5e')).toBe('123');
+});
+
+test('does not apply the yellow OOB result rule to Vertical Cabling', () => {
+  const random = sequence([0.5, 0.79, 0.25]);
+  const [record] = mapImportedRows([importRow({
+    cableNumber: '#123',
+    cableTypeText: 'Cat5e(Yellow)',
+    source: {
+      sheetName: 'Vertical Cabling',
+      rowNumber: 2,
+      expansionIndex: 0,
+      rule: 'vertical-cabling',
+    },
+  })], {
+    cableType: 'Cat 5e (Vertical Cabling)',
+    startingDateTime: '10-07-2026 09:00:00 AM',
+    random,
+    idFactory: defaultRecordIdFactory,
+  });
+
+  expect(record).toMatchObject({
+    cableLabel: '123', cableNumber: '123', result: 'PASS',
+  });
+  expect(random.calls()).toBe(3);
+});
+
+test('normalizes a pre-suffixed yellow Cat5e source without duplicating console', () => {
+  const random = sequence([0.5, 0.79, 0.25]);
+  const [record] = mapImportedRows([importRow({
+    cableNumber: '#123(console)',
+    cableTypeText: '黄网',
+  })], {
+    cableType: 'Cat 5e',
+    startingDateTime: '10-07-2026 09:00:00 AM',
+    random,
+    idFactory: defaultRecordIdFactory,
+  });
+
+  expect(record).toMatchObject({
+    cableLabel: '#123(console)', cableNumber: '123', result: 'FAIL',
+  });
   expect(random.calls()).toBe(3);
 });
 

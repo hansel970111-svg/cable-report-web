@@ -39,6 +39,7 @@ test('approved dependency baseline is exact', async () => {
     sharp: '0.35.0',
     'minimatch@3.1.2': '3.1.4',
     'minimatch@9.0.5': '9.0.7',
+    'nanoid@3.3.17': '3.3.18',
     flatted: '3.4.2',
     'picomatch@2.3.1': '2.3.2',
     'picomatch@4.0.3': '4.0.5',
@@ -54,7 +55,7 @@ test('approved dependency baseline is exact', async () => {
   expect(packageJson.pnpm?.overrides).not.toHaveProperty('undici');
   expect(packageJson.packageManager).toBe('pnpm@9.15.9');
   expect(packageJson.engines.node).toBe('>=24.0.0 <25');
-  expect(packageJson.engines.pnpm).toBe('9.15.9');
+  expect(packageJson.engines.pnpm).toBe('9.15.9 || 11.4.0');
   expect(packageJson.scripts.test).toBe(
     'corepack pnpm test:unit && corepack pnpm test:python',
   );

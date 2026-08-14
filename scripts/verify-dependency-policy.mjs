@@ -30,6 +30,92 @@ function parseYamlKey(value) {
   return parseYamlScalar(value.replace(/:\s*$/, ''));
 }
 
+export function parsePnpmWorkspacePolicy(workspace) {
+  const packages = [];
+  const overrides = new Map();
+  const seenSections = new Set();
+  let section = null;
+
+  for (const [index, line] of workspace.split(/\r?\n/).entries()) {
+    if (line.trim() === '' || line.trimStart().startsWith('#')) continue;
+
+    if (/^[^\s]/.test(line)) {
+      const sectionMatch = line.match(/^(packages|overrides):\s*$/);
+      if (!sectionMatch) {
+        throw new Error(`pnpm-workspace.yaml line ${index + 1} has an unsupported section`);
+      }
+      section = sectionMatch[1];
+      if (seenSections.has(section)) {
+        throw new Error(`pnpm-workspace.yaml repeats the ${section} section`);
+      }
+      seenSections.add(section);
+      continue;
+    }
+
+    if (section === 'packages') {
+      const packageMatch = line.match(/^  - '((?:[^']|'')+)'\s*$/);
+      if (!packageMatch) {
+        throw new Error(`pnpm-workspace.yaml line ${index + 1} has an invalid package entry`);
+      }
+      const packagePattern = packageMatch[1].replaceAll("''", "'");
+      if (packages.includes(packagePattern)) {
+        throw new Error(`pnpm-workspace.yaml repeats package ${packagePattern}`);
+      }
+      packages.push(packagePattern);
+      continue;
+    }
+
+    if (section === 'overrides') {
+      const overrideMatch = line.match(
+        /^  '((?:[^']|'')+)': '((?:[^']|'')+)'\s*$/,
+      );
+      if (!overrideMatch) {
+        throw new Error(`pnpm-workspace.yaml line ${index + 1} has an invalid override entry`);
+      }
+      const name = overrideMatch[1].replaceAll("''", "'");
+      const version = overrideMatch[2].replaceAll("''", "'");
+      if (overrides.has(name)) {
+        throw new Error(`pnpm-workspace.yaml repeats override ${name}`);
+      }
+      overrides.set(name, version);
+      continue;
+    }
+
+    throw new Error(`pnpm-workspace.yaml line ${index + 1} is outside a supported section`);
+  }
+
+  return { packages, overrides };
+}
+
+export function parseLockfileOverrides(lockfile) {
+  const overrides = new Map();
+  let inOverrides = false;
+  let sawOverrides = false;
+
+  for (const [index, line] of lockfile.split(/\r?\n/).entries()) {
+    if (line === 'overrides:') {
+      if (sawOverrides) throw new Error('pnpm-lock.yaml repeats the overrides section');
+      sawOverrides = true;
+      inOverrides = true;
+      continue;
+    }
+    if (!inOverrides) continue;
+    if (/^[^\s]/.test(line)) break;
+    if (line.trim() === '' || line.trimStart().startsWith('#')) continue;
+
+    const overrideMatch = line.match(/^  (.+):\s+(.+)$/);
+    if (!overrideMatch) {
+      throw new Error(`pnpm-lock.yaml line ${index + 1} has an invalid override entry`);
+    }
+    const name = parseYamlKey(`${overrideMatch[1]}:`);
+    const version = parseYamlScalar(overrideMatch[2]);
+    if (overrides.has(name)) throw new Error(`pnpm-lock.yaml repeats override ${name}`);
+    overrides.set(name, version);
+  }
+
+  return overrides;
+}
+
 export function parseRootImporter(lockfile) {
   const lines = lockfile.split(/\r?\n/);
   const root = { dependencies: new Map(), devDependencies: new Map() };
@@ -146,11 +232,58 @@ function parseAutoInstallPeers(lockfile) {
   return undefined;
 }
 
-export function verifyDependencyPolicy(packageJson, lockfile) {
+function compareOverrideMaps(sourceName, expectedSourceName, expected, actual, errors) {
+  for (const [name, version] of expected) {
+    if (!actual.has(name)) {
+      errors.push(`${sourceName} override ${name} is missing`);
+      continue;
+    }
+    if (actual.get(name) !== version) {
+      errors.push(
+        `${sourceName} override ${name} mismatch: expected=${version}, actual=${actual.get(name)}`,
+      );
+    }
+  }
+
+  for (const name of actual.keys()) {
+    if (!expected.has(name)) {
+      errors.push(`${sourceName} override ${name} is not declared in ${expectedSourceName}`);
+    }
+  }
+}
+
+export function verifyDependencyPolicy(packageJson, lockfile, workspace) {
   const manifest = JSON.parse(packageJson);
   const root = parseRootImporter(lockfile);
   const packageResolutions = parsePackageResolutions(lockfile);
   const errors = [];
+
+  const manifestOverrides = new Map(Object.entries(manifest.pnpm?.overrides ?? {}));
+  const workspacePolicy = parsePnpmWorkspacePolicy(workspace);
+  const workspaceOverrides = workspacePolicy.overrides;
+  const lockOverrides = parseLockfileOverrides(lockfile);
+  if (manifestOverrides.size === 0) {
+    errors.push('package.json pnpm.overrides must not be empty');
+  }
+  if (workspacePolicy.packages.length !== 1 || workspacePolicy.packages[0] !== '.') {
+    errors.push(
+      `pnpm-workspace.yaml packages must be exactly ["."]; received ${JSON.stringify(workspacePolicy.packages)}`,
+    );
+  }
+  compareOverrideMaps(
+    'pnpm-workspace.yaml',
+    'package.json',
+    manifestOverrides,
+    workspaceOverrides,
+    errors,
+  );
+  compareOverrideMaps(
+    'pnpm-lock.yaml',
+    'pnpm-workspace.yaml',
+    workspaceOverrides,
+    lockOverrides,
+    errors,
+  );
 
   const autoInstallPeers = parseAutoInstallPeers(lockfile);
   if (autoInstallPeers !== false) {
@@ -240,11 +373,17 @@ function optionValue(arguments_, name, fallback) {
 async function main() {
   const packagePath = optionValue(process.argv.slice(2), '--package-json', 'package.json');
   const lockfilePath = optionValue(process.argv.slice(2), '--lockfile', 'pnpm-lock.yaml');
-  const [packageJson, lockfile] = await Promise.all([
+  const workspacePath = optionValue(
+    process.argv.slice(2),
+    '--workspace',
+    'pnpm-workspace.yaml',
+  );
+  const [packageJson, lockfile, workspace] = await Promise.all([
     readFile(packagePath, 'utf8'),
     readFile(lockfilePath, 'utf8'),
+    readFile(workspacePath, 'utf8'),
   ]);
-  const result = verifyDependencyPolicy(packageJson, lockfile);
+  const result = verifyDependencyPolicy(packageJson, lockfile, workspace);
   console.log(
     `Dependency policy verified: ${result.dependencies} dependencies, ${result.devDependencies} devDependencies.`,
   );

@@ -1,6 +1,10 @@
 import { expect, test } from '@playwright/test';
 
-import { makeCat5eWorkbookBuffer, XLSX_MIME } from './support/workbook';
+import {
+  makeCat5eWorkbookBuffer,
+  makeMixedCat5eWorkbookBuffer,
+  XLSX_MIME,
+} from './support/workbook';
 
 type GeneratedPayload = {
   revision: number;
@@ -8,7 +12,9 @@ type GeneratedPayload = {
   site: string;
   records: Array<{
     cableLabel: string;
+    cableNumber: string;
     dateTime: string;
+    result: 'PASS' | 'FAIL';
   }>;
 };
 
@@ -92,4 +98,56 @@ test('imports, edits, deletes, and generates a report in browser mode', async ({
   expect(generatedPayload.records[0]?.dateTime).toMatch(
     /^\d{2}-\d{2}-\d{4} \d{2}:00:\d{2} (?:AM|PM)$/,
   );
+});
+
+test('maps yellow Cat5e rows to console FAIL records end to end', async ({ page }) => {
+  let generatedPayload: GeneratedPayload | null = null;
+  await page.route('**/api/generate-report', async route => {
+    generatedPayload = route.request().postDataJSON() as GeneratedPayload;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/pdf',
+      headers: {
+        'content-disposition': 'attachment; filename="yellow-cat5e.pdf"',
+        'x-report-job-id': 'e2e-yellow-cat5e',
+      },
+      body: '%PDF-1.4\n%%EOF\n',
+    });
+  });
+
+  await page.goto('/');
+  await page.getByLabel('项目号 (Site)').fill('YYBX-OE38-00027');
+  await page.getByLabel('线缆类型').selectOption('Cat 5e');
+  await page.getByLabel('Excel 布线表').setInputFiles({
+    name: 'cat5e-red-yellow.xlsx',
+    mimeType: XLSX_MIME,
+    buffer: makeMixedCat5eWorkbookBuffer(),
+  });
+
+  const importResponsePromise = page.waitForResponse(response => (
+    new URL(response.url()).pathname === '/api/import-excel'
+    && response.request().method() === 'POST'
+  ));
+  await page.getByRole('button', { name: '加载并导入' }).click();
+  expect((await importResponsePromise).status()).toBe(200);
+
+  const preview = page.getByRole('table', { name: '线缆记录预览' });
+  await expect(preview.getByText('#1', { exact: true })).toBeVisible();
+  await expect(preview.getByText('#123(console)', { exact: true })).toBeVisible();
+  await expect(preview.getByText('PASS', { exact: true })).toBeVisible();
+  await expect(preview.getByText('FAIL', { exact: true })).toBeVisible();
+
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: '生成测试报告' }).click();
+  await downloadPromise;
+
+  expect(generatedPayload).not.toBeNull();
+  expect(generatedPayload!.records.map(record => ({
+    cableLabel: record.cableLabel,
+    cableNumber: record.cableNumber,
+    result: record.result,
+  }))).toEqual([
+    { cableLabel: '#1', cableNumber: '1', result: 'PASS' },
+    { cableLabel: '#123(console)', cableNumber: '123', result: 'FAIL' },
+  ]);
 });

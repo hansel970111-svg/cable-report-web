@@ -18,14 +18,21 @@ afterEach(async () => {
   );
 });
 
-async function runVerifier(packageJson: string, lockfile: string) {
+async function runVerifier(
+  packageJson: string,
+  lockfile: string,
+  workspace?: string,
+) {
+  const effectiveWorkspace = workspace ?? await readFile('pnpm-workspace.yaml', 'utf8');
   const directory = await mkdtemp(join(tmpdir(), 'dependency-policy-'));
   temporaryDirectories.push(directory);
   const packagePath = join(directory, 'package.json');
   const lockfilePath = join(directory, 'pnpm-lock.yaml');
+  const workspacePath = join(directory, 'pnpm-workspace.yaml');
   await Promise.all([
     writeFile(packagePath, packageJson),
     writeFile(lockfilePath, lockfile),
+    writeFile(workspacePath, effectiveWorkspace),
   ]);
   return execFileAsync(process.execPath, [
     verifier,
@@ -33,15 +40,22 @@ async function runVerifier(packageJson: string, lockfile: string) {
     packagePath,
     '--lockfile',
     lockfilePath,
+    '--workspace',
+    workspacePath,
   ]);
 }
 
 async function trustedInputs() {
-  const [packageJson, lockfile] = await Promise.all([
+  const [packageJson, lockfile, workspace] = await Promise.all([
     readFile('package.json', 'utf8'),
     readFile('pnpm-lock.yaml', 'utf8'),
+    readFile('pnpm-workspace.yaml', 'utf8'),
   ]);
-  return { packageJson, lockfile: lockfile.replaceAll('\r\n', '\n') };
+  return {
+    packageJson,
+    lockfile: lockfile.replaceAll('\r\n', '\n'),
+    workspace: workspace.replaceAll('\r\n', '\n'),
+  };
 }
 
 test('dependency verifier accepts the trusted root importer', async () => {
@@ -111,6 +125,77 @@ test('dependency verifier rejects automatic peer installation', async () => {
 
   await expect(runVerifier(packageJson, tampered)).rejects.toMatchObject({
     stderr: expect.stringContaining('autoInstallPeers'),
+  });
+});
+
+test('dependency verifier rejects a workspace override mismatch', async () => {
+  const { packageJson, lockfile, workspace } = await trustedInputs();
+  const tampered = workspace.replace(
+    "'nanoid@3.3.17': '3.3.18'",
+    "'nanoid@3.3.17': '3.3.17'",
+  );
+  expect(tampered).not.toBe(workspace);
+
+  await expect(runVerifier(packageJson, lockfile, tampered)).rejects.toMatchObject({
+    stderr: expect.stringContaining('pnpm-workspace.yaml override nanoid@3.3.17 mismatch'),
+  });
+});
+
+test('dependency verifier rejects a lock override mismatch', async () => {
+  const { packageJson, lockfile } = await trustedInputs();
+  const tampered = lockfile.replace(
+    '  nanoid@3.3.17: 3.3.18',
+    '  nanoid@3.3.17: 3.3.17',
+  );
+  expect(tampered).not.toBe(lockfile);
+
+  await expect(runVerifier(packageJson, tampered)).rejects.toMatchObject({
+    stderr: expect.stringContaining('pnpm-lock.yaml override nanoid@3.3.17 mismatch'),
+  });
+});
+
+test('dependency verifier rejects a missing package override', async () => {
+  const { packageJson, lockfile } = await trustedInputs();
+  const manifest = JSON.parse(packageJson);
+  delete manifest.pnpm.overrides['nanoid@3.3.17'];
+
+  await expect(runVerifier(`${JSON.stringify(manifest)}\n`, lockfile)).rejects.toMatchObject({
+    stderr: expect.stringContaining(
+      'pnpm-workspace.yaml override nanoid@3.3.17 is not declared in package.json',
+    ),
+  });
+});
+
+test('dependency verifier rejects a workspace without overrides', async () => {
+  const { packageJson, lockfile, workspace } = await trustedInputs();
+  const tampered = workspace.replace(/^overrides:[\s\S]*$/m, '');
+  expect(tampered).not.toBe(workspace);
+
+  await expect(runVerifier(packageJson, lockfile, tampered)).rejects.toMatchObject({
+    stderr: expect.stringContaining('pnpm-workspace.yaml override'),
+  });
+});
+
+test('dependency verifier rejects a duplicate workspace override', async () => {
+  const { packageJson, lockfile, workspace } = await trustedInputs();
+  const tampered = workspace.replace(
+    "  'nanoid@3.3.17': '3.3.18'",
+    "  'nanoid@3.3.17': '3.3.18'\n  'nanoid@3.3.17': '3.3.18'",
+  );
+  expect(tampered).not.toBe(workspace);
+
+  await expect(runVerifier(packageJson, lockfile, tampered)).rejects.toMatchObject({
+    stderr: expect.stringContaining('pnpm-workspace.yaml repeats override nanoid@3.3.17'),
+  });
+});
+
+test('dependency verifier rejects a wider workspace package scope', async () => {
+  const { packageJson, lockfile, workspace } = await trustedInputs();
+  const tampered = workspace.replace("  - '.'", "  - 'packages/*'");
+  expect(tampered).not.toBe(workspace);
+
+  await expect(runVerifier(packageJson, lockfile, tampered)).rejects.toMatchObject({
+    stderr: expect.stringContaining('pnpm-workspace.yaml packages must be exactly'),
   });
 });
 

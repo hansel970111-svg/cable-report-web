@@ -147,6 +147,32 @@ describe('real workbook characterization', () => {
     });
   });
 
+  it('imports confirmed yellow Cat5e names alongside red rows', () => {
+    const result = importExcel(workbookInput([
+      ['OOB', [
+        ['线缆类型', '线号', '线长'],
+        ['红', '1', 10],
+        ['Cat5e(Yellow)', '2', 20],
+        [' cat 5e ( yellow ) ', '3', 30],
+        ['黄网', '123', 40],
+        ['Yellow', '4', 50],
+        ['黄色', '5', 60],
+        ['黄', '6', 70],
+      ]],
+    ]), 'Cat 5e');
+
+    expect(result.rows.map(row => ({
+      cableNumber: row.cableNumber,
+      cableTypeText: row.cableTypeText,
+      length: row.length,
+    }))).toEqual([
+      { cableNumber: '1', cableTypeText: '红', length: 10 },
+      { cableNumber: '2', cableTypeText: 'Cat5e(Yellow)', length: 20 },
+      { cableNumber: '3', cableTypeText: 'cat 5e ( yellow )', length: 30 },
+      { cableNumber: '123', cableTypeText: '黄网', length: 40 },
+    ]);
+  });
+
   it('imports the Vertical fixture with zero-based expansion coordinates', () => {
     const result = importExcel(
       fixtureInput('vertical.xlsx'),
@@ -266,6 +292,32 @@ describe('legacy parsing rules', () => {
     expect(result.rows[0].source).toEqual({
       sheetName: 'Before', rowNumber: 2, expansionIndex: 0, rule: 'cat5e-oob',
     });
+  });
+
+  it('keeps the yellow OOB rule out of Vertical sheets selected by YYBX precedence', () => {
+    const result = importExcel(workbookInput([
+      ['OOB', [
+        ['线缆类型', '线号', '线长'],
+        ['红', '1', 10],
+      ]],
+      ['Vertical Cabling', [
+        ['线缆类型', '线号', '线长'],
+        ['Cat5e(Yellow)', '2', 20],
+        ['红', '3', 30],
+      ]],
+      ['Workload', [
+        ['线缆类型', '线号', '线长'],
+        ['红', '4', 40],
+      ]],
+    ], 'YYBX-source.xlsx'), 'Cat 5e');
+
+    expect(result.rows.map(row => ({
+      cableNumber: row.cableNumber,
+      sheetName: row.source.sheetName,
+    }))).toEqual([
+      { cableNumber: '1', sheetName: 'OOB' },
+      { cableNumber: '3', sheetName: 'Vertical Cabling' },
+    ]);
   });
 
   it('expands both Cable Label and length columns on Cross sheets and sorts naturally', () => {
@@ -618,6 +670,19 @@ describe('legacy parsing rules', () => {
       'DE46-01-1', 'DE46-01-2', 'DE47-02-1', 'DE48-03-1', 'DE49-04-1',
     ]);
     expect(result.rows.map(row => row.source.expansionIndex)).toEqual([0, 1, 0, 0, 0]);
+  });
+
+  it('does not apply the yellow Cat5e rule to Vertical Cabling', () => {
+    const result = importExcel(workbookInput([
+      ['Vertical Cabling', [
+        ['Rack&Room', 'RU', '线缆类型', 'QTY', 'Length'],
+        ['DE46', 'RU01', '红', 1, 30],
+        ['DE47', 'RU02', 'Cat5e(Yellow)', 1, 30],
+        ['DE48', 'RU03', '黄网', 1, 30],
+      ]],
+    ]), 'Cat 5e (Vertical Cabling)');
+
+    expect(result.rows.map(row => row.cableNumber)).toEqual(['DE46-01-1']);
   });
 });
 

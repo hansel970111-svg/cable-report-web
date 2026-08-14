@@ -7,6 +7,23 @@ const TEMPLATE_ASSETS: Readonly<Record<CableType, string>> = Object.freeze({
   MPO: 'assets/M138-DE46-P-A-MPO.pdf',
 });
 
+const YELLOW_CAT5E_TYPE_PATTERN = /^cat\s*5e\s*\(\s*yellow\s*\)$/i;
+
+export function isYellowCat5eType(value: unknown): boolean {
+  const normalized = String(value ?? '').trim();
+  return normalized === '黄网' || YELLOW_CAT5E_TYPE_PATTERN.test(normalized);
+}
+
+export function cableNumberFromCableLabel(
+  cableLabel: string,
+  cableType: CableType,
+): string {
+  const withoutHash = cableLabel.trim().replace(/^#/, '');
+  return cableType === 'Cat 5e'
+    ? withoutHash.replace(/\(console\)$/i, '')
+    : withoutHash;
+}
+
 function extractBandwidth(value: string | null): string {
   const text = value ?? '';
   const match = text.match(/(\d+)\s*G/i);
@@ -41,7 +58,16 @@ export function buildCableLabel(row: CableImportRow, cableType: CableType): stri
       .join(' & ');
   }
 
-  return cableNumber.startsWith('#') ? cableNumber : `#${cableNumber}`;
+  const label = cableNumber.startsWith('#') ? cableNumber : `#${cableNumber}`;
+  if (
+    cableType === 'Cat 5e'
+    && isYellowCat5eType(row.cableTypeText)
+    && !/\(console\)$/i.test(label)
+  ) {
+    return `${label}(console)`;
+  }
+
+  return label;
 }
 
 export function buildLimit(row: CableImportRow, cableType: CableType): string {

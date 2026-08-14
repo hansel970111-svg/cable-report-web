@@ -1,3 +1,4 @@
+import { cableNumberFromCableLabel } from '@/domain/report/cable-rules';
 import type { ReportDraft } from '@/domain/report/model';
 import {
   reportDraftValidationMessage,
@@ -190,7 +191,7 @@ function applyCableLabelChanges(
     const rawCableLabel = values.get(record.id);
     if (rawCableLabel === undefined) return record;
     const cableLabel = rawCableLabel.trim();
-    const cableNumber = cableLabel.replace(/^#/, '');
+    const cableNumber = cableNumberFromCableLabel(cableLabel, source.cableType);
     if (record.cableLabel === cableLabel && record.cableNumber === cableNumber) {
       return record;
     }
