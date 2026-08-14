@@ -55,7 +55,7 @@ test('approved dependency baseline is exact', async () => {
   expect(packageJson.pnpm?.overrides).not.toHaveProperty('undici');
   expect(packageJson.packageManager).toBe('pnpm@9.15.9');
   expect(packageJson.engines.node).toBe('>=24.0.0 <25');
-  expect(packageJson.engines.pnpm).toBe('9.15.9');
+  expect(packageJson.engines.pnpm).toBe('9.15.9 || 11.4.0');
   expect(packageJson.scripts.test).toBe(
     'corepack pnpm test:unit && corepack pnpm test:python',
   );
