@@ -219,6 +219,40 @@ describe('real workbook characterization', () => {
     });
   });
 
+  it('imports the compact VerticalCabling sheet name used by project exports', () => {
+    const result = importExcel(workbookInput([
+      ['VerticalCabling', [
+        [
+          '设备名', '包间-机柜.机房名', 'U位', '端口',
+          '设备名', '包间-机柜.机房名', 'U位', '端口',
+          '线缆类型', '长度', '数量', '备注',
+        ],
+        [
+          'OAW-S-1', 'A07', 41, '',
+          'Server 1-48', '', '', '',
+          'RJ45 Cat5e(Red)', 7, 2, 'project export',
+        ],
+      ]],
+    ]), 'Cat 5e (Vertical Cabling)');
+
+    expect(result.rows.map(row => ({
+      cableNumber: row.cableNumber,
+      cableTypeText: row.cableTypeText,
+      length: row.length,
+      expansionIndex: row.source.expansionIndex,
+    }))).toEqual([
+      {
+        cableNumber: 'A07-41-1', cableTypeText: 'RJ45 Cat5e(Red)', length: 7,
+        expansionIndex: 0,
+      },
+      {
+        cableNumber: 'A07-41-2', cableTypeText: 'RJ45 Cat5e(Red)', length: 7,
+        expansionIndex: 1,
+      },
+    ]);
+    expect(result.metadata.sheetNames).toEqual(['VerticalCabling']);
+  });
+
   it('imports the BIFF LC fixture as the exact legacy row', () => {
     const result = importExcel(fixtureInput('lc.xls'), 'LC');
 

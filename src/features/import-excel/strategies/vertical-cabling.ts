@@ -74,11 +74,15 @@ function emptyExtraction(): StrategyExtraction {
   };
 }
 
+function isVerticalCablingSheetName(sheetName: string): boolean {
+  return sheetName.toLowerCase().replace(/[\s_-]/g, '').includes('verticalcabling');
+}
+
 export const verticalCablingStrategy = defineStrategy(
   'Cat 5e (Vertical Cabling)',
   (context, limits) => {
     const sheetName = context.workbook.SheetNames.find(
-      name => name.toLowerCase().includes('vertical cabling'),
+      isVerticalCablingSheetName,
     );
     if (!sheetName) return emptyExtraction();
 
