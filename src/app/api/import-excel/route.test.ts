@@ -488,7 +488,7 @@ describe('workbook validation and limits', () => {
     [
       'ODF_SEGMENT_COLUMNS_INVALID' as const,
       400,
-      '过 ODF 的工作表需要两列线号及各自对应的长度列。',
+      '过 ODF 的工作表需要至少两列线号及各自对应的长度列。',
     ],
   ])('maps %s to its stable public file error', async (code, status, message) => {
     const importer = vi.fn(() => {

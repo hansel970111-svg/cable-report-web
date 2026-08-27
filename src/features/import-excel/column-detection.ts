@@ -200,29 +200,79 @@ function getLengthColumnPriority(value: unknown): number {
   return 5;
 }
 
+const MAX_ODF_SEGMENT_COLUMN_GAP = 8;
+
+type CableSegmentPairing = {
+  segments: CableSegmentColumns[];
+  headerPriority: number;
+  columnDistance: number;
+};
+
+function preferCableSegmentPairing(
+  first: CableSegmentPairing,
+  second: CableSegmentPairing,
+): CableSegmentPairing {
+  if (first.segments.length !== second.segments.length) {
+    return first.segments.length > second.segments.length ? first : second;
+  }
+  if (first.headerPriority !== second.headerPriority) {
+    return first.headerPriority < second.headerPriority ? first : second;
+  }
+  if (first.columnDistance !== second.columnDistance) {
+    return first.columnDistance < second.columnDistance ? first : second;
+  }
+
+  return first;
+}
+
 function pairCableSegmentColumns(
   headers: ExcelRow,
   cableNoColumns: number[],
   lengthColumns: number[],
 ): CableSegmentColumns[] {
   const orderedCableNoColumns = [...cableNoColumns]
-    .sort((first, second) => first - second)
-    .slice(0, 2);
+    .sort((first, second) => first - second);
+  const orderedLengthColumns = [...lengthColumns]
+    .sort((first, second) => first - second);
+  const cache = new Map<string, CableSegmentPairing>();
 
-  return orderedCableNoColumns.map((cableNoColumn, index) => {
-    const nextCableNoColumn = orderedCableNoColumns[index + 1];
-    const lengthColumn = lengthColumns
-      .filter(candidate => (
-        candidate > cableNoColumn
-        && (nextCableNoColumn === undefined || candidate < nextCableNoColumn)
-      ))
-      .sort((first, second) => (
-        getLengthColumnPriority(headers[first]) - getLengthColumnPriority(headers[second])
-        || first - second
-      ))[0] ?? null;
+  const pairFrom = (
+    cableNoIndex: number,
+    lengthIndex: number,
+  ): CableSegmentPairing => {
+    if (
+      cableNoIndex === orderedCableNoColumns.length
+      || lengthIndex === orderedLengthColumns.length
+    ) {
+      return { segments: [], headerPriority: 0, columnDistance: 0 };
+    }
 
-    return { cableNoColumn, lengthColumn };
-  });
+    const cacheKey = `${cableNoIndex}:${lengthIndex}`;
+    const cached = cache.get(cacheKey);
+    if (cached) return cached;
+
+    let best = preferCableSegmentPairing(
+      pairFrom(cableNoIndex + 1, lengthIndex),
+      pairFrom(cableNoIndex, lengthIndex + 1),
+    );
+    const cableNoColumn = orderedCableNoColumns[cableNoIndex];
+    const lengthColumn = orderedLengthColumns[lengthIndex];
+    const distance = Math.abs(cableNoColumn - lengthColumn);
+
+    if (distance <= MAX_ODF_SEGMENT_COLUMN_GAP) {
+      const remainder = pairFrom(cableNoIndex + 1, lengthIndex + 1);
+      best = preferCableSegmentPairing(best, {
+        segments: [{ cableNoColumn, lengthColumn }, ...remainder.segments],
+        headerPriority: getLengthColumnPriority(headers[lengthColumn]) + remainder.headerPriority,
+        columnDistance: distance + remainder.columnDistance,
+      });
+    }
+
+    cache.set(cacheKey, best);
+    return best;
+  };
+
+  return pairFrom(0, 0).segments;
 }
 
 function findLengthColumns(headers: ExcelRow): number[] {
@@ -543,11 +593,10 @@ export function detectSheetColumns(
   const hasMatchingDataRows = rows
     .slice(headerRowCount)
     .some(row => typeMatcher(row[cableTypeCol]));
-  const cableSegmentColumns = isOdfPath && cableNoCols.length === 2
+  const cableSegmentColumns = isOdfPath
     ? pairCableSegmentColumns(primaryHeaders, cableNoCols, lengthCols)
     : [];
-  const hasCompleteSegmentColumns = cableSegmentColumns.length === 2
-    && cableSegmentColumns.every(segment => segment.lengthColumn !== null);
+  const hasCompleteSegmentColumns = cableSegmentColumns.length >= 2;
   if (
     isOdfPath
     && hasMatchingDataRows
