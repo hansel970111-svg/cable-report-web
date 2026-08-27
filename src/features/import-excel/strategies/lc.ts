@@ -36,7 +36,8 @@ export const lcStrategy = defineStrategy('LC', (context, limits) => {
     sheetFilter: sheetName => {
       if (yybxWorkbook) return isBeforeWorkloadSheet(context, sheetName);
 
-      return !sheetName.toLowerCase().includes('vertical cabling')
+      return !sheetName.trim().startsWith('_')
+        && !sheetName.toLowerCase().includes('vertical cabling')
         && !isWorkloadSheet(sheetName);
     },
     typeMatcher: matchesLcCableType,

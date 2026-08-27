@@ -21,7 +21,11 @@ const FATAL_STDERR = [
   /本地服务启动超时/,
   /启动失败/,
 ] as const;
-const PROCESS_PROBE_TIMEOUT_MS = 15_000;
+// The hosted Windows runner can keep the WMI-backed process table query busy
+// while an Electron renderer is shutting down.  Keep the cleanup assertion
+// strict, but give that system query enough time to return rather than turning
+// a successful packaged run into a retry-only result.
+const PROCESS_PROBE_TIMEOUT_MS = 60_000;
 
 export type ProcessSnapshot = {
   pid: number;

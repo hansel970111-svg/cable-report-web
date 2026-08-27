@@ -53,7 +53,7 @@ const PUBLIC_ERRORS: Readonly<Record<ImportExcelErrorCode, {
   },
   ODF_SEGMENT_COLUMNS_INVALID: {
     status: 400,
-    message: '过 ODF 的工作表需要两列线号及各自对应的长度列。',
+    message: '过 ODF 的工作表需要至少两列线号及各自对应的长度列。',
     retryable: false,
     field: 'file',
   },
