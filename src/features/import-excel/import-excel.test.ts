@@ -173,6 +173,32 @@ describe('real workbook characterization', () => {
     ]);
   });
 
+  it('imports OOB records after a three-row grouped header', () => {
+    const result = importExcel(workbookInput([
+      ['OOB Cabling', [
+        ['A End', '', '', '', 'Z End', '', '', '', 'Cable Type'],
+        ['Device', 'SN', 'Rack&Room', 'Port', 'Device', 'SN', 'Rack&Room', 'Port'],
+        [
+          '设备名', 'SN', '包间-机柜.机房名', '端口',
+          '设备名', 'SN', '包间-机柜.机房名', '端口',
+          '线缆类型', '线号', '路由', '线长',
+        ],
+        [
+          'OAW-1', '', 'A1-3-E04_21.FR230', 31,
+          'LSW-1', '', 'A1-3-A17_29.FR230', 'mgt',
+          'RJ45 Cat5E(Red)', '#1', '中桥', 35,
+        ],
+      ]],
+    ]), 'Cat 5e');
+
+    expect(result.rows).toMatchObject([
+      {
+        cableNumber: '#1', cableTypeText: 'RJ45 Cat5E(Red)', length: 35,
+        source: { sheetName: 'OOB Cabling', rowNumber: 4 },
+      },
+    ]);
+  });
+
   it('imports the Vertical fixture with zero-based expansion coordinates', () => {
     const result = importExcel(
       fixtureInput('vertical.xlsx'),
@@ -547,6 +573,31 @@ describe('legacy parsing rules', () => {
     ]);
   });
 
+  it('omits the final end-to-end line number from ODF segment reports', () => {
+    const result = importExcel(workbookInput([
+      ['Horizontal Cabling Cross', [
+        [
+          'A-ODF设备', 'A-ODF位置', 'A-ODF端口', '长度', '线号', 'A对端',
+          'Z-ODF设备', 'Z-ODF位置', 'Z-ODF端口', '长度', '线号', 'Z对端',
+          'Z设备', 'Z位置', 'Z端口', '线缆类型', '线长', '线号',
+        ],
+        [
+          'ODF-A', 'A1', 'A-1', 15, '#17', '',
+          'ODF-Z', 'Z1', 'Z-1', 60, '#21', '',
+          'ESR', 'A1-4-H03', '', '10G SM LC', 60, '#14',
+        ],
+      ]],
+    ]), 'LC');
+
+    expect(result.rows.map(row => ({
+      cableNumber: row.cableNumber,
+      length: row.length,
+    }))).toEqual([
+      { cableNumber: '#17', length: 15 },
+      { cableNumber: '#21', length: 60 },
+    ]);
+  });
+
   it('prefers the segment line length when a total length field comes first', () => {
     const result = importExcel(workbookInput([
       ['Cross Connect', [
@@ -692,6 +743,26 @@ describe('legacy parsing rules', () => {
 
     expect(result.rows.map(row => row.cableNumber)).toEqual(['#2', '#10']);
     expect(result.metadata.sheetNames).toEqual(['Cross A', 'Cross B']);
+  });
+
+  it('does not duplicate LC records from an internal source worksheet', () => {
+    const result = importExcel(workbookInput([
+      ['Horizontal Cabling', [
+        ['线缆类型', '线号', '线长'],
+        ['SM,LC-LC', '#9', 65],
+      ]],
+      ['_Horizontal Cabling Source', [
+        ['线缆类型', '线号', '线长'],
+        ['SM,LC-LC', '#9', 65],
+      ]],
+    ]), 'LC');
+
+    expect(result.rows.map(row => ({
+      cableNumber: row.cableNumber,
+      sheetName: row.source.sheetName,
+    }))).toEqual([
+      { cableNumber: '#9', sheetName: 'Horizontal Cabling' },
+    ]);
   });
 
   it('does not sum generic LC length columns when the sheet has no Cross or ODF structure', () => {

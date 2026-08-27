@@ -15,6 +15,7 @@ export type DetectedColumns = Readonly<Record<string, string | null>>;
 export type CableSegmentColumns = {
   cableNoColumn: number;
   lengthColumn: number | null;
+  isOdfSegment: boolean;
 };
 
 export type LengthMode = 'firstNumeric' | 'sumFirstTwoPlus50';
@@ -201,6 +202,7 @@ function getLengthColumnPriority(value: unknown): number {
 }
 
 const MAX_ODF_SEGMENT_COLUMN_GAP = 8;
+const MAX_ODF_SEGMENT_CONTEXT_COLUMN_GAP = 8;
 
 type CableSegmentPairing = {
   segments: CableSegmentColumns[];
@@ -262,7 +264,7 @@ function pairCableSegmentColumns(
     if (distance <= MAX_ODF_SEGMENT_COLUMN_GAP) {
       const remainder = pairFrom(cableNoIndex + 1, lengthIndex + 1);
       best = preferCableSegmentPairing(best, {
-        segments: [{ cableNoColumn, lengthColumn }, ...remainder.segments],
+        segments: [{ cableNoColumn, lengthColumn, isOdfSegment: false }, ...remainder.segments],
         headerPriority: getLengthColumnPriority(headers[lengthColumn]) + remainder.headerPriority,
         columnDistance: distance + remainder.columnDistance,
       });
@@ -273,6 +275,19 @@ function pairCableSegmentColumns(
   };
 
   return pairFrom(0, 0).segments;
+}
+
+function findOdfSegmentCableNoColumns(
+  headers: ExcelRow,
+  cableNoColumns: number[],
+): number[] {
+  const columnsWithOdfContext = cableNoColumns.filter(column => (
+    headers
+      .slice(Math.max(0, column - MAX_ODF_SEGMENT_CONTEXT_COLUMN_GAP), column)
+      .some(header => normalizeLower(header).includes('odf'))
+  ));
+
+  return columnsWithOdfContext;
 }
 
 function findLengthColumns(headers: ExcelRow): number[] {
@@ -520,29 +535,28 @@ export function detectSheetColumns(
   typeMatcher: (value: unknown) => boolean,
   options: SheetColumnDetectionOptions = {},
 ): SheetColumnProfile | null {
-  const firstHeaders = rows[0] || [];
-  const secondHeaders = rows[1] || [];
-
-  const firstCableTypeColumn = findCableTypeColumn(firstHeaders);
-  const secondCableTypeColumn = findCableTypeColumn(secondHeaders);
-  const secondCableNoColumn = findCableNoColumn(secondHeaders);
-  const secondLengthColumns = findLengthColumns(secondHeaders);
-  const hasSecondHeaderColumns = secondCableNoColumn >= 0 || secondLengthColumns.length > 0;
-
-  const useTwoRowHeader = firstCableTypeColumn >= 0 && hasSecondHeaderColumns;
-  const headerRowCount = useTwoRowHeader ? 2 : 1;
-  const primaryHeaders = useTwoRowHeader ? secondHeaders : firstHeaders;
-  const fallbackHeaders = useTwoRowHeader ? firstHeaders : secondHeaders;
-  const hasDataHeaders = hasCableDataHeaders(primaryHeaders)
-    || hasCableDataHeaders(fallbackHeaders);
+  const headerRows = rows.slice(0, Math.min(rows.length, 3));
+  const firstHeaders = headerRows[0] || [];
+  const dataHeaderRowIndex = headerRows.reduce<number>((selectedIndex, headers, index) => (
+    findCableNoColumn(headers) >= 0 || findLengthColumns(headers).length > 0
+      ? index
+      : selectedIndex
+  ), -1);
+  const cableTypeHeaderRowIndex = headerRows.findIndex(
+    headers => findCableTypeColumn(headers) >= 0,
+  );
+  const headerRowCount = Math.max(dataHeaderRowIndex, cableTypeHeaderRowIndex) + 1;
+  const primaryHeaders = dataHeaderRowIndex >= 0
+    ? headerRows[dataHeaderRowIndex]
+    : firstHeaders;
+  const hasDataHeaders = dataHeaderRowIndex >= 0
+    || headerRows.some(hasCableDataHeaders);
 
   if (!hasDataHeaders) return null;
 
-  let cableTypeCol = useTwoRowHeader
-    ? firstCableTypeColumn
-    : firstCableTypeColumn >= 0
-      ? firstCableTypeColumn
-      : secondCableTypeColumn;
+  let cableTypeCol = cableTypeHeaderRowIndex >= 0
+    ? findCableTypeColumn(headerRows[cableTypeHeaderRowIndex])
+    : -1;
   let inferredCableTypeColumn = false;
 
   if (cableTypeCol === -1) {
@@ -552,9 +566,7 @@ export function detectSheetColumns(
 
   if (cableTypeCol === -1) return null;
 
-  const explicitCableNoColumn = useTwoRowHeader
-    ? secondCableNoColumn
-    : findCableNoColumn(primaryHeaders);
+  const explicitCableNoColumn = findCableNoColumn(primaryHeaders);
   const explicitCableNoColumns = findCableNoColumns(primaryHeaders);
   const inferredCableNoColumn = inferredCableTypeColumn
     ? inferCableNoColumnAfterType(rows, primaryHeaders, cableTypeCol, headerRowCount)
@@ -569,26 +581,24 @@ export function detectSheetColumns(
     : inferredCableNoColumn >= 0
       ? [inferredCableNoColumn]
       : [];
-  const lengthCols = useTwoRowHeader
-    ? secondLengthColumns
-    : findLengthColumns(primaryHeaders);
+  const lengthCols = findLengthColumns(primaryHeaders);
   const primaryDateTimeColumn = findDateTimeColumn(primaryHeaders);
   const dateTimeCol = primaryDateTimeColumn >= 0
     ? primaryDateTimeColumn
-    : findDateTimeColumn(fallbackHeaders);
-  const sourceLabelCols = [
-    ...findSourceLabelColumns(primaryHeaders),
-    ...findSourceLabelColumns(fallbackHeaders),
-  ];
+    : headerRows.reduce<number>((column, headers) => (
+      column >= 0 ? column : findDateTimeColumn(headers)
+    ), -1);
+  const sourceLabelCols = [...new Set(headerRows.flatMap(findSourceLabelColumns))];
 
   const isCrossSheet = sheetName.toLowerCase().includes('cross');
-  const structuralHeaders = useTwoRowHeader
-    ? [...firstHeaders, ...secondHeaders]
-    : primaryHeaders;
+  const structuralHeaders = headerRows.slice(0, headerRowCount).flat();
   const hasOdfColumns = structuralHeaders
     .some(header => normalizeLower(header).includes('odf'));
   const isOdfPath = options.expandOdfSegments === true
     && (isCrossSheet || hasOdfColumns);
+  const odfSegmentCableNoCols = isOdfPath && hasOdfColumns
+    ? findOdfSegmentCableNoColumns(primaryHeaders, cableNoCols)
+    : [];
   const hasSegmentStructure = cableNoCols.length > 1 || lengthCols.length > 1;
   const hasMatchingCableNumberRows = rows
     .slice(headerRowCount)
@@ -597,7 +607,10 @@ export function detectSheetColumns(
       && cableNoCols.some(column => normalizeCell(row[column]))
     ));
   const cableSegmentColumns = isOdfPath
-    ? pairCableSegmentColumns(primaryHeaders, cableNoCols, lengthCols)
+    ? pairCableSegmentColumns(primaryHeaders, cableNoCols, lengthCols).map(segment => ({
+        ...segment,
+        isOdfSegment: odfSegmentCableNoCols.includes(segment.cableNoColumn),
+      }))
     : [];
   const hasCompleteSegmentColumns = cableSegmentColumns.length >= 2;
   if (
@@ -617,7 +630,7 @@ export function detectSheetColumns(
     ? 'expandSegments'
     : 'firstNonEmpty';
   const shouldSumSegmentLengths = !hasCompleteSegmentColumns
-    && (isCrossSheet || useTwoRowHeader);
+    && (isCrossSheet || headerRowCount > 1);
   const lengthMode: LengthMode = shouldSumSegmentLengths && lengthCols.length >= 2
     ? 'sumFirstTwoPlus50'
     : 'firstNumeric';
@@ -637,7 +650,7 @@ export function detectSheetColumns(
     sourceLabelCols,
     detectedColumns: {
       cableType: normalizeCell(firstHeaders[cableTypeCol])
-        || normalizeCell(secondHeaders[cableTypeCol])
+        || headerRows.slice(1).map(headers => normalizeCell(headers[cableTypeCol])).find(Boolean)
         || `推断列 ${XLSX.utils.encode_col(cableTypeCol)}`,
       cableNo: cableNoName
         || (cableNoCol >= 0 ? `推断列 ${XLSX.utils.encode_col(cableNoCol)}` : '自动序号'),
@@ -646,7 +659,10 @@ export function detectSheetColumns(
         : null,
       dateTime: dateTimeCol >= 0
         ? normalizeCell(primaryHeaders[dateTimeCol])
-          || normalizeCell(fallbackHeaders[dateTimeCol])
+          || headerRows
+            .map(headers => normalizeCell(headers[dateTimeCol]))
+            .find(Boolean)
+          || null
         : null,
     },
   };
@@ -678,7 +694,18 @@ export function readCableSegments(
   row: ExcelRow,
   columns: CableSegmentColumns[],
 ): CableSegment[] {
-  return columns.map(({ cableNoColumn, lengthColumn }, expansionIndex) => ({
+  const populatedOdfSegments = columns.filter(({ cableNoColumn, isOdfSegment }) => (
+    isOdfSegment && normalizeCell(row[cableNoColumn])
+  ));
+  const expandedColumns = columns.map((segment, expansionIndex) => ({
+    ...segment,
+    expansionIndex,
+  }));
+  const selectedColumns = populatedOdfSegments.length >= 2
+    ? expandedColumns.filter(segment => segment.isOdfSegment)
+    : expandedColumns;
+
+  return selectedColumns.map(({ cableNoColumn, lengthColumn, expansionIndex }) => ({
     cableNumber: normalizeCell(row[cableNoColumn]),
     length: lengthColumn === null ? null : readNumber(row, lengthColumn),
     expansionIndex,
