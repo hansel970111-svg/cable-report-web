@@ -590,16 +590,19 @@ export function detectSheetColumns(
   const isOdfPath = options.expandOdfSegments === true
     && (isCrossSheet || hasOdfColumns);
   const hasSegmentStructure = cableNoCols.length > 1 || lengthCols.length > 1;
-  const hasMatchingDataRows = rows
+  const hasMatchingCableNumberRows = rows
     .slice(headerRowCount)
-    .some(row => typeMatcher(row[cableTypeCol]));
+    .some(row => (
+      typeMatcher(row[cableTypeCol])
+      && cableNoCols.some(column => normalizeCell(row[column]))
+    ));
   const cableSegmentColumns = isOdfPath
     ? pairCableSegmentColumns(primaryHeaders, cableNoCols, lengthCols)
     : [];
   const hasCompleteSegmentColumns = cableSegmentColumns.length >= 2;
   if (
     isOdfPath
-    && hasMatchingDataRows
+    && hasMatchingCableNumberRows
     && (hasOdfColumns || hasSegmentStructure)
     && !hasCompleteSegmentColumns
   ) {

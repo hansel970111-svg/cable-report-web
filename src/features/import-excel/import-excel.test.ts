@@ -446,6 +446,38 @@ describe('legacy parsing rules', () => {
     expect(result.metadata.detectedColumns.length).toBe('长度, 长度, 长度');
   });
 
+  it('does not pair an endpoint length with a globally blank optional ODF Cable Label column', () => {
+    const result = importExcel(workbookInput([
+      ['DSW-PSW', [
+        [
+          'A设备', 'A位置', 'U位', 'A端口',
+          'A-ODF设备', 'A-ODF位置', 'A-ODF端口', '数量', '路由', '长度', '线号', 'A对端',
+          '',
+          'Z-ODF设备', 'Z-ODF位置', 'U位', 'Z-ODF端口', '备注', '数量', '路由', '线号', 'Z对端',
+          'Z设备', 'SN', 'Z位置', 'U位', 'Z端口', '线缆类型', '长度', '路由', '数量', '线号',
+          '项目号',
+        ],
+        [
+          'OGFW-A', 'OE38_B2-2_B08-41', 41, 'GE0/0/13',
+          'ODF', 'OE38_B2-2_A04-45', 'Port 2', 1, '南桥', 20, '#3', 'OGFW-A-REMOTE',
+          '',
+          'ODF', 'OE38_A1-1-A05-26', '', 'Port 2', '', '', '', '', 'OGFW-Z-REMOTE',
+          'OGFW-Z', 'DS1825AX0105', 'OE38_A1-1_A04-42', 42, 'GE0/0/13', '1G,SM,LC-LC', 15, '直连', 1, '#5',
+          '[OE38-N248]',
+        ],
+      ]],
+    ]), 'LC');
+
+    expect(result.rows.map(row => ({
+      cableNumber: row.cableNumber,
+      length: row.length,
+      expansionIndex: row.source.expansionIndex,
+    }))).toEqual([
+      { cableNumber: '#3', length: 20, expansionIndex: 0 },
+      { cableNumber: '#5', length: 15, expansionIndex: 1 },
+    ]);
+  });
+
   it('pairs ODF labels with length columns by physical column order', () => {
     const result = importExcel(workbookInput([
       ['Cross Connect', [
@@ -527,6 +559,18 @@ describe('legacy parsing rules', () => {
         ]],
       ]), 'LC'),
       { code: 'ODF_SEGMENT_COLUMNS_INVALID', retryable: false, field: 'file' },
+    );
+  });
+
+  it('does not reject an empty ODF placeholder row as an incomplete segment layout', () => {
+    expectImportError(
+      () => importExcel(workbookInput([
+        ['ODF Links', [
+          ['线缆类型', '线号', '长度', 'A-ODF设备'],
+          ['SM,LC-LC', '', '', 'ODF-A'],
+        ]],
+      ]), 'LC'),
+      { code: 'NO_MATCHING_ROWS', retryable: false },
     );
   });
 
