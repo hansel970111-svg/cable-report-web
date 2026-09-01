@@ -1,4 +1,5 @@
 import type { CableImportRow, CableType, ReportDraft } from './model';
+import { REPORT_FIELD_LIMITS } from './schema';
 
 const TEMPLATE_ASSETS: Readonly<Record<CableType, string>> = Object.freeze({
   'Cat 5e': 'assets/M138-DE46-OOB-Cat5e.pdf',
@@ -38,11 +39,26 @@ export function defaultLimitForCableType(cableType: CableType): string {
   return 'TIA - Cat 5e Channel';
 }
 
+function shortenVerticalCableLabel(cableNumber: string): string {
+  const label = cableNumber.replace(/^#/, '');
+  if (label.length <= REPORT_FIELD_LIMITS.cableLabel) return label;
+
+  // First remove the campus prefix, for example "NL235_".
+  const withoutCampusPrefix = label.replace(/^[^_]+_/, '');
+  if (withoutCampusPrefix.length <= REPORT_FIELD_LIMITS.cableLabel) {
+    return withoutCampusPrefix;
+  }
+
+  // For two-digit-and-above ports, also remove the leading rack prefix such
+  // as "A0-1_", leaving the rack/port identifier intact.
+  return withoutCampusPrefix.replace(/^[A-Za-z]+\d+-\d+_/, '');
+}
+
 export function buildCableLabel(row: CableImportRow, cableType: CableType): string {
   const cableNumber = row.cableNumber.trim();
 
   if (cableType === 'Cat 5e (Vertical Cabling)') {
-    return cableNumber.replace(/^#/, '');
+    return shortenVerticalCableLabel(cableNumber);
   }
 
   if (cableType === 'MPO') {
