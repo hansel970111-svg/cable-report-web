@@ -144,6 +144,35 @@ test('does not apply the yellow OOB result rule to Vertical Cabling', () => {
   expect(random.calls()).toBe(3);
 });
 
+test('shortens overlength Vertical Cabling labels and numbers in two stages', () => {
+  const rows = [
+    importRow({ cableNumber: 'NL235_A0-1_A07-24-1' }),
+    importRow({
+      cableNumber: 'NL235_A0-1_A07-24-10',
+      source: {
+        sheetName: 'Vertical Cabling', rowNumber: 3, expansionIndex: 0, rule: 'vertical-cabling',
+      },
+    }),
+  ];
+
+  const records = mapImportedRows(rows, {
+    cableType: 'Cat 5e (Vertical Cabling)',
+    startingDateTime: '10-07-2026 09:00:00 AM',
+    random: { next: () => 0.5 },
+    idFactory: defaultRecordIdFactory,
+  });
+
+  expect(records.map(record => ({
+    cableLabel: record.cableLabel,
+    cableNumber: record.cableNumber,
+  }))).toEqual([
+    { cableLabel: 'A0-1_A07-24-1', cableNumber: 'A0-1_A07-24-1' },
+    { cableLabel: 'A07-24-10', cableNumber: 'A07-24-10' },
+  ]);
+  expect(records.every(record => record.cableLabel.length <= 13)).toBe(true);
+  expect(records.every(record => record.cableNumber.length <= 13)).toBe(true);
+});
+
 test('normalizes a pre-suffixed yellow Cat5e source without duplicating console', () => {
   const random = sequence([0.5, 0.79, 0.25]);
   const [record] = mapImportedRows([importRow({

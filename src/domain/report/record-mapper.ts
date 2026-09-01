@@ -49,6 +49,7 @@ export function mapImportedRows(
     const nextMargin = Number(((highMargin ? 11 : 9) + options.random.next() * 2).toFixed(1));
     const cableLabel = buildCableLabel(row, options.cableType);
     const cableNumber = options.cableType === 'Cat 5e'
+      || options.cableType === 'Cat 5e (Vertical Cabling)'
       ? cableNumberFromCableLabel(cableLabel, options.cableType)
       : normalizeCableNumber(row.cableNumber, options.cableType);
 
